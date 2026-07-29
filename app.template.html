@@ -471,27 +471,14 @@ initSchema(SCHEMA);
 
 const $ = s => document.querySelector(s);
 
-// 파이프라인을 왼쪽에서 오른쪽으로 훑을 때 색이 한 바퀴 도는 순서.
-const ACCENT = {
-  run:'#4B2ED4', connect:'#0F6FB8', extract:'#0E7C86', select:'#137A57',
-  format:'#6E7A12', download:'#A66A00', process:'#B4471F', store:'#A6265E', report:'#5B5566',
-};
-const IO_ACCENT = { src:'#137A57', out:'#141C19' };
+const ACCENT = STAGE_ACCENT;   // 단계 색은 레지스트리가 갖는다
 /* ══ 포맷 셀렉터 문법 ════════════════════════
-   파서·컴파일러·어휘는 core/format-grammar.js 로 옮겼다. 브라우저 없이
-   단위 테스트되는 유일한 층이라 따로 떼어 둘 값어치가 있다.
-   노드 종류의 표기·색은 UI 관심사라 여기 남는다. */
-const FTYPE = {
-  stream:   { label:'스트림',  tag:'stream',   accent:'#137A57', blurb:'어떤 스트림을 고를지' },
-  merge:    { label:'병합',    tag:'+',        accent:'#0F6FB8', blurb:'영상과 음성을 한 파일로 합친다' },
-  fallback: { label:'폴백',    tag:'/',        accent:'#A66A00', blurb:'앞의 것이 없으면 다음 것' },
-  multi:    { label:'동시',    tag:',',        accent:'#A6265E', blurb:'여러 포맷을 한꺼번에 받는다' },
-  fout:     { label:'-f 출력', tag:'format',   accent:'#141C19', blurb:'여기 이어진 표현식이 --format 값이 된다' },
-};
+   파서·컴파일러·어휘는 core/format-grammar.js,
+   노드 종류의 표기·색·포트는 ui/node-kinds.js 에 있다. */
 const FOP_TYPES = FORMAT_OPS;
 /* ══ 그래프 상태 ═════════════════════════════ */
 const NODE_W = 300, HEAD_H = 34;
-const PROTECTED = new Set([SRC, OUT, FOUT]);
+const PROTECTED = protectedIds();   // 각 그래프의 고정 끝점
 
 let state, view, seq;
 const ui = {
@@ -525,19 +512,7 @@ const measuredHeight = id => {
 };
 const filtersOf = n => (n.filters ||= []);
 
-function accentOf(n) {
-  if (n.type === 'stage') return ACCENT[n.stage];
-  if (FTYPE[n.type]) return FTYPE[n.type].accent;
-  return IO_ACCENT[n.id] || ACCENT.run;
-}
-function setCount(n) {
-  if (n.type === 'stage') {
-    const v = valuesOf(n);
-    return Object.keys(v).filter(k => v[k] !== '').length;
-  }
-  if (n.type === 'stream') return filtersOf(n).length;
-  return 0;
-}
+const setCount = n => badgeOf(n);
 
 /* ── 그래프 질의 (모드 공용) ─────────────── */
 // 원시 연산은 core/graph.js, 의미론은 core/pipeline.js · core/format-graph.js.
@@ -570,7 +545,7 @@ function addStageNode(sid, x, y) {
 /* ── 포맷 서브그래프 전용 ────────────────── */
 // 트리 ↔ 그래프 변환과 문제 진단은 core/format-graph.js 에 있다.
 const opsOf = id => operands(state.format, id);
-const fmtIssues = () => formatIssues(state.format, t => FTYPE[t].tag);
+const fmtIssues = () => formatIssues(state.format, tagOfType);
 const fmtExpr = () => formatExpr(state.format);
 
 function addFormatNode(type, x, y, extra) {
@@ -597,8 +572,7 @@ function toWorld(clientX, clientY) {
   return { x: (clientX - r.left - view.x) / view.k, y: (clientY - r.top - view.y) / view.k };
 }
 const portPos = n => ({ inX: n.x, outX: n.x + NODE_W, y: n.y + HEAD_H / 2 });
-const hasInPort = n => !(n.id === 'src' || n.type === 'stream');
-const hasOutPort = n => !(n.id === 'out' || n.type === 'fout');
+const hasInPort = hasIn, hasOutPort = hasOut;
 
 /* ══ 명령어 조립 ═════════════════════════════ */
 // 조립·해석은 core/pipeline.js 에 있다. 여기서는 현재 상태를 넘기기만 한다.
@@ -892,7 +866,7 @@ function opBody(n, body) {
   const ins = opsOf(n.id);
   const box = document.createElement('div');
   box.className = 'ops';
-  box.innerHTML = `<div>${FTYPE[n.type].blurb} · 입력은 <b>세로 위치 순서</b>다.</div>`;
+  box.innerHTML = `<div>${blurbOf(n)} · 입력은 <b>세로 위치 순서</b>다.</div>`;
   if (!ins.length) {
     box.insertAdjacentHTML('beforeend', '<div class="warn">이어진 입력이 없다.</div>');
   } else {
@@ -905,7 +879,7 @@ function opBody(n, body) {
     box.append(ol);
     if (ins.length === 1) {
       box.insertAdjacentHTML('beforeend',
-        `<div class="warn">입력이 하나뿐이라 <code>${FTYPE[n.type].tag}</code> 는 그냥 통과된다.</div>`);
+        `<div class="warn">입력이 하나뿐이라 <code>${tagOf(n)}</code> 는 그냥 통과된다.</div>`);
     }
   }
   body.append(box);
@@ -932,22 +906,82 @@ function foutBody(n, body) {
   }
 }
 
+/* ── 노드 본문 등록 ──────────────────────── */
+// 노드 종류를 추가하려면 defineKind 한 줄과 defineBody 한 줄이면 된다.
+
+defineBody('source', (n, body) => {
+  const ta = document.createElement('textarea');
+  ta.value = n.urls || '';
+  ta.spellcheck = false;
+  ta.placeholder = 'https://…  — 한 줄에 하나';
+  ta.oninput = () => { n.urls = ta.value; renderAfterEdit(); };
+  const note = document.createElement('div');
+  note.className = 'node-note';
+  note.textContent = '명령어 맨 뒤에 붙는 대상 URL.';
+  body.append(ta, note);
+});
+
+defineBody('sink', (n, body) => {
+  const toks = tokensNow();
+  const note = document.createElement('div');
+  note.className = 'node-note';
+  note.textContent = '여기까지 이어진 노드만 아래 명령어에 들어간다.';
+  const stat = document.createElement('div');
+  stat.className = 'sink-stat';
+  stat.innerHTML = `<span>토큰 ${toks.length}</span>`
+    + `<span>단계 ${new Set(toks.map(t => t.node)).size}</span>`
+    + `<span>URL ${urlsNow().length}</span>`;
+  body.append(note, stat);
+});
+
+defineBody('stage', (n, body) => {
+  const vals = valuesOf(n);
+  const rows = BY_STAGE[n.stage].filter(o => o.id in vals);
+  if (!rows.length) {
+    const note = document.createElement('div');
+    note.className = 'node-note';
+    note.textContent = blurbOf(n) + ' — 아직 고른 옵션이 없다.';
+    body.append(note);
+  }
+  for (const o of rows) body.append(optRow(n, o));
+
+  if (ui.picker && ui.picker.node === n.id) {
+    const box = document.createElement('div');
+    box.className = 'picker';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.spellcheck = false;
+    inp.placeholder = labelOf(n) + ' 옵션 검색…';
+    inp.value = ui.picker.q;
+    const ul = document.createElement('ul');
+    inp.oninput = () => { ui.picker.q = inp.value; renderPickerList(n, ul, inp.value); };
+    inp.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); ui.picker = null; render(); } };
+    box.append(inp, ul);
+    body.append(box);
+    renderPickerList(n, ul, ui.picker.q);
+    queueMicrotask(() => inp.focus());
+  } else {
+    const add = document.createElement('button');
+    add.className = 'add'; add.type = 'button'; add.textContent = '+ 옵션';
+    add.onclick = () => { ui.picker = { node:n.id, q:'' }; render(); };
+    body.append(add);
+  }
+});
+
+defineBody('stream', (n, body) => streamBody(n, body));
+for (const type of FOP_TYPES) defineBody(type, (n, body) => opBody(n, body));
+defineBody('fout', (n, body) => foutBody(n, body));
+
 /* ── 노드 ────────────────────────────────── */
 function headLabel(n) {
-  if (n.type === 'stage')
-    return `<span class="node-tag">[${n.stage}]</span><span class="node-ko">${STAGE[n.stage].label}<span class="node-badge">우회</span></span>`;
-  if (n.id === 'src')
-    return `<span class="node-tag">[source]</span><span class="node-ko">소스<span class="node-badge">끊김</span></span>`;
-  if (n.id === 'out')
-    return `<span class="node-tag">[command]</span><span class="node-ko">명령어<span class="node-badge">끊김</span></span>`;
-  const f = FTYPE[n.type];
-  return `<span class="node-tag">[${f.tag}]</span><span class="node-ko">${f.label}<span class="node-badge">끊김</span></span>`;
+  const badge = bypassLabelOf(n);
+  return `<span class="node-tag">[${tagOf(n)}]</span>`
+       + `<span class="node-ko">${labelOf(n)}<span class="node-badge">${badge}</span></span>`;
 }
 
 function nodeEl(n, live) {
-  const isIO = n.type === 'source' || n.type === 'sink' || n.type === 'fout';
+  const io = isIO(n);
   const el = document.createElement('div');
-  el.className = 'node' + (isIO ? ' io' : '')
+  el.className = 'node' + (io ? ' io' : '')
     + (live.has(n.id) ? '' : ' bypass') + (ui.sel === n.id ? ' sel' : '')
     + (n.collapsed ? ' collapsed' : '');
   el.dataset.id = n.id;
@@ -980,73 +1014,14 @@ function nodeEl(n, live) {
   } else {
     head.append(document.createElement('span'));
   }
-  head.title = n.type === 'stage' ? STAGE[n.stage].blurb
-             : FTYPE[n.type] ? FTYPE[n.type].blurb : '';
+  head.title = blurbOf(n);
   head.ondblclick = toggle;
   el.append(head);
 
   const body = document.createElement('div');
   body.className = 'node-body';
+  bodyOf(n.type)(n, body);          // 어떤 본문을 그릴지는 레지스트리가 안다
 
-  if (n.id === 'src') {
-    const ta = document.createElement('textarea');
-    ta.value = n.urls || '';
-    ta.spellcheck = false;
-    ta.placeholder = 'https://…  — 한 줄에 하나';
-    ta.oninput = () => { n.urls = ta.value; renderAfterEdit(); };
-    const note = document.createElement('div');
-    note.className = 'node-note';
-    note.textContent = '명령어 맨 뒤에 붙는 대상 URL.';
-    body.append(ta, note);
-  } else if (n.id === 'out') {
-    const toks = tokensNow();
-    const note = document.createElement('div');
-    note.className = 'node-note';
-    note.textContent = '여기까지 이어진 노드만 아래 명령어에 들어간다.';
-    const stat = document.createElement('div');
-    stat.className = 'sink-stat';
-    stat.innerHTML = `<span>토큰 ${toks.length}</span>`
-      + `<span>단계 ${new Set(toks.map(t => t.node)).size}</span>`
-      + `<span>URL ${urlsNow().length}</span>`;
-    body.append(note, stat);
-  } else if (n.type === 'stream') {
-    streamBody(n, body);
-  } else if (FOP_TYPES.includes(n.type)) {
-    opBody(n, body);
-  } else if (n.type === 'fout') {
-    foutBody(n, body);
-  } else {
-    const vals = valuesOf(n);
-    const rows = BY_STAGE[n.stage].filter(o => o.id in vals);
-    if (!rows.length) {
-      const note = document.createElement('div');
-      note.className = 'node-note';
-      note.textContent = STAGE[n.stage].blurb + ' — 아직 고른 옵션이 없다.';
-      body.append(note);
-    }
-    for (const o of rows) body.append(optRow(n, o));
-
-    if (ui.picker && ui.picker.node === n.id) {
-      const box = document.createElement('div');
-      box.className = 'picker';
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.spellcheck = false;
-      inp.placeholder = STAGE[n.stage].label + ' 옵션 검색…';
-      inp.value = ui.picker.q;
-      const ul = document.createElement('ul');
-      inp.oninput = () => { ui.picker.q = inp.value; renderPickerList(n, ul, inp.value); };
-      inp.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); ui.picker = null; render(); } };
-      box.append(inp, ul);
-      body.append(box);
-      renderPickerList(n, ul, ui.picker.q);
-      queueMicrotask(() => inp.focus());
-    } else {
-      const add = document.createElement('button');
-      add.className = 'add'; add.type = 'button'; add.textContent = '+ 옵션';
-      add.onclick = () => { ui.picker = { node:n.id, q:'' }; render(); };
-      body.append(add);
-    }
-  }
   if (!n.collapsed) el.append(body);
 
   if (hasInPort(n)) {
@@ -1087,6 +1062,7 @@ function renderNodes() {
 
 function renderPalette() {
   const list = $('#pal-list');
+  const mode = ui.mode;
   list.innerHTML = '';
   $('#pal-head').textContent = inFormat() ? '포맷 노드' : '실행 단계';
   $('#pal-hint').innerHTML = inFormat()
@@ -1094,33 +1070,20 @@ function renderPalette() {
     : '캔버스로 끌어다 놓거나 클릭해서 노드를 만든다. 소스에서 명령어까지 <b>이어진 노드만</b> 결과에 들어간다.';
   $('#autowire').hidden = inFormat();
 
-  if (inFormat()) {
-    for (const type of ['stream', ...FOP_TYPES]) {
-      const f = FTYPE[type];
-      const b = document.createElement('button');
-      b.className = 'pal-item';
-      b.type = 'button';
-      b.dataset.fnode = type;
-      b.style.setProperty('--a', f.accent);
-      b.title = f.blurb;
-      b.innerHTML = `<span class="dot"></span>`
-        + `<span class="tag">[<b>${f.tag}</b>]<span class="ko">${f.label}</span></span><span></span>`;
-      list.append(b);
-    }
-    return;
-  }
-
-  for (const s of STAGES) {
-    const placed = stageOf(s.id);
+  // 항목도, 표기도, 색도 전부 레지스트리에서 나온다.
+  for (const item of paletteItems(mode, STAGES)) {
+    const placed = item.kind === 'stage' ? stageOf(item.key) : null;
+    const n = placed ? setCount(placed) : 0;
     const b = document.createElement('button');
     b.className = 'pal-item' + (placed ? ' placed' : '');
     b.type = 'button';
-    b.dataset.stage = s.id;
-    b.style.setProperty('--a', ACCENT[s.id]);
-    b.title = s.blurb + (placed ? ' · 이미 캔버스에 있다' : '');
+    if (item.kind === 'stage') b.dataset.stage = item.key;
+    else b.dataset.fnode = item.key;
+    b.style.setProperty('--a', item.accent);
+    b.title = item.blurb + (placed ? ' · 이미 캔버스에 있다' : '');
     b.innerHTML = `<span class="dot"></span>`
-      + `<span class="tag">[<b>${s.id}</b>]<span class="ko">${s.label}</span></span>`
-      + (placed && setCount(placed) ? `<span class="n">${setCount(placed)}</span>` : '<span></span>');
+      + `<span class="tag">[<b>${item.tag}</b>]<span class="ko">${item.label}</span></span>`
+      + (n ? `<span class="n">${n}</span>` : '<span></span>');
     list.append(b);
   }
 }
@@ -1498,8 +1461,9 @@ $('#pal-list').addEventListener('pointerdown', e => {
     if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
       ghost = document.createElement('div');
       ghost.className = 'pal-ghost';
-      ghost.style.setProperty('--a', ftype ? FTYPE[ftype].accent : ACCENT[sid]);
-      ghost.textContent = ftype ? `[${FTYPE[ftype].tag}] ${FTYPE[ftype].label}` : `[${sid}] ${STAGE[sid].label}`;
+      const meta = paletteItems(ui.mode, STAGES).find(x => x.key === (ftype || sid));
+      ghost.style.setProperty('--a', meta.accent);
+      ghost.textContent = `[${meta.tag}] ${meta.label}`;
       document.body.append(ghost);
     }
     if (ghost) { ghost.style.left = (ev.clientX + 12) + 'px'; ghost.style.top = (ev.clientY + 12) + 'px'; }

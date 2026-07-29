@@ -26,6 +26,7 @@ MODULES = [
     "src/core/pipeline.js",
     "src/core/layout.js",
     "src/core/persist.js",
+    "src/ui/node-kinds.js",
 ]
 
 IMPORT_RE = re.compile(r"^\s*import\s[^;]*?;\s*$", re.M)

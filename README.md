@@ -3,7 +3,8 @@
 yt-dlp 옵션을 **노드 그래프**로 조립한다. 의존성 없는 단일 HTML 파일 하나로 굽는다.
 
 ```
-python build.py            # → dist/ytdlp-studio.html
+npm run build     # → dist/ytdlp-studio.html
+npm test          # 단위(node) + e2e(playwright)
 ```
 
 브라우저로 그 파일을 열면 끝이다. 서버도, 번들러도, 네트워크도 필요 없다.
@@ -91,12 +92,32 @@ multi    := fallback (',' …)*     bv,ba
 
 ## 구성
 
-| 파일 | 하는 일 |
-|---|---|
-| `gen_schema.py` | yt-dlp의 optparse 트리를 리플렉션해 `schema.json`으로 떨군다 |
-| `schema.json` | 191개 옵션 · 9개 생애주기 단계 (yt-dlp 2026.07.04 기준) |
-| `app.template.html` | 노드 에디터 본체 + 포맷 셀렉터 파서/컴파일러. `/*__SCHEMA__*/{}` 자리에 스키마가 인라인된다 |
-| `build.py` | 둘을 합쳐 `dist/ytdlp-studio.html` 하나로 굽는다 |
+```
+src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
+  schema.js          색인 · 검색 · KO 사전
+  graph.js           adjacency · reach · connect · removeNode · topoOrder
+  format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
+  format-graph.js    트리 ↔ 그래프 · 문제 진단
+  pipeline.js        livePath · buildTokens · 명령어 조립/해석
+  layout.js          정돈 · 화면 맞춤 · 줌 계산 (높이는 인자로 받는다)
+  persist.js         스냅샷 · 복원 · 마이그레이션
+src/ui/
+  node-kinds.js      노드 종류 레지스트리
+app.template.html    캔버스 · 렌더 · 포인터 · 배선
+gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
+build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
+tests/unit/          브라우저 없이 도는 43종
+tests/e2e/           실제로 조작해 보는 41종
+```
+
+**번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
+`build.py` 가 의존 순서대로 이어 붙이며 `import`/`export` 만 걷어낸다. 이름이
+겹치면 빌드가 막는다. 덕분에 소스는 진짜 ES 모듈로 남아 `node --test` 로 돌고,
+산출물은 의존성 0 의 HTML 한 장으로 남는다.
+
+**노드 종류를 추가하려면** `src/ui/node-kinds.js` 에 `defineKind` 한 줄,
+본문을 그린다면 `defineBody` 한 줄이면 된다. 색·표기·포트 유무·배지·팔레트
+노출은 전부 그 표에서 나온다.
 
 스키마는 help 텍스트를 긁는 게 아니라 옵션 객체를 직접 읽는다. yt-dlp를 올리면
 스키마도 따라 올라간다. 릴리스마다 재실행할 것:
@@ -108,7 +129,7 @@ python build.py
 ```
 
 손으로 정한 건 두 군데뿐이다. `gen_schema.py`의 **optparse 그룹 → 생애주기 단계**
-매핑(16 → 9)과, `app.template.html`의 **한국어 의도 → yt-dlp 어휘** 사전(`KO`).
+매핑(16 → 9)과, `src/core/schema.js`의 **한국어 의도 → yt-dlp 어휘** 사전(`KO`).
 후자가 이 도구의 실제 부가가치다. "자막", "403", "이어받기" 같은 말로 검색이
 걸리게 하는 층은 introspection이 절대 못 준다. 안 걸리는 말이 나오면 계속 채울 것.
 

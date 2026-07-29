@@ -253,3 +253,57 @@ test('모르는 단계의 노드는 버린다 — 스키마가 바뀌어도 안 
   });
   assert.equal(r.state.nodes.old, undefined);
 });
+
+/* ── ui/node-kinds.js ────────────────────── */
+test('노드 레지스트리가 모든 종류를 안다', async () => {
+  const { initSchema } = await import('../../src/core/schema.js');
+  const raw = JSON.parse(
+    await (await import('node:fs/promises')).readFile(
+      new URL('../../schema.json', import.meta.url), 'utf8'));
+  initSchema(raw);
+  const K = await import('../../src/ui/node-kinds.js');
+
+  for (const type of ['source', 'sink', 'stage', 'stream', 'merge', 'fallback', 'multi', 'fout']) {
+    assert.ok(K.kindByType(type), `${type} 이 등록되지 않았다`);
+  }
+
+  // 끝점은 지울 수 없다
+  assert.deepEqual([...K.protectedIds()].sort(), ['fout', 'out', 'src']);
+
+  // 포트는 그래프의 끝을 막는다
+  assert.equal(K.hasIn({ type: 'source' }), false, '소스에 입력이 있다');
+  assert.equal(K.hasOut({ type: 'sink' }), false, '명령어에 출력이 있다');
+  assert.equal(K.hasIn({ type: 'stream' }), false, '스트림에 입력이 있다');
+  assert.equal(K.hasOut({ type: 'fout' }), false, '-f 출력에 출력이 있다');
+
+  // 단계 노드는 자기 stage 에서 표기·색을 끌어온다
+  const n = { type: 'stage', stage: 'format' };
+  assert.equal(K.tagOf(n), 'format');
+  assert.equal(K.labelOf(n), '포맷');
+  assert.equal(K.accentOf(n), K.STAGE_ACCENT.format);
+  assert.equal(K.bypassLabelOf(n), '우회');
+  assert.equal(K.bypassLabelOf({ type: 'stream' }), '끊김');
+
+  // 배지
+  assert.equal(K.badgeOf({ type: 'stage', values: { a: 1, b: '', c: 3 } }), 2);
+  assert.equal(K.badgeOf({ type: 'stream', filters: [1, 2] }), 2);
+  assert.equal(K.badgeOf({ type: 'fout' }), 0);
+});
+
+test('팔레트 항목이 레지스트리에서 나온다', async () => {
+  const { initSchema, STAGES } = await import('../../src/core/schema.js');
+  const raw = JSON.parse(
+    await (await import('node:fs/promises')).readFile(
+      new URL('../../schema.json', import.meta.url), 'utf8'));
+  initSchema(raw);
+  const K = await import('../../src/ui/node-kinds.js');
+
+  const pipe = K.paletteItems('pipeline', STAGES);
+  assert.equal(pipe.length, 9, '단계 9개가 안 나온다');
+  assert.ok(pipe.every(i => i.accent && i.label && i.tag));
+
+  const fmt = K.paletteItems('format');
+  assert.deepEqual(fmt.map(i => i.key), ['stream', 'merge', 'fallback', 'multi']);
+  // 끝점은 팔레트에 안 나온다 — 캔버스에 이미 하나씩 있다
+  assert.ok(!fmt.some(i => i.key === 'fout'));
+});
