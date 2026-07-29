@@ -7,9 +7,9 @@ export const name = '포맷 셀렉터 서브그래프';
 
 export default async function ({ p, step, assert, dialogs, setDialog }) {
   const cmd = () => p.textContent('#cmd');
-  const expr = () => p.evaluate(() => formatExpr());
+  const expr = () => p.evaluate(() => __yt.formatExpr());
   const fmtVal = () => p.evaluate(() => {
-    const n = Object.values(state.nodes).find(x => x.stage === 'format');
+    const n = Object.values(__yt.state.nodes).find(x => x.stage === 'format');
     return n ? n.values.format : null;
   });
 
@@ -31,7 +31,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await enter();
     assert(!(await p.locator('#crumb').isHidden()), '브레드크럼이 안 뜸');
     const kinds = await p.evaluate(() =>
-      Object.values(state.format.nodes).map(n => n.type).sort().join(','));
+      Object.values(__yt.state.format.nodes).map(n => n.type).sort().join(','));
     assert(kinds === 'fout,merge,stream,stream', '노드 구성이 다르다: ' + kinds);
     assert(await expr() === 'bv*[height<=720]+ba', '컴파일 결과: ' + await expr());
     return kinds + ' → ' + await expr();
@@ -138,19 +138,19 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('배선: merge → fallback → fout, 스트림 추가로 (…)+ba/b 구성', async () => {
     const ids = await p.evaluate(() => {
-      const g = state.format;
+      const g = __yt.state.format;
       const N = Object.values(g.nodes);
       const merge = N.find(n => n.type === 'merge');
       const fb = N.find(n => n.type === 'fallback');
       // 스트림 하나 더 만들어 b 로 두고, 위치로 순서를 정한다
-      const nb = addFormatNode('stream', merge.x, merge.y + 260, { sel: 'b' });
+      const nb = __yt.addFormatNode('stream', merge.x, merge.y + 260, { sel: 'b' });
       g.edges = g.edges.filter(e => e.to !== 'fout');
-      connect(merge.id, fb.id, g);
-      connect(nb.id, fb.id, g);
-      connect(fb.id, 'fout', g);
+      __yt.connect(merge.id, fb.id, g);
+      __yt.connect(nb.id, fb.id, g);
+      __yt.connect(fb.id, 'fout', g);
       // 폴백 노드는 병합보다 오른쪽에 두어야 읽기 좋다
       fb.x = merge.x + 260; fb.y = merge.y + 120;
-      render();
+      __yt.render();
       return { merge: merge.id, fb: fb.id, nb: nb.id };
     });
     await p.waitForTimeout(250);
@@ -165,21 +165,21 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     const before = await expr();
     // b 스트림을 merge 위로 올리면 폴백 순서가 뒤집혀야 한다
     await p.evaluate(() => {
-      const g = state.format;
+      const g = __yt.state.format;
       const nb = Object.values(g.nodes).find(n => n.type === 'stream' && n.sel === 'b');
       const merge = Object.values(g.nodes).find(n => n.type === 'merge');
       nb.y = merge.y - 300;
-      render();
+      __yt.render();
     });
     await p.waitForTimeout(200);
     const after = await expr();
     assert(after === 'b/bv*[height<=1080]+ba', '뒤집히지 않음: ' + after);
     await p.evaluate(() => {
-      const g = state.format;
+      const g = __yt.state.format;
       const nb = Object.values(g.nodes).find(n => n.type === 'stream' && n.sel === 'b');
       const merge = Object.values(g.nodes).find(n => n.type === 'merge');
       nb.y = merge.y + 300;
-      render();
+      __yt.render();
     });
     await p.waitForTimeout(200);
     assert(await expr() === before, '되돌리기 실패: ' + await expr());
@@ -190,25 +190,25 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     const e = await p.evaluate(() => {
       // (bv/wv)+ba : fallback 을 merge 의 자식으로 넣는다
       const g = { nodes: {}, edges: [], view: { x:0,y:0,k:1 } };
-      state.format = g;
+      __yt.state.format = g;
       g.nodes.fout = { id:'fout', type:'fout', x:900, y:200 };
-      const a = addFormatNode('stream', 0, 0, { sel:'bv' });
-      const b2 = addFormatNode('stream', 0, 120, { sel:'wv' });
-      const c = addFormatNode('stream', 0, 300, { sel:'ba' });
-      const fb = addFormatNode('fallback', 300, 60);
-      const mg = addFormatNode('merge', 600, 180);
-      connect(a.id, fb.id, g); connect(b2.id, fb.id, g);
-      connect(fb.id, mg.id, g); connect(c.id, mg.id, g);
-      connect(mg.id, 'fout', g);
-      render();
-      return formatExpr();
+      const a = __yt.addFormatNode('stream', 0, 0, { sel:'bv' });
+      const b2 = __yt.addFormatNode('stream', 0, 120, { sel:'wv' });
+      const c = __yt.addFormatNode('stream', 0, 300, { sel:'ba' });
+      const fb = __yt.addFormatNode('fallback', 300, 60);
+      const mg = __yt.addFormatNode('merge', 600, 180);
+      __yt.connect(a.id, fb.id, g); __yt.connect(b2.id, fb.id, g);
+      __yt.connect(fb.id, mg.id, g); __yt.connect(c.id, mg.id, g);
+      __yt.connect(mg.id, 'fout', g);
+      __yt.render();
+      return __yt.formatExpr();
     });
     await p.waitForTimeout(200);
     assert(e === '(bv/wv)+ba', 'expr: ' + e);
     // 다시 파싱해도 같은 트리인지
     const stable = await p.evaluate(() => {
-      const s = formatExpr();
-      return emitTree(parseFormat(s)) === s;
+      const s = __yt.formatExpr();
+      return __yt.emitTree(__yt.parseFormat(s)) === s;
     });
     assert(stable, '재파싱 불안정');
     return e;
@@ -216,8 +216,8 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('fout 연결을 끊으면 -f 가 비고 문제가 보고된다', async () => {
     await p.evaluate(() => {
-      state.format.edges = state.format.edges.filter(e => e.to !== 'fout');
-      render();
+      __yt.state.format.edges = __yt.state.format.edges.filter(e => e.to !== 'fout');
+      __yt.render();
     });
     await p.waitForTimeout(200);
     assert(await expr() === '', 'expr가 안 비었다: ' + await expr());
@@ -230,11 +230,11 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('-f 출력은 입력 하나만 받는다 (새로 이으면 교체)', async () => {
     const n = await p.evaluate(() => {
-      const g = state.format;
+      const g = __yt.state.format;
       const streams = Object.values(g.nodes).filter(x => x.type === 'stream');
-      connect(streams[0].id, 'fout', g);
-      connect(streams[1].id, 'fout', g);
-      render();
+      __yt.connect(streams[0].id, 'fout', g);
+      __yt.connect(streams[1].id, 'fout', g);
+      __yt.render();
       return g.edges.filter(e => e.to === 'fout').length;
     });
     assert(n === 1, `fout 입력 ${n}개`);
@@ -243,11 +243,11 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('파이프라인으로 복귀 → -f 값 유지', async () => {
     await p.evaluate(() => {
-      const g = state.format;
+      const g = __yt.state.format;
       const mg = Object.values(g.nodes).find(x => x.type === 'merge');
       g.edges = g.edges.filter(e => e.to !== 'fout');
-      connect(mg.id, 'fout', g);
-      render();
+      __yt.connect(mg.id, 'fout', g);
+      __yt.render();
     });
     await p.waitForTimeout(200);
     const e = await expr();
@@ -262,9 +262,9 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
   });
 
   await step('레이아웃 유지: 다시 들어가도 그래프가 보존된다', async () => {
-    const before = await p.evaluate(() => JSON.stringify(state.format.nodes));
+    const before = await p.evaluate(() => JSON.stringify(__yt.state.format.nodes));
     await enter();
-    const after = await p.evaluate(() => JSON.stringify(state.format.nodes));
+    const after = await p.evaluate(() => JSON.stringify(__yt.state.format.nodes));
     assert(before === after, '그래프가 재생성됨');
     return '노드 배치 그대로';
   });
@@ -276,7 +276,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await p.waitForTimeout(250);
     await enter();
     const kinds = await p.evaluate(() =>
-      Object.values(state.format.nodes).map(n => n.type).sort().join(','));
+      Object.values(__yt.state.format.nodes).map(n => n.type).sort().join(','));
     assert(kinds === 'fallback,fout,merge,stream,stream,stream', '노드 구성: ' + kinds);
     assert(await expr() === 'bv[ext=mp4]+ba[ext=m4a]/b', 'expr: ' + await expr());
     return kinds;
@@ -301,7 +301,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await p.locator('.node').filter({ hasText: '[format]' }).locator('.row-sub').first().click();
     await p.waitForTimeout(250);
     assert(!(await p.locator('#crumb').isHidden()), '서브그래프로 안 들어감');
-    assert(await p.evaluate(() => Object.keys(state.format.nodes).length) === 1, '빈 그래프가 아님');
+    assert(await p.evaluate(() => Object.keys(__yt.state.format.nodes).length) === 1, '빈 그래프가 아님');
     const notes = await p.textContent('#notes');
     assert(notes.includes('덮어썼다'), '경고 없음: ' + notes);
     return notes.slice(0, 60);
@@ -310,7 +310,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
   await step('명령어 읽기가 -f 를 서브그래프까지 풀어 준다', async () => {
     await setup('yt-dlp -f "bestvideo[height<=?1080][fps>30]+bestaudio/best" https://a');
     const kinds = await p.evaluate(() =>
-      Object.values(state.format.nodes).map(n => n.type).sort().join(','));
+      Object.values(__yt.state.format.nodes).map(n => n.type).sort().join(','));
     assert(kinds === 'fallback,fout,merge,stream,stream,stream', '노드 구성: ' + kinds);
     assert(await expr() === 'bestvideo[height<=?1080][fps>30]+bestaudio/best', 'expr: ' + await expr());
     assert(await fmtVal() === 'bestvideo[height<=?1080][fps>30]+bestaudio/best', 'val: ' + await fmtVal());
@@ -334,7 +334,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     assert(await expr() === before, `정렬이 표현식을 바꿨다: ${before} → ${await expr()}`);
     const overlap = await p.evaluate(() => {
       const els = [...document.querySelectorAll('.node')];
-      const box = e => { const n = state.format.nodes[e.dataset.id];
+      const box = e => { const n = __yt.state.format.nodes[e.dataset.id];
         return { x1:n.x, y1:n.y, x2:n.x + e.offsetWidth, y2:n.y + e.offsetHeight }; };
       const bs = els.map(box); const hit = [];
       for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
@@ -349,11 +349,11 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
   });
 
   await step('localStorage: 서브그래프와 모드까지 복원', async () => {
-    const before = await p.evaluate(() => [formatExpr(), commandString(), ui.mode].join('|'));
+    const before = await p.evaluate(() => [__yt.formatExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
     await p.waitForTimeout(400);
     await p.reload();
     await p.waitForTimeout(400);
-    const after = await p.evaluate(() => [formatExpr(), commandString(), ui.mode].join('|'));
+    const after = await p.evaluate(() => [__yt.formatExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
     assert(before === after, `불일치\n${before}\n${after}`);
     assert(!(await p.locator('#crumb').isHidden()), '서브그래프 모드가 복원 안 됨');
     return after.split('|')[0];
@@ -364,10 +364,10 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await p.waitForTimeout(150);
     const json = await p.locator('#graph-text').inputValue();
     assert(json.includes('"format"'), 'JSON에 서브그래프가 없음');
-    const before = await p.evaluate(() => commandString());
+    const before = await p.evaluate(() => __yt.commandString());
     await p.click('#graph-load');
     await p.waitForTimeout(300);
-    assert(await p.evaluate(() => commandString()) === before, 'JSON 왕복 불일치');
+    assert(await p.evaluate(() => __yt.commandString()) === before, 'JSON 왕복 불일치');
     return `${Math.round(json.length / 1024)}KB`;
   });
 
@@ -377,9 +377,9 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     const before = await expr();
     assert(before === 'bv+ba/b', 'setup: ' + before);
     await p.evaluate(() => {
-      const mg = Object.values(state.format.nodes).find(n => n.type === 'merge');
-      removeNode(mg.id, state.format);
-      render();
+      const mg = Object.values(__yt.state.format.nodes).find(n => n.type === 'merge');
+      __yt.removeNode(mg.id, __yt.state.format);
+      __yt.render();
     });
     await p.waitForTimeout(250);
     // merge 를 지우면 bv, ba 가 fallback 으로 직결된다

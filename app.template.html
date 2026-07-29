@@ -2110,6 +2110,24 @@ $('#copy-conf').onclick = e => copy(confString(), e.target);
 
 addEventListener('resize', () => { applyView(); renderWires(); });
 
+/* ══ 테스트 손잡이 ═══════════════════════════
+   e2e 가 잡는 유일한 표면. 내부 이름·시그니처가 바뀌어도 여기서 흡수해서
+   테스트가 리팩터링의 브레이크로 남게 한다. 앱 코드는 이걸 쓰지 않는다. */
+window.__yt = {
+  get state() { return state; },
+  get ui() { return ui; },
+  get view() { return view; },
+  render,
+  connect: (from, to, g) => connect(from, to, g || graph()),
+  removeNode: (id, g) => removeNode(id, g || graph()),
+  addFormatNode,
+  formatExpr,
+  commandString,
+  confString,
+  parseFormat,
+  emitTree,
+};
+
 /* ── 시작 ────────────────────────────────── */
 const fresh = !load();
 if (fresh) resetState();

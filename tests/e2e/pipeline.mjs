@@ -142,7 +142,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
   });
 
   await step('왕복: 읽은 명령어 == 조립한 명령어', async () => {
-    const c = (await p.evaluate(() => commandString())).replace(/\s+/g, ' ');
+    const c = (await p.evaluate(() => __yt.commandString())).replace(/\s+/g, ' ');
     for (const frag of ['-f "bv*[height<=720]+ba"', '--embed-subs', '--sub-langs ko,en', '--sponsorblock-remove sponsor', '--cookies-from-browser chrome'])
       assert(c.includes(frag), `누락: ${frag}\n실제: ${c}`);
     return c;
@@ -150,24 +150,24 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('순환 연결 차단', async () => {
     const ok = await p.evaluate(() => {
-      const ids = Object.keys(state.nodes).filter(i => state.nodes[i].type === 'stage');
-      return connect('out', 'src') === false && connect(ids[1], ids[0]) === false;
+      const ids = Object.keys(__yt.state.nodes).filter(i => __yt.state.nodes[i].type === 'stage');
+      return __yt.connect('out', 'src') === false && __yt.connect(ids[1], ids[0]) === false;
     });
     assert(ok, '순환이 허용됨');
   });
 
   await step('localStorage 복원', async () => {
-    const before = await p.evaluate(() => commandString());
+    const before = await p.evaluate(() => __yt.commandString());
     await p.waitForTimeout(400);
     await p.reload();
     await p.waitForTimeout(400);
-    const after = await p.evaluate(() => commandString());
+    const after = await p.evaluate(() => __yt.commandString());
     assert(before === after, `복원 불일치\n${before}\n${after}`);
     return '동일';
   });
 
   await step('conf 출력', async () => {
-    const conf = await p.evaluate(() => confString());
+    const conf = await p.evaluate(() => __yt.confString());
     assert(conf.split('\n').filter(Boolean).length >= 5, 'conf 줄 수 부족: ' + conf);
     return conf.split('\n').filter(Boolean).length + '줄';
   });
