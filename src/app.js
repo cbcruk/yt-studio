@@ -1,478 +1,121 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>yt-dlp 스튜디오</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --ground:#EBEEE9;
-    --panel:#F5F7F3;
-    --ink:#141C19;
-    --dim:#69756F;
-    --rule:#CBD2CB;
-    --signal:#4B2ED4;
-    --signal-wash:#4B2ED414;
-    --set:#137A57;
-    --set-wash:#137A5714;
-    --warn:#B02E1F;
-    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-    --display:"Space Grotesk",var(--mono);
-    --node-w:300px;
-    --head-h:34px;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    margin:0; background:var(--ground); color:var(--ink);
-    font:400 13px/1.55 var(--mono);
-    display:flex; flex-direction:column; overflow:hidden;
-    -webkit-font-smoothing:antialiased;
-  }
-  button,input,select,textarea{font:inherit;color:inherit}
-  ::selection{background:var(--signal);color:#fff}
-
-  /* ── header ─────────────────────────────── */
-  .top{
-    border-bottom:1px solid var(--rule); background:var(--panel);
-    padding:12px 18px; display:flex; flex-wrap:wrap; gap:14px; align-items:center;
-    flex:none; position:relative; z-index:40;
-  }
-  .wordmark{font:700 19px/1 var(--display);letter-spacing:-.02em;white-space:nowrap}
-  .wordmark em{font-style:normal;color:var(--signal)}
-  .ver{color:var(--dim);font-size:11px;letter-spacing:.04em;margin-top:3px}
-  .top-spacer{flex:1}
-  .topact{display:flex;gap:8px;flex-wrap:wrap}
-
-  /* 서브그래프 브레드크럼 */
-  .crumb{display:flex;align-items:center;gap:8px;font-size:12px}
-  .crumb[hidden]{display:none}
-  .crumb .sep{color:var(--dim)}
-  .crumb .here{font:500 13px/1 var(--display);color:var(--fmt,#6E7A12)}
-  .crumb .back{
-    border:1px solid var(--rule);background:transparent;border-radius:3px;
-    padding:4px 9px;cursor:pointer;white-space:nowrap;
-  }
-  .crumb .back:hover{border-color:var(--signal);color:var(--signal)}
-
-  .field{position:relative;display:flex;align-items:center;gap:8px;flex:1 1 300px;min-width:220px}
-  .field[hidden]{display:none}
-  .field label{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
-  .field input{
-    flex:1;background:var(--ground);border:1px solid var(--rule);border-radius:3px;
-    padding:6px 9px;min-width:0;
-  }
-  .field input:focus-visible{outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
-
-  .btn{
-    background:transparent;border:1px solid var(--rule);border-radius:3px;
-    padding:6px 11px;cursor:pointer;white-space:nowrap;
-    transition:border-color .12s,color .12s,background .12s;
-  }
-  .btn:hover{border-color:var(--signal);color:var(--signal)}
-  .btn:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
-  .btn.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
-  .btn.primary:hover{background:var(--signal);border-color:var(--signal);color:#fff}
-
-  /* ── search overlay ─────────────────────── */
-  .hits{
-    position:absolute; top:calc(100% + 6px); left:0; width:min(560px,90vw);
-    background:var(--panel); border:1px solid var(--ink); border-radius:4px;
-    box-shadow:0 14px 34px #141c1922; max-height:56vh; overflow-y:auto; z-index:60;
-  }
-  .hits[hidden]{display:none}
-  .hits-head{padding:8px 12px;color:var(--dim);font-size:11px;border-bottom:1px solid var(--rule);
-    position:sticky;top:0;background:var(--panel)}
-  .hit{
-    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
-    width:100%;text-align:left;border:0;background:none;border-bottom:1px solid var(--rule);
-    padding:8px 12px;cursor:pointer;
-  }
-  .hit:hover,.hit:focus-visible{background:var(--signal-wash);outline:none}
-  .hit-flag{font-weight:600;word-break:break-all}
-  .hit-flag .short{color:var(--signal);font-weight:500}
-  .hit-help{color:var(--dim);font-size:11px;margin-top:2px;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .hit mark{background:#F0D97B;color:var(--ink);padding:0 1px}
-  .hit-stage{font-size:10px;letter-spacing:.1em;text-transform:uppercase;
-    border:1px solid currentColor;border-radius:9px;padding:1px 7px;white-space:nowrap}
-  .hit-on{color:var(--set);font-size:11px;white-space:nowrap}
-
-  /* ── main split ─────────────────────────── */
-  .main{flex:1;display:flex;min-height:0}
-
-  /* palette */
-  .palette{
-    width:196px;flex:none;border-right:1px solid var(--rule);background:var(--panel);
-    padding:12px 0 18px;overflow-y:auto;
-  }
-  .pal-head{padding:0 14px 8px;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
-  .pal-hint{padding:0 14px 12px;color:var(--dim);font-size:11px;line-height:1.5}
-  .pal-hint b{color:var(--ink);font-weight:500}
-  .pal-item{
-    display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px;
-    width:100%;text-align:left;border:0;background:none;padding:6px 14px;cursor:grab;
-    color:var(--dim);position:relative;touch-action:none;
-  }
-  .pal-item .dot{width:7px;height:7px;border-radius:2px;background:var(--a)}
-  .pal-item .tag{color:var(--ink)}
-  .pal-item .tag b{font-weight:500}
-  .pal-item .ko{font:500 12px/1 var(--display);margin-left:5px}
-  .pal-item:hover{background:var(--ground)}
-  .pal-item:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
-  .pal-item .n{font-size:11px;color:var(--set);background:var(--set-wash);border-radius:9px;padding:1px 6px}
-  .pal-item.placed{opacity:.45;cursor:default}
-  .pal-item.placed:hover{background:none}
-  .pal-sep{border:0;border-top:1px solid var(--rule);margin:12px 14px}
-  .pal-act{display:flex;flex-direction:column;gap:6px;padding:0 14px}
-  .pal-act .btn{width:100%}
-
-  .pal-ghost{
-    position:fixed;z-index:99;pointer-events:none;background:var(--panel);
-    border:1px solid var(--a);border-left:3px solid var(--a);border-radius:4px;
-    padding:6px 10px;box-shadow:0 8px 22px #141c1926;font-size:12px;
-  }
-
-  /* ── canvas ─────────────────────────────── */
-  .viewport{
-    flex:1;position:relative;overflow:hidden;min-width:0;touch-action:none;
-    background:radial-gradient(circle at 1px 1px, var(--rule) 1px, transparent 0);
-    background-size:22px 22px;
-    cursor:grab;
-  }
-  .viewport.panning{cursor:grabbing}
-  .viewport.wiring{cursor:crosshair}
-  /* 서브그래프 안이라는 걸 캔버스 자체가 말해 준다 */
-  .viewport.sub{background-color:#F1F0E6}
-  .wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  .wire-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
-  .wire{fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
-  .wire.dead{stroke:var(--rule);stroke-dasharray:5 5}
-  .wire-g:hover .wire{stroke:var(--warn);stroke-width:3}
-  .wire-temp{fill:none;stroke:var(--signal);stroke-width:2;stroke-dasharray:5 4}
-  .wire-ord{font:500 10px var(--mono);fill:var(--dim);pointer-events:none}
-
-  /* 레이어 자체는 클릭을 통과시킨다 — 아래 깔린 와이어를 집을 수 있어야 한다. */
-  .nodes{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
-  .node{
-    pointer-events:auto;
-    position:absolute;width:var(--node-w);background:var(--panel);
-    border:1px solid var(--rule);border-radius:5px;
-    box-shadow:0 2px 0 #141c190a, 0 10px 24px #141c1910;
-  }
-  /* 경로에서 끊긴 노드는 흐리게. 소스·명령어 노드는 계속 만져야 하므로 테두리만 바꾼다. */
-  .node.bypass{border-style:dashed}
-  .node.bypass:not(.io){opacity:.5}
-  .node.sel{border-color:var(--a);box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 30%,transparent),0 10px 24px #141c1914}
-  .node.lit{box-shadow:0 0 0 2px var(--signal),0 10px 24px #141c1914}
-  .node.collapsed .node-head{border-bottom:0;border-radius:4px}
-  .node-head{
-    height:var(--head-h);display:grid;grid-template-columns:auto 1fr auto auto auto;
-    align-items:center;gap:7px;padding:0 8px 0 10px;cursor:grab;
-    border-bottom:1px solid var(--rule);border-left:3px solid var(--a);
-    border-radius:4px 4px 0 0;background:var(--ground);user-select:none;
-  }
-  .node-head:active{cursor:grabbing}
-  .node-tag{color:var(--a);font-weight:600}
-  .node-ko{font:500 12px/1 var(--display);color:var(--ink)}
-  .node-n{font-size:11px;color:var(--set);background:var(--set-wash);border-radius:9px;padding:1px 6px}
-  .node-n[data-n="0"]{visibility:hidden}
-  .node-x{border:0;background:none;color:var(--dim);cursor:pointer;padding:2px 4px;line-height:1;border-radius:3px}
-  .node-x:hover{color:var(--warn);background:#B02E1F14}
-  .node-body{padding:6px 8px 8px;max-height:340px;overflow-y:auto}
-  .node-note{color:var(--dim);font-size:11px;padding:4px 2px 6px;line-height:1.5}
-  .node-badge{
-    display:inline-block;margin-left:2px;font-size:10px;letter-spacing:.08em;
-    color:var(--warn);border:1px solid var(--warn);border-radius:9px;padding:0 6px;
-  }
-  .node:not(.bypass) .node-badge{display:none}
-
-  .port{
-    position:absolute;width:13px;height:13px;border-radius:50%;
-    background:var(--panel);border:2px solid var(--a);cursor:crosshair;z-index:3;
-    top:calc(var(--head-h)/2);
-  }
-  .port.in{left:-7px;transform:translateY(-50%)}
-  .port.out{right:-7px;transform:translateY(-50%)}
-  .port:hover,.port.hot{background:var(--a);transform:translateY(-50%) scale(1.3)}
-
-  /* 파이프라인 노드 안의 옵션 행 */
-  .row{border-top:1px solid var(--rule);padding:7px 2px 8px}
-  .row:first-child{border-top:0}
-  .row.lit{background:var(--signal-wash);box-shadow:inset 3px 0 0 var(--signal)}
-  .row-top{display:flex;align-items:baseline;gap:6px}
-  .row-flag{font-weight:600;word-break:break-all;flex:1;min-width:0}
-  .row-flag .short{color:var(--signal);font-weight:500}
-  .row-x{border:0;background:none;color:var(--dim);cursor:pointer;padding:0 3px;line-height:1;border-radius:3px}
-  .row-x:hover{color:var(--warn);background:#B02E1F14}
-  .row-sub{
-    border:1px solid var(--rule);background:var(--ground);border-radius:3px;
-    padding:1px 7px;font-size:11px;color:var(--dim);cursor:pointer;white-space:nowrap;
-  }
-  .row-sub:hover{border-color:#6E7A12;color:#6E7A12}
-  .row-help{color:var(--dim);font-size:11px;margin:2px 0 5px;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .row-ctl input[type=text],.row-ctl select,.row-ctl textarea{
-    width:100%;background:var(--ground);border:1px solid var(--rule);
-    border-radius:3px;padding:5px 7px;font-size:12px;
-  }
-  .row-ctl textarea{resize:vertical;min-height:52px;line-height:1.4}
-  .row-ctl input:focus-visible,.row-ctl select:focus-visible,.row-ctl textarea:focus-visible{
-    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent
-  }
-  .tri{display:flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
-  .tri button{
-    flex:1;border:0;background:var(--ground);padding:4px 6px;cursor:pointer;
-    font-size:11px;color:var(--dim);border-left:1px solid var(--rule);
-  }
-  .tri button:first-child{border-left:0}
-  .tri button[aria-pressed=true]{background:var(--ink);color:var(--ground)}
-  .tri button:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
-
-  .add{
-    width:100%;border:1px dashed var(--rule);background:none;border-radius:3px;
-    padding:5px;margin-top:7px;cursor:pointer;color:var(--dim);font-size:12px;
-  }
-  .add:hover{border-color:var(--a);color:var(--a)}
-  .picker{margin-top:7px;border:1px solid var(--a);border-radius:3px;overflow:hidden}
-  .picker input{width:100%;border:0;border-bottom:1px solid var(--rule);
-    background:var(--ground);padding:6px 8px;font-size:12px}
-  .picker input:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
-  .picker ul{list-style:none;margin:0;padding:0;max-height:186px;overflow-y:auto}
-  .picker li button{
-    width:100%;text-align:left;border:0;background:none;padding:6px 8px;cursor:pointer;
-    border-bottom:1px solid var(--rule);
-  }
-  .picker li:last-child button{border-bottom:0}
-  .picker li button:hover,.picker li button:focus-visible{background:var(--signal-wash);outline:none}
-  .picker .pf{font-weight:600;font-size:12px;word-break:break-all}
-  .picker .ph{color:var(--dim);font-size:11px;
-    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
-  .picker .none{padding:8px;color:var(--dim);font-size:11px}
-
-  /* source / sink 노드 */
-  .node.io textarea{
-    width:100%;background:var(--ground);border:1px solid var(--rule);border-radius:3px;
-    padding:6px 8px;font-size:12px;resize:vertical;min-height:58px;line-height:1.5;
-  }
-  .node.io textarea:focus-visible{outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
-  .sink-stat{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .sink-stat span{border:1px solid var(--rule);border-radius:9px;padding:1px 8px;font-size:11px;color:var(--dim)}
-
-  /* ── 포맷 서브그래프 노드 ────────────────── */
-  .fsel{display:flex;flex-direction:column;gap:5px}
-  .fsel select,.fsel input{
-    width:100%;background:var(--ground);border:1px solid var(--rule);
-    border-radius:3px;padding:5px 7px;font-size:12px;
-  }
-  .fsel select:focus-visible,.fsel input:focus-visible{
-    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
-  .fsel .why{color:var(--dim);font-size:11px;line-height:1.45}
-
-  .filt{border-top:1px solid var(--rule);margin-top:7px;padding-top:7px}
-  .filt-head{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-  .filt-head span{color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;flex:1}
-  .filt-row{display:grid;grid-template-columns:1fr 62px 1fr auto auto;gap:4px;margin-bottom:4px;align-items:center}
-  .filt-row.exists{grid-template-columns:1fr 62px auto}
-  .filt-q{display:flex;align-items:center;color:var(--dim);font-size:11px;cursor:pointer;user-select:none}
-  .filt-q input{width:auto;margin:0 2px 0 0}
-  .filt-q:has(input:checked){color:var(--set);font-weight:600}
-  .filt-row select,.filt-row input{
-    min-width:0;background:var(--ground);border:1px solid var(--rule);
-    border-radius:3px;padding:4px 5px;font-size:11px;
-  }
-  .filt-row select:focus-visible,.filt-row input:focus-visible{
-    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
-  .filt-loose{display:flex;align-items:center;gap:5px;color:var(--dim);font-size:11px;margin-top:2px}
-  .filt-loose input{width:auto}
-
-  .ofield-row{display:grid;grid-template-columns:74px 1fr;gap:6px;align-items:center;margin-bottom:4px}
-  .ofield-row>span{color:var(--dim);font-size:11px}
-  .ofield-row select,.ofield-row input{
-    min-width:0;background:var(--ground);border:1px solid var(--rule);
-    border-radius:3px;padding:4px 6px;font-size:11px;
-  }
-  .ofield-row select:focus-visible,.ofield-row input:focus-visible{
-    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
-
-  .ops{color:var(--dim);font-size:11px;line-height:1.6}
-  .ops ol{margin:5px 0 0;padding-left:20px}
-  .ops ol li{margin-bottom:2px;color:var(--ink);word-break:break-all}
-  .ops .warn{color:var(--warn)}
-  .fout-expr{
-    background:var(--ground);border:1px solid var(--rule);border-radius:3px;
-    padding:8px 9px;font-size:12px;line-height:1.6;word-break:break-all;min-height:34px;
-  }
-  .fout-expr:empty::before{content:"아직 아무것도 이어지지 않았다";color:var(--dim)}
-  .fout-issue{color:var(--warn);font-size:11px;margin-top:6px;line-height:1.5}
-
-  /* canvas HUD */
-  .hud{
-    position:absolute;right:12px;bottom:12px;display:flex;gap:6px;align-items:center;
-    background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:4px 6px;z-index:20;
-  }
-  .hud button{border:0;background:none;cursor:pointer;color:var(--dim);padding:2px 7px;border-radius:3px;font-size:13px}
-  .hud button:hover{color:var(--signal);background:var(--signal-wash)}
-  .hud .zoom{color:var(--dim);font-size:11px;min-width:38px;text-align:center}
-
-  .ghost-hint{
-    position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;
-    color:var(--dim);text-align:center;line-height:1.9;padding:20px;z-index:1;
-  }
-  .ghost-hint b{color:var(--ink);font-weight:500}
-  .ghost-hint[hidden]{display:none}
-
-  /* ── command readout ────────────────────── */
-  .readout{
-    border-top:1px solid var(--rule);background:var(--panel);
-    padding:10px 18px 12px;flex:none;
-  }
-  .readout-bar{display:flex;align-items:center;gap:10px;margin-bottom:7px;flex-wrap:wrap}
-  .readout-bar h2{
-    margin:0;font:500 10px/1 var(--mono);letter-spacing:.14em;
-    text-transform:uppercase;color:var(--dim)
-  }
-  .readout-bar .spacer{flex:1}
-  .cmd{
-    background:var(--ground);border:1px solid var(--rule);border-radius:3px;
-    padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;
-    line-height:1.9;max-height:22vh;
-  }
-  .cmd .prompt{color:var(--dim);user-select:none}
-  .tok{border-bottom:2px solid transparent;padding-bottom:1px;cursor:default;transition:background .1s}
-  .tok[data-opt]{border-bottom-color:var(--rule)}
-  .tok.lit{background:var(--signal);color:#fff;border-bottom-color:var(--signal)}
-  .tok.url{color:var(--set);font-weight:600}
-
-  .notes{margin-top:6px;color:var(--dim);font-size:11px;min-height:1.4em}
-  .notes b{color:var(--warn);font-weight:500}
-
-  /* dialogs */
-  dialog{
-    border:1px solid var(--ink);border-radius:4px;background:var(--panel);
-    color:var(--ink);padding:0;max-width:min(720px,92vw);width:100%;
-  }
-  dialog::backdrop{background:#141C1980}
-  .dlg{padding:18px 20px 16px}
-  .dlg h3{margin:0 0 4px;font:700 17px/1.2 var(--display)}
-  .dlg p{margin:0 0 12px;color:var(--dim);font-size:12px}
-  .dlg textarea{
-    width:100%;min-height:150px;background:var(--ground);border:1px solid var(--rule);
-    border-radius:3px;padding:9px;resize:vertical;line-height:1.5;font-size:12px;
-  }
-  .dlg textarea:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
-  .dlg-act{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
-
-  @media (max-width:860px){
-    .palette{position:absolute;left:0;top:0;bottom:0;z-index:30;transform:translateX(-100%);
-      transition:transform .16s;box-shadow:0 0 30px #141c1926}
-    .palette.open{transform:none}
-    .main{position:relative}
-    .field{flex-basis:100%}
-    #pal-toggle{display:inline-block}
-  }
-  #pal-toggle{display:none}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
-</head>
-<body>
-
-<header class="top">
-  <div>
-    <div class="wordmark">yt-dlp <em>스튜디오</em></div>
-    <div class="ver" id="ver"></div>
-  </div>
-
-  <div class="crumb" id="crumb" hidden>
-    <button class="back" id="crumb-back">← 파이프라인</button>
-    <span class="sep">/</span>
-    <span class="here">[format] 포맷 셀렉터 <code id="crumb-expr"></code></span>
-  </div>
-
-  <div class="field" id="field-q">
-    <label for="q">검색</label>
-    <input id="q" type="text" placeholder="자막 · sub · thumbnail · 403  ( / 키 )" spellcheck="false" autocomplete="off">
-    <div class="hits" id="hits" hidden></div>
-  </div>
-  <div class="top-spacer"></div>
-  <div class="topact">
-    <button class="btn" id="pal-toggle">노드</button>
-    <button class="btn" id="import">명령어 읽기</button>
-    <button class="btn" id="graph-io">그래프 JSON</button>
-    <button class="btn" id="reset">초기화</button>
-  </div>
-</header>
-
-<div class="main">
-  <aside class="palette" id="palette" aria-label="노드 팔레트">
-    <div class="pal-head" id="pal-head">실행 단계</div>
-    <div class="pal-hint" id="pal-hint"></div>
-    <div id="pal-list"></div>
-    <hr class="pal-sep">
-    <div class="pal-act">
-      <button class="btn" id="autolayout">정렬</button>
-      <button class="btn" id="autowire">전부 잇기</button>
-      <button class="btn" id="fit">화면 맞춤</button>
-    </div>
-  </aside>
-
-  <div class="viewport" id="viewport">
-    <svg class="wires" id="wires"><g id="wire-layer"></g></svg>
-    <div class="nodes" id="node-layer"></div>
-    <div class="ghost-hint" id="hint"></div>
-    <div class="hud">
-      <button id="zoom-out" title="축소">−</button>
-      <span class="zoom" id="zoom-label">100%</span>
-      <button id="zoom-in" title="확대">+</button>
-      <button id="zoom-reset" title="화면 맞춤">⤢</button>
-    </div>
-  </div>
-</div>
-
-<footer class="readout">
-  <div class="readout-bar">
-    <h2>조립 결과</h2>
-    <span class="spacer"></span>
-    <button class="btn" id="copy-conf">yt-dlp.conf로 복사</button>
-    <button class="btn primary" id="copy-cmd">명령어 복사</button>
-  </div>
-  <div class="cmd" id="cmd"></div>
-  <div class="notes" id="notes"></div>
-</footer>
-
-<dialog id="dlg-import">
-  <form method="dialog" class="dlg">
-    <h3>명령어 읽기</h3>
-    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. <code>-f</code> 값은 포맷 서브그래프로도 풀어 놓는다. 모르는 플래그는 아래 노트에 남는다.</p>
-    <textarea id="paste" spellcheck="false" placeholder='yt-dlp -f "bv*[height&lt;=1080]+ba/b" --embed-subs --sub-langs ko,en -o "%(title)s.%(ext)s" https://...'></textarea>
-    <div class="dlg-act">
-      <button class="btn" value="cancel">취소</button>
-      <button class="btn primary" id="do-import" value="ok" type="button">그래프로 되돌리기</button>
-    </div>
-  </form>
-</dialog>
-
-<dialog id="dlg-graph">
-  <form method="dialog" class="dlg">
-    <h3>그래프 JSON</h3>
-    <p>파이프라인과 포맷 서브그래프를 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
-    <textarea id="graph-text" spellcheck="false"></textarea>
-    <div class="dlg-act">
-      <button class="btn" value="cancel">닫기</button>
-      <button class="btn" id="graph-copy" type="button">복사</button>
-      <button class="btn primary" id="graph-load" type="button">불러오기</button>
-    </div>
-  </form>
-</dialog>
-
-<script>
-/* 빌드가 src/core/*.js 를 여기 이어 붙인다. */
-/*__MODULES__*/
-
-const SCHEMA = /*__SCHEMA__*/{};
+/**
+ * 캔버스 · 렌더 · 포인터 · 배선.
+ *
+ * DOM 을 아는 층은 전부 여기 있다. 문법·그래프 대수·레이아웃 계산은
+ * core/ 에, 노드와 그래프 종류의 선언은 ui/ 의 레지스트리에 있다.
+ */
+import { SCHEMA } from './core/schema-data.js';
+import {
+  BY_ID,
+  BY_STAGE,
+  KO,
+  OPTS,
+  STAGE,
+  STAGES,
+  STAGE_ORDER,
+  expand,
+  initSchema,
+  search,
+  stageIdx,
+} from './core/schema.js';
+import { connect, disconnect, hasEdge, removeNode } from './core/graph.js';
+import {
+  EXIST_OPS,
+  FKEYS,
+  FKEY_TYPE,
+  FORMAT_OPS,
+  NUM_OPS,
+  SELECTORS,
+  SEL_HELP,
+  SEL_SET,
+  STR_OPS,
+  emitTree,
+  parseFormat,
+} from './core/format-grammar.js';
+import {
+  FOUT,
+  blankFormat,
+  formatExpr,
+  formatIssues,
+  graphToTree,
+  operands,
+  treeToGraph,
+} from './core/format-graph.js';
+import {
+  CONVERSIONS,
+  FIELDS,
+  FIELD_HELP,
+  FIELD_SET,
+  OUT_TYPES,
+  STRF_PRESETS,
+  emitPiece,
+} from './core/output-template.js';
+import {
+  OOUT,
+  blankOutput,
+  outputExpr,
+  outputIssues,
+  outputPieces,
+  outputPreview,
+  piecesToGraph,
+} from './core/output-graph.js';
+import {
+  PATH_TYPES,
+  POUT,
+  blankPaths,
+  joinEntry,
+  pathsExpr,
+  pathsIssues,
+  pathsToGraph,
+} from './core/paths-graph.js';
+import {
+  blankPipeline,
+  buildTokens,
+  commandString,
+  confString,
+  livePath,
+  parseCommand,
+  quote,
+  spliceIntoChain,
+  stageNode,
+  urlList,
+} from './core/pipeline.js';
+import {
+  bounds,
+  chainLayout,
+  fitTo,
+  freeSpot,
+  orphansOf,
+  tidyColumns,
+  zoomAt,
+} from './core/layout.js';
+import { STORE_KEY, loadRaw, restore, snapshot } from './core/persist.js';
+import {
+  STAGE_ACCENT,
+  accentOf,
+  badgeOf,
+  blurbOf,
+  bodyOf,
+  bypassLabelOf,
+  defineBody,
+  defineKind,
+  hasIn,
+  hasOut,
+  isIO,
+  labelOf,
+  paletteItems,
+  protectedIds,
+  tagOf,
+  tagOfType,
+  widthOf,
+  widthOfType,
+} from './ui/node-kinds.js';
+import {
+  allGraphKinds,
+  defineGraphBehavior,
+  graphKind,
+  subgraphFor,
+} from './ui/graph-kinds.js';
 
 /* ══ 스키마 파생 ═════════════════════════════ */
 // 색인·검색·KO 사전은 core/schema.js 에 있다.
@@ -1980,6 +1623,3 @@ const fresh = !load();
 if (fresh) resetState();
 render();
 if (fresh) fitView();
-</script>
-</body>
-</html>

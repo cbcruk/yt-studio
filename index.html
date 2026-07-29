@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yt-dlp 스튜디오</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <div class="wordmark">yt-dlp <em>스튜디오</em></div>
+    <div class="ver" id="ver"></div>
+  </div>
+
+  <div class="crumb" id="crumb" hidden>
+    <button class="back" id="crumb-back">← 파이프라인</button>
+    <span class="sep">/</span>
+    <span class="here">[format] 포맷 셀렉터 <code id="crumb-expr"></code></span>
+  </div>
+
+  <div class="field" id="field-q">
+    <label for="q">검색</label>
+    <input id="q" type="text" placeholder="자막 · sub · thumbnail · 403  ( / 키 )" spellcheck="false" autocomplete="off">
+    <div class="hits" id="hits" hidden></div>
+  </div>
+  <div class="top-spacer"></div>
+  <div class="topact">
+    <button class="btn" id="pal-toggle">노드</button>
+    <button class="btn" id="import">명령어 읽기</button>
+    <button class="btn" id="graph-io">그래프 JSON</button>
+    <button class="btn" id="reset">초기화</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="palette" id="palette" aria-label="노드 팔레트">
+    <div class="pal-head" id="pal-head">실행 단계</div>
+    <div class="pal-hint" id="pal-hint"></div>
+    <div id="pal-list"></div>
+    <hr class="pal-sep">
+    <div class="pal-act">
+      <button class="btn" id="autolayout">정렬</button>
+      <button class="btn" id="autowire">전부 잇기</button>
+      <button class="btn" id="fit">화면 맞춤</button>
+    </div>
+  </aside>
+
+  <div class="viewport" id="viewport">
+    <svg class="wires" id="wires"><g id="wire-layer"></g></svg>
+    <div class="nodes" id="node-layer"></div>
+    <div class="ghost-hint" id="hint"></div>
+    <div class="hud">
+      <button id="zoom-out" title="축소">−</button>
+      <span class="zoom" id="zoom-label">100%</span>
+      <button id="zoom-in" title="확대">+</button>
+      <button id="zoom-reset" title="화면 맞춤">⤢</button>
+    </div>
+  </div>
+</div>
+
+<footer class="readout">
+  <div class="readout-bar">
+    <h2>조립 결과</h2>
+    <span class="spacer"></span>
+    <button class="btn" id="copy-conf">yt-dlp.conf로 복사</button>
+    <button class="btn primary" id="copy-cmd">명령어 복사</button>
+  </div>
+  <div class="cmd" id="cmd"></div>
+  <div class="notes" id="notes"></div>
+</footer>
+
+<dialog id="dlg-import">
+  <form method="dialog" class="dlg">
+    <h3>명령어 읽기</h3>
+    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. <code>-f</code> 값은 포맷 서브그래프로도 풀어 놓는다. 모르는 플래그는 아래 노트에 남는다.</p>
+    <textarea id="paste" spellcheck="false" placeholder='yt-dlp -f "bv*[height&lt;=1080]+ba/b" --embed-subs --sub-langs ko,en -o "%(title)s.%(ext)s" https://...'></textarea>
+    <div class="dlg-act">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn primary" id="do-import" value="ok" type="button">그래프로 되돌리기</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-graph">
+  <form method="dialog" class="dlg">
+    <h3>그래프 JSON</h3>
+    <p>파이프라인과 포맷 서브그래프를 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
+    <textarea id="graph-text" spellcheck="false"></textarea>
+    <div class="dlg-act">
+      <button class="btn" value="cancel">닫기</button>
+      <button class="btn" id="graph-copy" type="button">복사</button>
+      <button class="btn primary" id="graph-load" type="button">불러오기</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>

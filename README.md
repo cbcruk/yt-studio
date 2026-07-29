@@ -3,11 +3,12 @@
 yt-dlp 옵션을 **노드 그래프**로 조립한다. 의존성 없는 단일 HTML 파일 하나로 굽는다.
 
 ```
+npm run dev       # vite 개발 서버 (HMR)
 npm run build     # → dist/ytdlp-studio.html
-npm test          # 단위(node) + e2e(playwright)
+npm test          # 단위(node) + 개발 서버 스모크 + e2e(playwright)
 ```
 
-브라우저로 그 파일을 열면 끝이다. 서버도, 번들러도, 네트워크도 필요 없다.
+배포물은 브라우저로 그 파일을 열면 끝이다. 서버도, 번들러도, 네트워크도 필요 없다.
 
 ## 왜 노드인가
 
@@ -155,12 +156,27 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
 src/ui/
   node-kinds.js      노드 종류 레지스트리
   graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
-app.template.html    캔버스 · 렌더 · 포인터 · 배선
+  app.js             캔버스 · 렌더 · 포인터 · 배선
+  app.css            전부
+  core/schema-data.js  개발은 JSON import, 배포는 빌드가 값으로 갈아 끼운다
+index.html           개발 진입점이자 배포 템플릿 — 하나만 둔다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
 tests/unit/          브라우저 없이 도는 88종
+tests/dev-smoke.mjs  개발 서버가 뜨고 조용한지 9종
 tests/e2e/           실제로 조작해 보는 72종
 ```
+
+**같은 `index.html` 이 두 가지로 쓰인다.**
+
+| | CSS·JS | 스키마 |
+|---|---|---|
+| 개발 (`npm run dev`) | `<link>` · `<script type="module">` 그대로 | Vite 의 JSON import |
+| 배포 (`npm run build`) | `build.py` 가 인라인 | 빌드가 값으로 갈아 끼운다 |
+
+경로가 둘이면 **서로 다르게 깨진다.** 새 모듈을 `build.py` 의 `MODULES` 에 안 적으면
+배포만 깨지고, `app.js` 가 `import` 없이 심볼을 쓰면 개발만 깨진다(배포는 한 스코프로
+합쳐서 돌아가므로 안 걸린다). 앞은 빌드가, 뒤는 `npm run test:dev` 가 잡는다.
 
 **번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
 `build.py` 가 의존 순서대로 이어 붙이며 `import`/`export` 만 걷어낸다. 이름이
