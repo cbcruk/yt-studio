@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yt-dlp 스튜디오</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#EBEEE9;
+    --panel:#F5F7F3;
+    --ink:#141C19;
+    --dim:#69756F;
+    --rule:#CBD2CB;
+    --signal:#4B2ED4;
+    --signal-wash:#4B2ED414;
+    --set:#137A57;
+    --set-wash:#137A5714;
+    --warn:#B02E1F;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --display:"Space Grotesk",var(--mono);
+    --node-w:300px;
+    --head-h:34px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font:400 13px/1.55 var(--mono);
+    display:flex; flex-direction:column; overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select,textarea{font:inherit;color:inherit}
+  ::selection{background:var(--signal);color:#fff}
+
+  /* ── header ─────────────────────────────── */
+  .top{
+    border-bottom:1px solid var(--rule); background:var(--panel);
+    padding:12px 18px; display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+    flex:none; position:relative; z-index:40;
+  }
+  .wordmark{font:700 19px/1 var(--display);letter-spacing:-.02em;white-space:nowrap}
+  .wordmark em{font-style:normal;color:var(--signal)}
+  .ver{color:var(--dim);font-size:11px;letter-spacing:.04em;margin-top:3px}
+  .top-spacer{flex:1}
+  .topact{display:flex;gap:8px;flex-wrap:wrap}
+
+  .field{position:relative;display:flex;align-items:center;gap:8px;flex:1 1 300px;min-width:220px}
+  .field label{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+  .field input{
+    flex:1;background:var(--ground);border:1px solid var(--rule);border-radius:3px;
+    padding:6px 9px;min-width:0;
+  }
+  .field input:focus-visible{outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
+
+  .btn{
+    background:transparent;border:1px solid var(--rule);border-radius:3px;
+    padding:6px 11px;cursor:pointer;white-space:nowrap;
+    transition:border-color .12s,color .12s,background .12s;
+  }
+  .btn:hover{border-color:var(--signal);color:var(--signal)}
+  .btn:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+  .btn.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
+  .btn.primary:hover{background:var(--signal);border-color:var(--signal);color:#fff}
+  .btn.mini{padding:3px 7px;font-size:11px}
+
+  /* ── search overlay ─────────────────────── */
+  .hits{
+    position:absolute; top:calc(100% + 6px); left:0; width:min(560px,90vw);
+    background:var(--panel); border:1px solid var(--ink); border-radius:4px;
+    box-shadow:0 14px 34px #141c1922; max-height:56vh; overflow-y:auto; z-index:60;
+  }
+  .hits[hidden]{display:none}
+  .hits-head{padding:8px 12px;color:var(--dim);font-size:11px;border-bottom:1px solid var(--rule);
+    position:sticky;top:0;background:var(--panel)}
+  .hit{
+    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    width:100%;text-align:left;border:0;background:none;border-bottom:1px solid var(--rule);
+    padding:8px 12px;cursor:pointer;
+  }
+  .hit:hover,.hit:focus-visible{background:var(--signal-wash);outline:none}
+  .hit-flag{font-weight:600;word-break:break-all}
+  .hit-flag .short{color:var(--signal);font-weight:500}
+  .hit-help{color:var(--dim);font-size:11px;margin-top:2px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hit mark{background:#F0D97B;color:var(--ink);padding:0 1px}
+  .hit-stage{font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    border:1px solid currentColor;border-radius:9px;padding:1px 7px;white-space:nowrap}
+  .hit-on{color:var(--set);font-size:11px;white-space:nowrap}
+
+  /* ── main split ─────────────────────────── */
+  .main{flex:1;display:flex;min-height:0}
+
+  /* palette */
+  .palette{
+    width:196px;flex:none;border-right:1px solid var(--rule);background:var(--panel);
+    padding:12px 0 18px;overflow-y:auto;
+  }
+  .pal-head{padding:0 14px 8px;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+  .pal-hint{padding:0 14px 12px;color:var(--dim);font-size:11px;line-height:1.5}
+  .pal-item{
+    display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px;
+    width:100%;text-align:left;border:0;background:none;padding:6px 14px;cursor:grab;
+    color:var(--dim);position:relative;touch-action:none;
+  }
+  .pal-item .dot{width:7px;height:7px;border-radius:2px;background:var(--a)}
+  .pal-item .tag{color:var(--ink)}
+  .pal-item .tag b{font-weight:500}
+  .pal-item .ko{font:500 12px/1 var(--display);margin-left:5px}
+  .pal-item:hover{background:var(--ground)}
+  .pal-item:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+  .pal-item .n{font-size:11px;color:var(--set);background:var(--set-wash);border-radius:9px;padding:1px 6px}
+  .pal-item.placed{opacity:.45;cursor:default}
+  .pal-item.placed:hover{background:none}
+  .pal-sep{border:0;border-top:1px solid var(--rule);margin:12px 14px}
+  .pal-act{display:flex;flex-direction:column;gap:6px;padding:0 14px}
+  .pal-act .btn{width:100%}
+
+  .pal-ghost{
+    position:fixed;z-index:99;pointer-events:none;background:var(--panel);
+    border:1px solid var(--a);border-left:3px solid var(--a);border-radius:4px;
+    padding:6px 10px;box-shadow:0 8px 22px #141c1926;font-size:12px;
+  }
+
+  /* ── canvas ─────────────────────────────── */
+  .viewport{
+    flex:1;position:relative;overflow:hidden;min-width:0;touch-action:none;
+    background:
+      radial-gradient(circle at 1px 1px, var(--rule) 1px, transparent 0);
+    background-size:22px 22px;
+    background-position:0 0;
+    cursor:grab;
+  }
+  .viewport.panning{cursor:grabbing}
+  .viewport.wiring{cursor:crosshair}
+  .wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+  .wires g{pointer-events:none}
+  .wire-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
+  .wire{fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+  .wire.dead{stroke:var(--rule);stroke-dasharray:5 5}
+  .wire-g:hover .wire{stroke:var(--warn);stroke-width:3}
+  .wire-temp{fill:none;stroke:var(--signal);stroke-width:2;stroke-dasharray:5 4}
+
+  /* 레이어 자체는 클릭을 통과시킨다 — 아래 깔린 와이어를 집을 수 있어야 한다. */
+  .nodes{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
+  .node{
+    pointer-events:auto;
+    position:absolute;width:var(--node-w);background:var(--panel);
+    border:1px solid var(--rule);border-radius:5px;
+    box-shadow:0 2px 0 #141c190a, 0 10px 24px #141c1910;
+  }
+  /* 경로에서 끊긴 단계는 흐리게. 소스·명령어 노드는 계속 만져야 하므로 테두리만 바꾼다. */
+  .node.bypass{border-style:dashed}
+  .node.bypass:not(.io){opacity:.5}
+  .node.sel{border-color:var(--a);box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 30%,transparent),0 10px 24px #141c1914}
+  .node.lit{box-shadow:0 0 0 2px var(--signal),0 10px 24px #141c1914}
+  .node.collapsed .node-head{border-bottom:0;border-radius:4px}
+  .node-head{
+    height:var(--head-h);display:grid;grid-template-columns:auto 1fr auto auto auto;
+    align-items:center;gap:7px;padding:0 8px 0 10px;cursor:grab;
+    border-bottom:1px solid var(--rule);border-left:3px solid var(--a);
+    border-radius:4px 4px 0 0;background:var(--ground);user-select:none;
+  }
+  .node-head:active{cursor:grabbing}
+  .node-tag{color:var(--a);font-weight:600}
+  .node-ko{font:500 12px/1 var(--display);color:var(--ink)}
+  .node-n{font-size:11px;color:var(--set);background:var(--set-wash);border-radius:9px;padding:1px 6px}
+  .node-n[data-n="0"]{visibility:hidden}
+  .node-x{border:0;background:none;color:var(--dim);cursor:pointer;padding:2px 4px;line-height:1;border-radius:3px}
+  .node-x:hover{color:var(--warn);background:#B02E1F14}
+  .node-body{padding:6px 8px 8px;max-height:340px;overflow-y:auto}
+  .node-note{color:var(--dim);font-size:11px;padding:4px 2px 6px;line-height:1.5}
+  .node.bypass .node-badge{
+    display:inline-block;margin-left:2px;font-size:10px;letter-spacing:.08em;
+    color:var(--warn);border:1px solid var(--warn);border-radius:9px;padding:0 6px;
+  }
+  .node:not(.bypass) .node-badge{display:none}
+
+  .port{
+    position:absolute;width:13px;height:13px;border-radius:50%;
+    background:var(--panel);border:2px solid var(--a);cursor:crosshair;z-index:3;
+    top:calc(var(--head-h)/2);
+  }
+  .port:hover,.port.hot{background:var(--a);transform:translateY(-50%) scale(1.25)}
+  .port.in{left:-7px;transform:translateY(-50%)}
+  .port.out{right:-7px;transform:translateY(-50%)}
+  .port:hover,.port.hot{transform:translateY(-50%) scale(1.3)}
+
+  /* option rows inside a node */
+  .row{border-top:1px solid var(--rule);padding:7px 2px 8px}
+  .row:first-child{border-top:0}
+  .row.lit{background:var(--signal-wash);box-shadow:inset 3px 0 0 var(--signal)}
+  .row-top{display:flex;align-items:baseline;gap:6px}
+  .row-flag{font-weight:600;word-break:break-all;flex:1;min-width:0}
+  .row-flag .short{color:var(--signal);font-weight:500}
+  .row-x{border:0;background:none;color:var(--dim);cursor:pointer;padding:0 3px;line-height:1;border-radius:3px}
+  .row-x:hover{color:var(--warn);background:#B02E1F14}
+  .row-help{color:var(--dim);font-size:11px;margin:2px 0 5px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .row-ctl input[type=text],.row-ctl select,.row-ctl textarea{
+    width:100%;background:var(--ground);border:1px solid var(--rule);
+    border-radius:3px;padding:5px 7px;font-size:12px;
+  }
+  .row-ctl textarea{resize:vertical;min-height:52px;line-height:1.4}
+  .row-ctl input:focus-visible,.row-ctl select:focus-visible,.row-ctl textarea:focus-visible{
+    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent
+  }
+  .tri{display:flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+  .tri button{
+    flex:1;border:0;background:var(--ground);padding:4px 6px;cursor:pointer;
+    font-size:11px;color:var(--dim);border-left:1px solid var(--rule);
+  }
+  .tri button:first-child{border-left:0}
+  .tri button[aria-pressed=true]{background:var(--ink);color:var(--ground)}
+  .tri button:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+
+  .add{
+    width:100%;border:1px dashed var(--rule);background:none;border-radius:3px;
+    padding:5px;margin-top:7px;cursor:pointer;color:var(--dim);font-size:12px;
+  }
+  .add:hover{border-color:var(--a);color:var(--a)}
+  .picker{margin-top:7px;border:1px solid var(--a);border-radius:3px;overflow:hidden}
+  .picker input{width:100%;border:0;border-bottom:1px solid var(--rule);
+    background:var(--ground);padding:6px 8px;font-size:12px}
+  .picker input:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+  .picker ul{list-style:none;margin:0;padding:0;max-height:186px;overflow-y:auto}
+  .picker li button{
+    width:100%;text-align:left;border:0;background:none;padding:6px 8px;cursor:pointer;
+    border-bottom:1px solid var(--rule);
+  }
+  .picker li:last-child button{border-bottom:0}
+  .picker li button:hover,.picker li button:focus-visible{background:var(--signal-wash);outline:none}
+  .picker .pf{font-weight:600;font-size:12px;word-break:break-all}
+  .picker .ph{color:var(--dim);font-size:11px;
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .picker .none{padding:8px;color:var(--dim);font-size:11px}
+
+  /* source / sink nodes */
+  .node.io .node-head{cursor:grab}
+  .node.io textarea{
+    width:100%;background:var(--ground);border:1px solid var(--rule);border-radius:3px;
+    padding:6px 8px;font-size:12px;resize:vertical;min-height:58px;line-height:1.5;
+  }
+  .node.io textarea:focus-visible{outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
+  .sink-stat{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .sink-stat span{border:1px solid var(--rule);border-radius:9px;padding:1px 8px;font-size:11px;color:var(--dim)}
+
+  /* canvas HUD */
+  .hud{
+    position:absolute;right:12px;bottom:12px;display:flex;gap:6px;align-items:center;
+    background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:4px 6px;z-index:20;
+  }
+  .hud button{border:0;background:none;cursor:pointer;color:var(--dim);padding:2px 7px;border-radius:3px;font-size:13px}
+  .hud button:hover{color:var(--signal);background:var(--signal-wash)}
+  .hud .zoom{color:var(--dim);font-size:11px;min-width:38px;text-align:center}
+
+  .ghost-hint{
+    position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;
+    color:var(--dim);text-align:center;line-height:1.9;padding:20px;z-index:1;
+  }
+  .ghost-hint b{color:var(--ink);font-weight:500}
+  .ghost-hint[hidden]{display:none}
+
+  /* ── command readout ────────────────────── */
+  .readout{
+    border-top:1px solid var(--rule);background:var(--panel);
+    padding:10px 18px 12px;flex:none;
+  }
+  .readout-bar{display:flex;align-items:center;gap:10px;margin-bottom:7px;flex-wrap:wrap}
+  .readout-bar h2{
+    margin:0;font:500 10px/1 var(--mono);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim)
+  }
+  .readout-bar .spacer{flex:1}
+  .cmd{
+    background:var(--ground);border:1px solid var(--rule);border-radius:3px;
+    padding:10px 12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;
+    line-height:1.9;max-height:22vh;
+  }
+  .cmd .prompt{color:var(--dim);user-select:none}
+  .tok{border-bottom:2px solid transparent;padding-bottom:1px;cursor:default;transition:background .1s}
+  .tok[data-opt]{border-bottom-color:var(--rule)}
+  .tok.lit{background:var(--signal);color:#fff;border-bottom-color:var(--signal)}
+  .tok.url{color:var(--set);font-weight:600}
+
+  .notes{margin-top:6px;color:var(--dim);font-size:11px;min-height:1.4em}
+  .notes b{color:var(--warn);font-weight:500}
+
+  /* dialogs */
+  dialog{
+    border:1px solid var(--ink);border-radius:4px;background:var(--panel);
+    color:var(--ink);padding:0;max-width:min(720px,92vw);width:100%;
+  }
+  dialog::backdrop{background:#141C1980}
+  .dlg{padding:18px 20px 16px}
+  .dlg h3{margin:0 0 4px;font:700 17px/1.2 var(--display)}
+  .dlg p{margin:0 0 12px;color:var(--dim);font-size:12px}
+  .dlg textarea{
+    width:100%;min-height:150px;background:var(--ground);border:1px solid var(--rule);
+    border-radius:3px;padding:9px;resize:vertical;line-height:1.5;font-size:12px;
+  }
+  .dlg textarea:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
+  .dlg-act{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+
+  @media (max-width:860px){
+    .palette{position:absolute;left:0;top:0;bottom:0;z-index:30;transform:translateX(-100%);
+      transition:transform .16s;box-shadow:0 0 30px #141c1926}
+    .palette.open{transform:none}
+    .main{position:relative}
+    .field{flex-basis:100%}
+  }
+  #pal-toggle{display:none}
+  @media (max-width:860px){#pal-toggle{display:inline-block}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <div class="wordmark">yt-dlp <em>스튜디오</em></div>
+    <div class="ver" id="ver"></div>
+  </div>
+  <div class="field">
+    <label for="q">검색</label>
+    <input id="q" type="text" placeholder="자막 · sub · thumbnail · 403  ( / 키 )" spellcheck="false" autocomplete="off">
+    <div class="hits" id="hits" hidden></div>
+  </div>
+  <div class="top-spacer"></div>
+  <div class="topact">
+    <button class="btn" id="pal-toggle">단계</button>
+    <button class="btn" id="import">명령어 읽기</button>
+    <button class="btn" id="graph-io">그래프 JSON</button>
+    <button class="btn" id="reset">초기화</button>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="palette" id="palette" aria-label="단계 팔레트">
+    <div class="pal-head">실행 단계</div>
+    <div class="pal-hint">캔버스로 끌어다 놓거나 클릭해서 노드를 만든다. 소스에서 명령어까지 <b>이어진 노드만</b> 결과에 들어간다.</div>
+    <div id="pal-list"></div>
+    <hr class="pal-sep">
+    <div class="pal-act">
+      <button class="btn" id="autolayout">정렬</button>
+      <button class="btn" id="autowire">전부 잇기</button>
+      <button class="btn" id="fit">화면 맞춤</button>
+    </div>
+  </aside>
+
+  <div class="viewport" id="viewport">
+    <svg class="wires" id="wires"><g id="wire-layer"></g></svg>
+    <div class="nodes" id="node-layer"></div>
+    <div class="ghost-hint" id="hint">
+      <div>캔버스가 비어 있다.<br>왼쪽 <b>실행 단계</b>를 끌어다 놓고 <b>소스 → 명령어</b> 사이에 이어라.<br>
+      또는 위의 <b>명령어 읽기</b>로 기존 명령어를 그래프로 되돌려라.</div>
+    </div>
+    <div class="hud">
+      <button id="zoom-out" title="축소">−</button>
+      <span class="zoom" id="zoom-label">100%</span>
+      <button id="zoom-in" title="확대">+</button>
+      <button id="zoom-reset" title="화면 맞춤">⤢</button>
+    </div>
+  </div>
+</div>
+
+<footer class="readout">
+  <div class="readout-bar">
+    <h2>조립 결과</h2>
+    <span class="spacer"></span>
+    <button class="btn" id="copy-conf">yt-dlp.conf로 복사</button>
+    <button class="btn primary" id="copy-cmd">명령어 복사</button>
+  </div>
+  <div class="cmd" id="cmd"></div>
+  <div class="notes" id="notes"></div>
+</footer>
+
+<dialog id="dlg-import">
+  <form method="dialog" class="dlg">
+    <h3>명령어 읽기</h3>
+    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. 모르는 플래그는 아래 노트에 남는다.</p>
+    <textarea id="paste" spellcheck="false" placeholder='yt-dlp -f "bv*[height&lt;=1080]+ba" --embed-subs --sub-langs ko,en -o "%(title)s.%(ext)s" https://...'></textarea>
+    <div class="dlg-act">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn primary" id="do-import" value="ok" type="button">그래프로 되돌리기</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-graph">
+  <form method="dialog" class="dlg">
+    <h3>그래프 JSON</h3>
+    <p>지금 그래프를 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
+    <textarea id="graph-text" spellcheck="false"></textarea>
+    <div class="dlg-act">
+      <button class="btn" value="cancel">닫기</button>
+      <button class="btn" id="graph-copy" type="button">복사</button>
+      <button class="btn primary" id="graph-load" type="button">불러오기</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const SCHEMA = {"ytdlp_version":"2026.07.04","stages":[{"id":"run","label":"실행","blurb":"한 번의 실행 전체가 어떻게 동작할지","groups":["General Options"]},{"id":"connect","label":"접속","blurb":"어떻게 서버에 붙을지","groups":["Network Options","Geo-restriction","Workarounds","Authentication Options"]},{"id":"extract","label":"추출","blurb":"무엇을 긁어올지","groups":["Extractor Options"]},{"id":"select","label":"선택","blurb":"컬렉션에서 어떤 항목을 남길지","groups":["Video Selection"]},{"id":"format","label":"포맷","blurb":"어떤 스트림·자막·썸네일을 고를지","groups":["Video Format Options","Subtitle Options","Thumbnail Options"]},{"id":"download","label":"다운로드","blurb":"어떻게 받아올지","groups":["Download Options"]},{"id":"process","label":"후처리","blurb":"받은 뒤 어떻게 가공할지","groups":["Post-Processing Options","SponsorBlock Options"]},{"id":"store","label":"저장","blurb":"어디에 어떤 이름으로 둘지","groups":["Filesystem Options","Internet Shortcut Options"]},{"id":"report","label":"보고","blurb":"이 과정을 어떻게 보여줄지","groups":["Verbosity and Simulation Options"]}],"options":[{"id":"abort-on-error","flag":"--abort-on-error","short":null,"aliases":["--no-ignore-errors"],"stage":"run","group":"General Options","dest":"ignoreerrors","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Abort downloading of further videos if an error occurs (Alias: --no-ignore-errors)","negation":"--no-abort-on-error"},{"id":"alias","flag":"--alias","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"_","kind":"value","metavar":"ALIASES OPTIONS","choices":null,"default":null,"help":"Create aliases for an option string. Unless an alias starts with a dash \"-\", it is prefixed with \"--\". Arguments are parsed according to the Python string formatting mini-language. E.g. --alias get-audio,-X \"-S aext:{0},abr -x --audio-format {0}\" creates options \"--get-audio\" and \"-X\" that takes an argument (ARG0) and expands to \"-S aext:ARG0,abr -x --audio-format ARG0\". All defined aliases are listed in the --help output. Alias options can trigger more aliases; so be careful to avoid defining recursive options. As a safety measure, each alias may be triggered a maximum of 100 times. This option can be used multiple times","negation":null},{"id":"color","flag":"--color","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"color","kind":"value","metavar":"[STREAM:]POLICY","choices":null,"default":{},"help":"Whether to emit color codes in output, optionally prefixed by the STREAM (stdout or stderr) to apply the setting to. Can be one of \"always\", \"auto\" (default), \"never\", or \"no_color\" (use non color terminal sequences). Use \"auto-tty\" or \"no_color-tty\" to decide based on terminal support only. Can be used multiple times","negation":null},{"id":"compat-options","flag":"--compat-options","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"compat_opts","kind":"value","metavar":"OPTS","choices":null,"default":"set()","help":"Options that can help keep compatibility with youtube-dl or youtube-dlc configurations by reverting some of the changes made in yt-dlp. See \"Differences in default behavior\" for details","negation":null},{"id":"config-locations","flag":"--config-locations","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"config_locations","kind":"repeatable","metavar":"PATH","choices":null,"default":null,"help":"Location of the main configuration file; either the path to the config or its containing directory (\"-\" for stdin). Can be used multiple times and inside other configuration files","negation":"--no-config-locations"},{"id":"default-search","flag":"--default-search","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"default_search","kind":"value","metavar":"PREFIX","choices":null,"default":null,"help":"Use this prefix for unqualified URLs. E.g. \"gvsearch2:python\" downloads two videos from google videos for the search term \"python\". Use the value \"auto\" to let yt-dlp guess (\"auto_warning\" to emit a warning when guessing). \"error\" just throws an error. The default value \"fixup_error\" repairs broken URLs, but emits an error if this is not possible instead of searching","negation":null},{"id":"extractor-descriptions","flag":"--extractor-descriptions","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"list_extractor_descriptions","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Output descriptions of all supported extractors and exit","negation":null},{"id":"flat-playlist","flag":"--flat-playlist","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"extract_flat","kind":"value","metavar":null,"choices":null,"default":false,"help":"Do not extract a playlist's URL result entries; some entry metadata may be missing and downloading may be bypassed","negation":"--no-flat-playlist"},{"id":"help","flag":"--help","short":"-h","aliases":[],"stage":"run","group":"General Options","dest":"print_help","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Print this help text and exit","negation":null},{"id":"ignore-config","flag":"--ignore-config","short":null,"aliases":["--no-config"],"stage":"run","group":"General Options","dest":"ignoreconfig","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Don't load any more configuration files except those given to --config-locations. For backward compatibility, if this option is found inside the system configuration file, the user configuration is not loaded. (Alias: --no-config)","negation":null},{"id":"ignore-errors","flag":"--ignore-errors","short":"-i","aliases":[],"stage":"run","group":"General Options","dest":"ignoreerrors","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Ignore download and postprocessing errors. The download will be considered successful even if the postprocessing fails","negation":null},{"id":"js-runtimes","flag":"--js-runtimes","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"js_runtimes","kind":"value","metavar":"RUNTIME[:PATH]","choices":null,"default":["deno"],"help":"Additional JavaScript runtime to enable, with an optional location for the runtime (either the path to the binary or its containing directory). This option can be used multiple times to enable multiple runtimes. Supported runtimes are (in order of priority, from highest to lowest): deno, node, quickjs, bun. Only \"deno\" is enabled by default. The highest priority runtime that is both enabled and available will be used. In order to use a lower priority runtime when \"deno\" is available, --no-js-runtimes needs to be passed before enabling other runtimes","negation":"--no-js-runtimes"},{"id":"list-extractors","flag":"--list-extractors","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"list_extractors","kind":"flag","metavar":null,"choices":null,"default":false,"help":"List all supported extractors and exit","negation":null},{"id":"live-from-start","flag":"--live-from-start","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"live_from_start","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Download livestreams from the start. Currently experimental and only supported for YouTube, Twitch, TVer, and mellow-fan","negation":"--no-live-from-start"},{"id":"mark-watched","flag":"--mark-watched","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"mark_watched","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Mark videos watched (even with --simulate)","negation":"--no-mark-watched"},{"id":"plugin-dirs","flag":"--plugin-dirs","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"plugin_dirs","kind":"value","metavar":"DIR","choices":null,"default":["default"],"help":"Path to an additional directory to search for plugins. This option can be used multiple times to add multiple directories. Use \"default\" to search the default plugin directories (default)","negation":"--no-plugin-dirs"},{"id":"preset-alias","flag":"--preset-alias","short":"-t","aliases":[],"stage":"run","group":"General Options","dest":"_","kind":"value","metavar":"PRESET","choices":null,"default":null,"help":"Applies a predefined set of options. e.g. --preset-alias mp3. The following presets are available: mp3, aac, mp4, mkv, sleep. See the \"Preset Aliases\" section at the end for more info. This option can be used multiple times","negation":null},{"id":"remote-components","flag":"--remote-components","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"remote_components","kind":"value","metavar":"COMPONENT","choices":null,"default":[],"help":"Remote components to allow yt-dlp to fetch when required. This option is currently not needed if you are using an official executable or have the requisite version of the yt-dlp-ejs package installed. You can use this option multiple times to allow multiple components. Supported values: ejs:npm (external JavaScript components from npm), ejs:github (external JavaScript components from yt-dlp-ejs GitHub). By default, no remote components are allowed","negation":"--no-remote-components"},{"id":"update","flag":"--update","short":"-U","aliases":[],"stage":"run","group":"General Options","dest":"update_self","kind":"value","metavar":null,"choices":null,"default":null,"help":"Check if updates are available. You installed yt-dlp with pip or using the wheel from PyPi; Use that to update","negation":"--no-update"},{"id":"update-to","flag":"--update-to","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"update_self","kind":"value","metavar":"[CHANNEL]@[TAG]","choices":null,"default":null,"help":"Upgrade/downgrade to a specific version. CHANNEL can be a repository as well. CHANNEL and TAG default to \"stable\" and \"latest\" respectively if omitted; See \"UPDATE\" for details. Supported channels: stable, nightly, master","negation":null},{"id":"use-extractors","flag":"--use-extractors","short":null,"aliases":["--ies"],"stage":"run","group":"General Options","dest":"allowed_extractors","kind":"value","metavar":"NAMES","choices":null,"default":[],"help":"Extractor names to use separated by commas. You can also use regexes, \"all\", \"default\" and \"end\" (end URL matching); e.g. --ies \"holodex.*,end,youtube\". Prefix the name with a \"-\" to exclude it, e.g. --ies default,-generic. Use --list-extractors for a list of extractor names. (Alias: --ies)","negation":null},{"id":"version","flag":"--version","short":null,"aliases":[],"stage":"run","group":"General Options","dest":null,"kind":"value","metavar":null,"choices":null,"default":null,"help":"Print program version and exit","negation":null},{"id":"wait-for-video","flag":"--wait-for-video","short":null,"aliases":[],"stage":"run","group":"General Options","dest":"wait_for_video","kind":"value","metavar":"MIN[-MAX]","choices":null,"default":null,"help":"Wait for scheduled streams to become available. Pass the minimum number of seconds (or range) to wait between retries","negation":"--no-wait-for-video"},{"id":"add-headers","flag":"--add-headers","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"headers","kind":"value","metavar":"FIELD:VALUE","choices":null,"default":{},"help":"Specify a custom HTTP header and its value, separated by a colon \":\". You can use this option multiple times","negation":null},{"id":"ap-list-mso","flag":"--ap-list-mso","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"ap_list_mso","kind":"flag","metavar":null,"choices":null,"default":false,"help":"List all supported multiple-system operators","negation":null},{"id":"ap-mso","flag":"--ap-mso","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"ap_mso","kind":"value","metavar":"MSO","choices":null,"default":null,"help":"Adobe Pass multiple-system operator (TV provider) identifier, use --ap-list-mso for a list of available MSOs","negation":null},{"id":"ap-password","flag":"--ap-password","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"ap_password","kind":"value","metavar":"PASSWORD","choices":null,"default":null,"help":"Multiple-system operator account password. If this option is left out, yt-dlp will ask interactively","negation":null},{"id":"ap-username","flag":"--ap-username","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"ap_username","kind":"value","metavar":"USERNAME","choices":null,"default":null,"help":"Multiple-system operator account login","negation":null},{"id":"bidi-workaround","flag":"--bidi-workaround","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"bidi_workaround","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Work around terminals that lack bidirectional text support. Requires bidiv or fribidi executable in PATH","negation":null},{"id":"client-certificate","flag":"--client-certificate","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"client_certificate","kind":"value","metavar":"CERTFILE","choices":null,"default":null,"help":"Path to client certificate file in PEM format. May include the private key","negation":null},{"id":"client-certificate-key","flag":"--client-certificate-key","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"client_certificate_key","kind":"value","metavar":"KEYFILE","choices":null,"default":null,"help":"Path to private key file for client certificate","negation":null},{"id":"client-certificate-password","flag":"--client-certificate-password","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"client_certificate_password","kind":"value","metavar":"PASSWORD","choices":null,"default":null,"help":"Password for client certificate private key, if encrypted. If not provided, and the key is encrypted, yt-dlp will ask interactively","negation":null},{"id":"cookies","flag":"--cookies","short":null,"aliases":[],"stage":"connect","group":"Filesystem Options","dest":"cookiefile","kind":"value","metavar":"FILE","choices":null,"default":null,"help":"Netscape formatted file to read cookies from and dump cookie jar in","negation":"--no-cookies"},{"id":"cookies-from-browser","flag":"--cookies-from-browser","short":null,"aliases":[],"stage":"connect","group":"Filesystem Options","dest":"cookiesfrombrowser","kind":"value","metavar":"BROWSER[+KEYRING][:PROFILE][::CONTAINER]","choices":null,"default":null,"help":"The name of the browser to load cookies from. Currently supported browsers are: brave, chrome, chromium, edge, firefox, opera, safari, vivaldi, whale. Optionally, the KEYRING used for decrypting Chromium cookies on Linux, the name/path of the PROFILE to load cookies from, and the CONTAINER name (if Firefox) (\"none\" for no container) can be given with their respective separators. By default, all containers of the most recently accessed profile are used. Currently supported keyrings are: basictext, gnomekeyring, kwallet, kwallet5, kwallet6","negation":"--no-cookies-from-browser"},{"id":"enable-file-urls","flag":"--enable-file-urls","short":null,"aliases":[],"stage":"connect","group":"Network Options","dest":"enable_file_urls","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Enable file:// URLs. This is disabled by default for security reasons.","negation":null},{"id":"encoding","flag":"--encoding","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"encoding","kind":"value","metavar":"ENCODING","choices":null,"default":null,"help":"Force the specified encoding (experimental)","negation":null},{"id":"force-ipv4","flag":"--force-ipv4","short":"-4","aliases":[],"stage":"connect","group":"Network Options","dest":"source_address","kind":"value","metavar":null,"choices":null,"default":null,"help":"Make all connections via IPv4","negation":null},{"id":"force-ipv6","flag":"--force-ipv6","short":"-6","aliases":[],"stage":"connect","group":"Network Options","dest":"source_address","kind":"value","metavar":null,"choices":null,"default":null,"help":"Make all connections via IPv6","negation":null},{"id":"geo-verification-proxy","flag":"--geo-verification-proxy","short":null,"aliases":[],"stage":"connect","group":"Geo-restriction","dest":"geo_verification_proxy","kind":"value","metavar":"URL","choices":null,"default":null,"help":"Use this proxy to verify the IP address for some geo-restricted sites. The default proxy specified by --proxy (or none, if the option is not present) is used for the actual downloading","negation":null},{"id":"impersonate","flag":"--impersonate","short":null,"aliases":[],"stage":"connect","group":"Network Options","dest":"impersonate","kind":"value","metavar":"CLIENT[:OS]","choices":null,"default":null,"help":"Client to impersonate for requests. E.g. chrome, chrome-110, chrome:windows-10. Pass --impersonate=\"\" to impersonate any client. Note that forcing impersonation for all requests may have a detrimental impact on download speed and stability","negation":null},{"id":"legacy-server-connect","flag":"--legacy-server-connect","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"legacy_server_connect","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Explicitly allow HTTPS connection to servers that do not support RFC 5746 secure renegotiation","negation":null},{"id":"list-impersonate-targets","flag":"--list-impersonate-targets","short":null,"aliases":[],"stage":"connect","group":"Network Options","dest":"list_impersonate_targets","kind":"flag","metavar":null,"choices":null,"default":false,"help":"List available clients to impersonate.","negation":null},{"id":"max-sleep-interval","flag":"--max-sleep-interval","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"max_sleep_interval","kind":"value","metavar":"SECONDS","choices":null,"default":null,"help":"Maximum number of seconds to sleep. Can only be used along with --min-sleep-interval","negation":null},{"id":"netrc","flag":"--netrc","short":"-n","aliases":[],"stage":"connect","group":"Authentication Options","dest":"usenetrc","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Use .netrc authentication data","negation":null},{"id":"netrc-cmd","flag":"--netrc-cmd","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"netrc_cmd","kind":"value","metavar":"NETRC_CMD","choices":null,"default":null,"help":"Command to execute to get the credentials for an extractor.","negation":null},{"id":"netrc-location","flag":"--netrc-location","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"netrc_location","kind":"value","metavar":"PATH","choices":null,"default":null,"help":"Location of .netrc authentication data; either the path or its containing directory. Defaults to ~/.netrc","negation":null},{"id":"no-check-certificates","flag":"--no-check-certificates","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"no_check_certificate","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Suppress HTTPS certificate validation","negation":null},{"id":"password","flag":"--password","short":"-p","aliases":[],"stage":"connect","group":"Authentication Options","dest":"password","kind":"value","metavar":"PASSWORD","choices":null,"default":null,"help":"Account password. If this option is left out, yt-dlp will ask interactively","negation":null},{"id":"prefer-insecure","flag":"--prefer-insecure","short":null,"aliases":["--prefer-unsecure"],"stage":"connect","group":"Workarounds","dest":"prefer_insecure","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Use an unencrypted connection to retrieve information about the video","negation":null},{"id":"proxy","flag":"--proxy","short":null,"aliases":[],"stage":"connect","group":"Network Options","dest":"proxy","kind":"value","metavar":"URL","choices":null,"default":null,"help":"Use the specified HTTP/HTTPS/SOCKS proxy. To enable SOCKS proxy, specify a proper scheme, e.g. socks5://user:pass@127.0.0.1:1080/. Pass in an empty string (--proxy \"\") for direct connection","negation":null},{"id":"sleep-interval","flag":"--sleep-interval","short":null,"aliases":["--min-sleep-interval"],"stage":"connect","group":"Workarounds","dest":"sleep_interval","kind":"value","metavar":"SECONDS","choices":null,"default":null,"help":"Number of seconds to sleep before each download. This is the minimum time to sleep when used along with --max-sleep-interval (Alias: --min-sleep-interval)","negation":null},{"id":"sleep-requests","flag":"--sleep-requests","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"sleep_interval_requests","kind":"value","metavar":"SECONDS","choices":null,"default":null,"help":"Number of seconds to sleep between requests during data extraction","negation":null},{"id":"sleep-subtitles","flag":"--sleep-subtitles","short":null,"aliases":[],"stage":"connect","group":"Workarounds","dest":"sleep_interval_subtitles","kind":"value","metavar":"SECONDS","choices":null,"default":0,"help":"Number of seconds to sleep before each subtitle download","negation":null},{"id":"socket-timeout","flag":"--socket-timeout","short":null,"aliases":[],"stage":"connect","group":"Network Options","dest":"socket_timeout","kind":"value","metavar":"SECONDS","choices":null,"default":null,"help":"Time to wait before giving up, in seconds","negation":null},{"id":"source-address","flag":"--source-address","short":null,"aliases":[],"stage":"connect","group":"Network Options","dest":"source_address","kind":"value","metavar":"IP","choices":null,"default":null,"help":"Client-side IP address to bind to","negation":null},{"id":"twofactor","flag":"--twofactor","short":"-2","aliases":[],"stage":"connect","group":"Authentication Options","dest":"twofactor","kind":"value","metavar":"TWOFACTOR","choices":null,"default":null,"help":"Two-factor authentication code","negation":null},{"id":"username","flag":"--username","short":"-u","aliases":[],"stage":"connect","group":"Authentication Options","dest":"username","kind":"value","metavar":"USERNAME","choices":null,"default":null,"help":"Login with this account ID","negation":null},{"id":"video-password","flag":"--video-password","short":null,"aliases":[],"stage":"connect","group":"Authentication Options","dest":"videopassword","kind":"value","metavar":"PASSWORD","choices":null,"default":null,"help":"Video-specific password","negation":null},{"id":"xff","flag":"--xff","short":null,"aliases":[],"stage":"connect","group":"Geo-restriction","dest":"geo_bypass","kind":"value","metavar":"VALUE","choices":null,"default":"default","help":"How to fake X-Forwarded-For HTTP header to try bypassing geographic restriction. One of \"default\" (only when known to be useful), \"never\", an IP block in CIDR notation, or a two-letter ISO 3166-2 country code","negation":null},{"id":"allow-dynamic-mpd","flag":"--allow-dynamic-mpd","short":null,"aliases":["--no-ignore-dynamic-mpd"],"stage":"extract","group":"Extractor Options","dest":"dynamic_mpd","kind":"flag","metavar":null,"choices":null,"default":true,"help":"Process dynamic DASH manifests (default) (Alias: --no-ignore-dynamic-mpd)","negation":null},{"id":"extractor-args","flag":"--extractor-args","short":null,"aliases":[],"stage":"extract","group":"Extractor Options","dest":"extractor_args","kind":"value","metavar":"IE_KEY:ARGS","choices":null,"default":{},"help":"Pass ARGS arguments to the IE_KEY extractor. See \"EXTRACTOR ARGUMENTS\" for details. You can use this option multiple times to give arguments for different extractors","negation":null},{"id":"extractor-retries","flag":"--extractor-retries","short":null,"aliases":[],"stage":"extract","group":"Extractor Options","dest":"extractor_retries","kind":"value","metavar":"RETRIES","choices":null,"default":3,"help":"Number of retries for known extractor errors (default is 3), or \"infinite\"","negation":null},{"id":"hls-split-discontinuity","flag":"--hls-split-discontinuity","short":null,"aliases":[],"stage":"extract","group":"Extractor Options","dest":"hls_split_discontinuity","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Split HLS playlists to different formats at discontinuities such as ad breaks","negation":"--no-hls-split-discontinuity"},{"id":"ignore-dynamic-mpd","flag":"--ignore-dynamic-mpd","short":null,"aliases":["--no-allow-dynamic-mpd"],"stage":"extract","group":"Extractor Options","dest":"dynamic_mpd","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Do not process dynamic DASH manifests (Alias: --no-allow-dynamic-mpd)","negation":null},{"id":"age-limit","flag":"--age-limit","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"age_limit","kind":"value","metavar":"YEARS","choices":null,"default":null,"help":"Download only videos suitable for the given age","negation":null},{"id":"break-match-filters","flag":"--break-match-filters","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"breaking_match_filter","kind":"repeatable","metavar":"FILTER","choices":null,"default":null,"help":"Same as \"--match-filters\" but stops the download process when a video is rejected","negation":"--no-break-match-filters"},{"id":"break-on-existing","flag":"--break-on-existing","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"break_on_existing","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Stop the download process when encountering a file that is in the archive supplied with the --download-archive option","negation":"--no-break-on-existing"},{"id":"break-per-input","flag":"--break-per-input","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"break_per_url","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Alters --max-downloads, --break-on-existing, --break-match-filters, and autonumber to reset per input URL","negation":"--no-break-per-input"},{"id":"date","flag":"--date","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"date","kind":"value","metavar":"DATE","choices":null,"default":null,"help":"Download only videos uploaded on this date. The date can be \"YYYYMMDD\" or in the format [now|today|yesterday][-N[day|week|month|year]]. E.g. \"--date today-2weeks\" downloads only videos uploaded on the same day two weeks ago","negation":null},{"id":"dateafter","flag":"--dateafter","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"dateafter","kind":"value","metavar":"DATE","choices":null,"default":null,"help":"Download only videos uploaded on or after this date. The date formats accepted are the same as --date","negation":null},{"id":"datebefore","flag":"--datebefore","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"datebefore","kind":"value","metavar":"DATE","choices":null,"default":null,"help":"Download only videos uploaded on or before this date. The date formats accepted are the same as --date","negation":null},{"id":"download-archive","flag":"--download-archive","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"download_archive","kind":"value","metavar":"FILE","choices":null,"default":null,"help":"Download only videos not listed in the archive file. Record the IDs of all downloaded videos in it","negation":"--no-download-archive"},{"id":"match-filters","flag":"--match-filters","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"match_filter","kind":"repeatable","metavar":"FILTER","choices":null,"default":null,"help":"Generic video filter. Any \"OUTPUT TEMPLATE\" field can be compared with a number or a string using the operators defined in \"Filtering Formats\". You can also simply specify a field to match if the field is present, use \"!field\" to check if the field is not present, and \"&\" to check multiple conditions. Use a \"\\\" to escape \"&\" or quotes if needed. If used multiple times, the filter matches if at least one of the conditions is met. E.g. --match-filters !is_live --match-filters \"like_count>?100 & description~='(?i)\\bcats \\& dogs\\b'\" matches only videos that are not live OR those that have a like count more than 100 (or the like field is not available) and also has a description that contains the phrase \"cats & dogs\" (caseless). Use \"--match-filters -\" to interactively ask whether to download each video","negation":"--no-match-filters"},{"id":"max-downloads","flag":"--max-downloads","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"max_downloads","kind":"value","metavar":"NUMBER","choices":null,"default":null,"help":"Abort after downloading NUMBER files","negation":null},{"id":"max-filesize","flag":"--max-filesize","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"max_filesize","kind":"value","metavar":"SIZE","choices":null,"default":null,"help":"Abort download if filesize is larger than SIZE, e.g. 50k or 44.6M","negation":null},{"id":"min-filesize","flag":"--min-filesize","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"min_filesize","kind":"value","metavar":"SIZE","choices":null,"default":null,"help":"Abort download if filesize is smaller than SIZE, e.g. 50k or 44.6M","negation":null},{"id":"no-playlist","flag":"--no-playlist","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"noplaylist","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Download only the video, if the URL refers to a video and a playlist","negation":"--yes-playlist"},{"id":"playlist-items","flag":"--playlist-items","short":"-I","aliases":[],"stage":"select","group":"Video Selection","dest":"playlist_items","kind":"value","metavar":"ITEM_SPEC","choices":null,"default":null,"help":"Comma-separated playlist_index of the items to download. You can specify a range using \"[START]:[STOP][:STEP]\". For backward compatibility, START-STOP is also supported. Use negative indices to count from the right and negative STEP to download in reverse order. E.g. \"-I 1:3,7,-5::2\" used on a playlist of size 15 will download the items at index 1,2,3,7,11,13,15","negation":null},{"id":"skip-playlist-after-errors","flag":"--skip-playlist-after-errors","short":null,"aliases":[],"stage":"select","group":"Video Selection","dest":"skip_playlist_after_errors","kind":"value","metavar":"N","choices":null,"default":null,"help":"Number of allowed failures until the rest of the playlist is skipped","negation":null},{"id":"audio-multistreams","flag":"--audio-multistreams","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"allow_multiple_audio_streams","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Allow multiple audio streams to be merged into a single file","negation":"--no-audio-multistreams"},{"id":"check-all-formats","flag":"--check-all-formats","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"check_formats","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Check all formats for whether they are actually downloadable","negation":null},{"id":"check-formats","flag":"--check-formats","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"check_formats","kind":"value","metavar":null,"choices":null,"default":null,"help":"Make sure formats are selected only from those that are actually downloadable","negation":"--no-check-formats"},{"id":"format","flag":"--format","short":"-f","aliases":[],"stage":"format","group":"Video Format Options","dest":"format","kind":"value","metavar":"FORMAT","choices":null,"default":null,"help":"Video format code, see \"FORMAT SELECTION\" for more details","negation":null},{"id":"format-sort","flag":"--format-sort","short":"-S","aliases":[],"stage":"format","group":"Video Format Options","dest":"format_sort","kind":"value","metavar":"SORTORDER","choices":null,"default":[],"help":"Sort the formats by the fields given, see \"Sorting Formats\" for more details","negation":null},{"id":"format-sort-force","flag":"--format-sort-force","short":null,"aliases":["--S-force"],"stage":"format","group":"Video Format Options","dest":"format_sort_force","kind":"flag","metavar":"FORMAT","choices":null,"default":false,"help":"Force user specified sort order to have precedence over all fields, see \"Sorting Formats\" for more details (Alias: --S-force)","negation":"--no-format-sort-force"},{"id":"format-sort-reset","flag":"--format-sort-reset","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"format_sort","kind":"value","metavar":null,"choices":null,"default":null,"help":"Disregard previous user specified sort order and reset to the default","negation":null},{"id":"list-formats","flag":"--list-formats","short":"-F","aliases":[],"stage":"format","group":"Video Format Options","dest":"listformats","kind":"flag","metavar":null,"choices":null,"default":null,"help":"List available formats of each video. Simulate unless --no-simulate is used","negation":null},{"id":"list-subs","flag":"--list-subs","short":null,"aliases":[],"stage":"format","group":"Subtitle Options","dest":"listsubtitles","kind":"flag","metavar":null,"choices":null,"default":false,"help":"List available subtitles of each video. Simulate unless --no-simulate is used","negation":null},{"id":"list-thumbnails","flag":"--list-thumbnails","short":null,"aliases":[],"stage":"format","group":"Thumbnail Options","dest":"list_thumbnails","kind":"flag","metavar":null,"choices":null,"default":false,"help":"List available thumbnails of each video. Simulate unless --no-simulate is used","negation":null},{"id":"merge-output-format","flag":"--merge-output-format","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"merge_output_format","kind":"value","metavar":"FORMAT","choices":null,"default":null,"help":"Containers that may be used when merging formats, separated by \"/\", e.g. \"mp4/mkv\". Ignored if no merge is required. (currently supported: avi, flv, mkv, mov, mp4, webm)","negation":null},{"id":"prefer-free-formats","flag":"--prefer-free-formats","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"prefer_free_formats","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Prefer video formats with free containers over non-free ones of the same quality. Use with \"-S ext\" to strictly prefer free containers irrespective of quality","negation":"--no-prefer-free-formats"},{"id":"sub-format","flag":"--sub-format","short":null,"aliases":[],"stage":"format","group":"Subtitle Options","dest":"subtitlesformat","kind":"value","metavar":"FORMAT","choices":null,"default":"best","help":"Subtitle format; accepts formats preference separated by \"/\", e.g. \"srt\" or \"ass/srt/best\"","negation":null},{"id":"sub-langs","flag":"--sub-langs","short":null,"aliases":["--srt-langs"],"stage":"format","group":"Subtitle Options","dest":"subtitleslangs","kind":"value","metavar":"LANGS","choices":null,"default":[],"help":"Languages of the subtitles to download (can be regex) or \"all\" separated by commas, e.g. --sub-langs \"en.*,ja\" (where \"en.*\" is a regex pattern that matches \"en\" followed by 0 or more of any character). You can prefix the language code with a \"-\" to exclude it from the requested languages, e.g. --sub-langs all,-live_chat. Use --list-subs for a list of available language tags","negation":null},{"id":"video-multistreams","flag":"--video-multistreams","short":null,"aliases":[],"stage":"format","group":"Video Format Options","dest":"allow_multiple_video_streams","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Allow multiple video streams to be merged into a single file","negation":"--no-video-multistreams"},{"id":"write-all-thumbnails","flag":"--write-all-thumbnails","short":null,"aliases":[],"stage":"format","group":"Thumbnail Options","dest":"writethumbnail","kind":"value","metavar":null,"choices":null,"default":null,"help":"Write all thumbnail image formats to disk","negation":null},{"id":"write-auto-subs","flag":"--write-auto-subs","short":null,"aliases":["--write-automatic-subs"],"stage":"format","group":"Subtitle Options","dest":"writeautomaticsub","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write automatically generated subtitle file (Alias: --write-automatic-subs)","negation":"--no-write-auto-subs"},{"id":"write-subs","flag":"--write-subs","short":null,"aliases":["--write-srt"],"stage":"format","group":"Subtitle Options","dest":"writesubtitles","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write subtitle file","negation":"--no-write-subs"},{"id":"write-thumbnail","flag":"--write-thumbnail","short":null,"aliases":[],"stage":"format","group":"Thumbnail Options","dest":"writethumbnail","kind":"value","metavar":null,"choices":null,"default":false,"help":"Write thumbnail image to disk","negation":"--no-write-thumbnail"},{"id":"abort-on-unavailable-fragments","flag":"--abort-on-unavailable-fragments","short":null,"aliases":["--no-skip-unavailable-fragments"],"stage":"download","group":"Download Options","dest":"skip_unavailable_fragments","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Abort download if a fragment is unavailable (Alias: --no-skip-unavailable-fragments)","negation":null},{"id":"buffer-size","flag":"--buffer-size","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"buffersize","kind":"value","metavar":"SIZE","choices":null,"default":"1024","help":"Size of download buffer, e.g. 1024 or 16K (default is 1024)","negation":null},{"id":"concurrent-fragments","flag":"--concurrent-fragments","short":"-N","aliases":[],"stage":"download","group":"Download Options","dest":"concurrent_fragment_downloads","kind":"value","metavar":"N","choices":null,"default":1,"help":"Number of fragments of a dash/hlsnative video that should be downloaded concurrently (default is 1)","negation":null},{"id":"download-sections","flag":"--download-sections","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"download_ranges","kind":"repeatable","metavar":"REGEX","choices":null,"default":null,"help":"Download only chapters that match the regular expression. A \"*\" prefix denotes time-range instead of chapter. Negative timestamps are calculated from the end. \"*from-url\" can be used to download between the \"start_time\" and \"end_time\" extracted from the URL. Needs ffmpeg. This option can be used multiple times to download multiple sections, e.g. --download-sections \"*10:15-inf\" --download-sections \"intro\"","negation":null},{"id":"downloader","flag":"--downloader","short":null,"aliases":["--external-downloader"],"stage":"download","group":"Download Options","dest":"external_downloader","kind":"value","metavar":"[PROTO:]NAME","choices":null,"default":{},"help":"Name or path of the external downloader to use (optionally) prefixed by the protocols (http, ftp, m3u8, dash, rtmp) to use it for. Currently supports native, aria2c, axel, curl, ffmpeg, httpie, wget. You can use this option multiple times to set different downloaders for different protocols. E.g. --downloader aria2c --downloader \"dash,m3u8:native\" will use aria2c for http/ftp downloads, and the native downloader for dash/m3u8 downloads (Alias: --external-downloader)","negation":null},{"id":"downloader-args","flag":"--downloader-args","short":null,"aliases":["--external-downloader-args"],"stage":"download","group":"Download Options","dest":"external_downloader_args","kind":"value","metavar":"NAME:ARGS","choices":null,"default":{},"help":"Give these arguments to the external downloader. Specify the downloader name and the arguments separated by a colon \":\". For ffmpeg, arguments can be passed to different positions using the same syntax as --postprocessor-args. You can use this option multiple times to give different arguments to different downloaders (Alias: --external-downloader-args)","negation":null},{"id":"file-access-retries","flag":"--file-access-retries","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"file_access_retries","kind":"value","metavar":"RETRIES","choices":null,"default":3,"help":"Number of times to retry on file access error (default is 3), or \"infinite\"","negation":null},{"id":"fragment-retries","flag":"--fragment-retries","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"fragment_retries","kind":"value","metavar":"RETRIES","choices":null,"default":10,"help":"Number of retries for a fragment (default is 10), or \"infinite\" (DASH, hlsnative and ISM)","negation":null},{"id":"hls-use-mpegts","flag":"--hls-use-mpegts","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"hls_use_mpegts","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Use the mpegts container for HLS videos; allowing some players to play the video while downloading, and reducing the chance of file corruption if download is interrupted. This is enabled by default for live streams","negation":"--no-hls-use-mpegts"},{"id":"http-chunk-size","flag":"--http-chunk-size","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"http_chunk_size","kind":"value","metavar":"SIZE","choices":null,"default":null,"help":"Size of a chunk for chunk-based HTTP downloading, e.g. 10485760 or 10M (default is disabled). May be useful for bypassing bandwidth throttling imposed by a webserver (experimental)","negation":null},{"id":"keep-fragments","flag":"--keep-fragments","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"keep_fragments","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Keep downloaded fragments on disk after downloading is finished","negation":"--no-keep-fragments"},{"id":"lazy-playlist","flag":"--lazy-playlist","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"lazy_playlist","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Process entries in the playlist as they are received. This disables n_entries, --playlist-random and --playlist-reverse","negation":"--no-lazy-playlist"},{"id":"limit-rate","flag":"--limit-rate","short":"-r","aliases":["--rate-limit"],"stage":"download","group":"Download Options","dest":"ratelimit","kind":"value","metavar":"RATE","choices":null,"default":null,"help":"Maximum download rate in bytes per second, e.g. 50K or 4.2M","negation":null},{"id":"playlist-random","flag":"--playlist-random","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"playlist_random","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Download playlist videos in random order","negation":null},{"id":"resize-buffer","flag":"--resize-buffer","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"noresizebuffer","kind":"flag","metavar":null,"choices":null,"default":null,"help":"The buffer size is automatically resized from an initial value of --buffer-size (default)","negation":"--no-resize-buffer"},{"id":"retries","flag":"--retries","short":"-R","aliases":[],"stage":"download","group":"Download Options","dest":"retries","kind":"value","metavar":"RETRIES","choices":null,"default":10,"help":"Number of retries (default is 10), or \"infinite\"","negation":null},{"id":"retry-sleep","flag":"--retry-sleep","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"retry_sleep","kind":"value","metavar":"[TYPE:]EXPR","choices":null,"default":{},"help":"Time to sleep between retries in seconds (optionally) prefixed by the type of retry (http (default), fragment, file_access, extractor) to apply the sleep to. EXPR can be a number, linear=START[:END[:STEP=1]] or exp=START[:END[:BASE=2]]. This option can be used multiple times to set the sleep for the different retry types, e.g. --retry-sleep linear=1::2 --retry-sleep fragment:exp=1:20","negation":null},{"id":"skip-unavailable-fragments","flag":"--skip-unavailable-fragments","short":null,"aliases":["--no-abort-on-unavailable-fragments"],"stage":"download","group":"Download Options","dest":"skip_unavailable_fragments","kind":"flag","metavar":null,"choices":null,"default":true,"help":"Skip unavailable fragments for DASH, hlsnative and ISM downloads (default) (Alias: --no-abort-on-unavailable-fragments)","negation":null},{"id":"throttled-rate","flag":"--throttled-rate","short":null,"aliases":[],"stage":"download","group":"Download Options","dest":"throttledratelimit","kind":"value","metavar":"RATE","choices":null,"default":null,"help":"Minimum download rate in bytes per second below which throttling is assumed and the video data is re-extracted, e.g. 100K","negation":null},{"id":"audio-format","flag":"--audio-format","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"audioformat","kind":"value","metavar":"FORMAT","choices":null,"default":"best","help":"Format to convert the audio to when -x is used. (currently supported: best (default), aac, alac, flac, m4a, mp3, opus, vorbis, wav). You can specify multiple rules using similar syntax as --remux-video","negation":null},{"id":"audio-quality","flag":"--audio-quality","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"audioquality","kind":"value","metavar":"QUALITY","choices":null,"default":"5","help":"Specify ffmpeg audio quality to use when converting the audio with -x. Insert a value between 0 (best) and 10 (worst) for VBR or a specific bitrate like 128K (default 5)","negation":null},{"id":"concat-playlist","flag":"--concat-playlist","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"concat_playlist","kind":"choice","metavar":"POLICY","choices":["never","always","multi_video"],"default":"multi_video","help":"Concatenate videos in a playlist. One of \"never\", \"always\", or \"multi_video\" (default; only when the videos form a single show). All the video files must have the same codecs and number of streams to be concatenable. The \"pl_video:\" prefix can be used with \"--paths\" and \"--output\" to set the output filename for the concatenated files. See \"OUTPUT TEMPLATE\" for details","negation":null},{"id":"convert-subs","flag":"--convert-subs","short":null,"aliases":["--convert-sub","--convert-subtitles"],"stage":"process","group":"Post-Processing Options","dest":"convertsubtitles","kind":"value","metavar":"FORMAT","choices":null,"default":null,"help":"Convert the subtitles to another format (currently supported: ass, lrc, srt, vtt). Use \"--convert-subs none\" to disable conversion (default) (Alias: --convert-subtitles)","negation":null},{"id":"convert-thumbnails","flag":"--convert-thumbnails","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"convertthumbnails","kind":"value","metavar":"FORMAT","choices":null,"default":null,"help":"Convert the thumbnails to another format (currently supported: jpg, png, webp). You can specify multiple rules using similar syntax as \"--remux-video\". Use \"--convert-thumbnails none\" to disable conversion (default)","negation":null},{"id":"embed-chapters","flag":"--embed-chapters","short":null,"aliases":["--add-chapters"],"stage":"process","group":"Post-Processing Options","dest":"addchapters","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Add chapter markers to the video file (Alias: --add-chapters)","negation":"--no-embed-chapters"},{"id":"embed-info-json","flag":"--embed-info-json","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"embed_infojson","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Embed the infojson as an attachment to mkv/mka video files","negation":"--no-embed-info-json"},{"id":"embed-metadata","flag":"--embed-metadata","short":null,"aliases":["--add-metadata"],"stage":"process","group":"Post-Processing Options","dest":"addmetadata","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Embed metadata to the video file. Also embeds chapters/infojson if present unless --no-embed-chapters/--no-embed-info-json are used (Alias: --add-metadata)","negation":"--no-embed-metadata"},{"id":"embed-subs","flag":"--embed-subs","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"embedsubtitles","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Embed subtitles in the video (only for mp4, webm and mkv videos)","negation":"--no-embed-subs"},{"id":"embed-thumbnail","flag":"--embed-thumbnail","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"embedthumbnail","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Embed thumbnail in the video as cover art","negation":"--no-embed-thumbnail"},{"id":"exec","flag":"--exec","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"exec_cmd","kind":"value","metavar":"[WHEN:]CMD","choices":null,"default":{},"help":"Execute a command, optionally prefixed with when to execute it, separated by a \":\". Supported values of \"WHEN\" are the same as that of --use-postprocessor (default: after_move). The same syntax as the output template can be used to pass any field as arguments to the command; however, for security reasons the only allowed conversions are: \"i\"/\"d\" (signed integer decimal), \"f\" (floating-point decimal) and \"q\" (shell-quoted). If no fields are passed, %(filepath,_filename|)q is appended to the end of the command. This option can be used multiple times","negation":"--no-exec"},{"id":"extract-audio","flag":"--extract-audio","short":"-x","aliases":[],"stage":"process","group":"Post-Processing Options","dest":"extractaudio","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Convert video files to audio-only files (requires ffmpeg and ffprobe)","negation":null},{"id":"ffmpeg-location","flag":"--ffmpeg-location","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"ffmpeg_location","kind":"value","metavar":"PATH","choices":null,"default":null,"help":"Location of the ffmpeg binary; either the path to the binary or its containing directory","negation":null},{"id":"fixup","flag":"--fixup","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"fixup","kind":"choice","metavar":"POLICY","choices":["never","ignore","warn","detect_or_warn","force"],"default":null,"help":"Automatically correct known faults of the file. One of never (do nothing), warn (only emit a warning), detect_or_warn (the default; fix the file if we can, warn otherwise), force (try fixing even if the file already exists)","negation":null},{"id":"force-keyframes-at-cuts","flag":"--force-keyframes-at-cuts","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"force_keyframes_at_cuts","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Force keyframes at cuts when downloading/splitting/removing sections. This is slow due to needing a re-encode, but the resulting video may have fewer artifacts around the cuts","negation":"--no-force-keyframes-at-cuts"},{"id":"keep-video","flag":"--keep-video","short":"-k","aliases":[],"stage":"process","group":"Post-Processing Options","dest":"keepvideo","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Keep the intermediate video file on disk after post-processing","negation":"--no-keep-video"},{"id":"no-sponsorblock","flag":"--no-sponsorblock","short":null,"aliases":[],"stage":"process","group":"SponsorBlock Options","dest":"no_sponsorblock","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Disable both --sponsorblock-mark and --sponsorblock-remove","negation":null},{"id":"parse-metadata","flag":"--parse-metadata","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"parse_metadata","kind":"value","metavar":"[WHEN:]FROM:TO","choices":null,"default":{},"help":"Parse additional metadata like title/artist from other fields; see \"MODIFYING METADATA\" for details. Supported values of \"WHEN\" are the same as that of --use-postprocessor (default: pre_process)","negation":null},{"id":"post-overwrites","flag":"--post-overwrites","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"nopostoverwrites","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Overwrite post-processed files (default)","negation":"--no-post-overwrites"},{"id":"postprocessor-args","flag":"--postprocessor-args","short":null,"aliases":["--ppa"],"stage":"process","group":"Post-Processing Options","dest":"postprocessor_args","kind":"value","metavar":"NAME:ARGS","choices":null,"default":{},"help":"Give these arguments to the postprocessors. Specify the postprocessor/executable name and the arguments separated by a colon \":\" to give the argument to the specified postprocessor/executable. Supported PP are: Merger, ModifyChapters, SplitChapters, ExtractAudio, VideoRemuxer, VideoConvertor, Metadata, EmbedSubtitle, EmbedThumbnail, SubtitlesConvertor, ThumbnailsConvertor, FixupStretched, FixupM4a, FixupM3u8, FixupTimestamp and FixupDuration. The supported executables are: AtomicParsley, FFmpeg and FFprobe. You can also specify \"PP+EXE:ARGS\" to give the arguments to the specified executable only when being used by the specified postprocessor. Additionally, for ffmpeg/ffprobe, \"_i\"/\"_o\" can be appended to the prefix optionally followed by a number to pass the argument before the specified input/output file, e.g. --ppa \"Merger+ffmpeg_i1:-v quiet\". You can use this option multiple times to give different arguments to different postprocessors. (Alias: --ppa)","negation":null},{"id":"recode-video","flag":"--recode-video","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"recodevideo","kind":"value","metavar":"FORMAT","choices":null,"default":null,"help":"Re-encode the video into another format if necessary. The syntax and supported formats are the same as --remux-video","negation":null},{"id":"remove-chapters","flag":"--remove-chapters","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"remove_chapters","kind":"repeatable","metavar":"REGEX","choices":null,"default":null,"help":"Remove chapters whose title matches the given regular expression. The syntax is the same as --download-sections. This option can be used multiple times","negation":"--no-remove-chapters"},{"id":"remux-video","flag":"--remux-video","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"remuxvideo","kind":"value","metavar":"FORMAT","choices":null,"default":null,"help":"Remux the video into another container if necessary (currently supported: avi, flv, gif, mkv, mov, mp4, webm, aac, aiff, alac, flac, m4a, mka, mp3, ogg, opus, vorbis, wav). If the target container does not support the video/audio codec, remuxing will fail. You can specify multiple rules; e.g. \"aac>m4a/mov>mp4/mkv\" will remux aac to m4a, mov to mp4 and anything else to mkv","negation":null},{"id":"replace-in-metadata","flag":"--replace-in-metadata","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"parse_metadata","kind":"value","metavar":"[WHEN:]FIELDS REGEX REPLACE","choices":null,"default":{},"help":"Replace text in a metadata field using the given regex. This option can be used multiple times. Supported values of \"WHEN\" are the same as that of --use-postprocessor (default: pre_process)","negation":null},{"id":"split-chapters","flag":"--split-chapters","short":null,"aliases":["--split-tracks"],"stage":"process","group":"Post-Processing Options","dest":"split_chapters","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Split video into multiple files based on internal chapters. The \"chapter:\" prefix can be used with \"--paths\" and \"--output\" to set the output filename for the split files. See \"OUTPUT TEMPLATE\" for details","negation":"--no-split-chapters"},{"id":"sponsorblock-api","flag":"--sponsorblock-api","short":null,"aliases":[],"stage":"process","group":"SponsorBlock Options","dest":"sponsorblock_api","kind":"value","metavar":"URL","choices":null,"default":"https://sponsor.ajay.app","help":"SponsorBlock API location, defaults to https://sponsor.ajay.app","negation":null},{"id":"sponsorblock-chapter-title","flag":"--sponsorblock-chapter-title","short":null,"aliases":[],"stage":"process","group":"SponsorBlock Options","dest":"sponsorblock_chapter_title","kind":"value","metavar":"TEMPLATE","choices":null,"default":"[SponsorBlock]: %(category_names)l","help":"An output template for the title of the SponsorBlock chapters created by --sponsorblock-mark. The only available fields are start_time, end_time, category, categories, name, category_names. Defaults to \"[SponsorBlock]: %(category_names)l\"","negation":null},{"id":"sponsorblock-mark","flag":"--sponsorblock-mark","short":null,"aliases":[],"stage":"process","group":"SponsorBlock Options","dest":"sponsorblock_mark","kind":"value","metavar":"CATS","choices":null,"default":"set()","help":"SponsorBlock categories to create chapters for, separated by commas. Available categories are sponsor, intro, outro, selfpromo, preview, filler, interaction, music_offtopic, hook, poi_highlight, chapter, all and default (=all). You can prefix the category with a \"-\" to exclude it. See [1] for descriptions of the categories. E.g. --sponsorblock-mark all,-preview [1] https://wiki.sponsor.ajay.app/w/Segment_Categories","negation":null},{"id":"sponsorblock-remove","flag":"--sponsorblock-remove","short":null,"aliases":[],"stage":"process","group":"SponsorBlock Options","dest":"sponsorblock_remove","kind":"value","metavar":"CATS","choices":null,"default":"set()","help":"SponsorBlock categories to be removed from the video file, separated by commas. If a category is present in both mark and remove, remove takes precedence. The syntax and available categories are the same as for --sponsorblock-mark except that \"default\" refers to \"all,-filler\" and poi_highlight, chapter are not available","negation":null},{"id":"use-postprocessor","flag":"--use-postprocessor","short":null,"aliases":[],"stage":"process","group":"Post-Processing Options","dest":"add_postprocessors","kind":"value","metavar":"NAME[:ARGS]","choices":null,"default":[],"help":"The (case-sensitive) name of plugin postprocessors to be enabled, and (optionally) arguments to be passed to it, separated by a colon \":\". ARGS are a semicolon \";\" delimited list of NAME=VALUE. The \"when\" argument determines when the postprocessor is invoked. It can be one of \"pre_process\" (after video extraction), \"after_filter\" (after video passes filter), \"video\" (after --format; before --print/--output), \"before_dl\" (before each video download), \"post_process\" (after each video download; default), \"after_move\" (after moving the video file to its final location), \"after_video\" (after downloading and processing all formats of a video), or \"playlist\" (at end of playlist). This option can be used multiple times to add different postprocessors","negation":null},{"id":"xattrs","flag":"--xattrs","short":null,"aliases":["--xattr"],"stage":"process","group":"Post-Processing Options","dest":"xattrs","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write metadata to the video file's xattrs (using Dublin Core and XDG standards)","negation":null},{"id":"batch-file","flag":"--batch-file","short":"-a","aliases":[],"stage":"store","group":"Filesystem Options","dest":"batchfile","kind":"value","metavar":"FILE","choices":null,"default":null,"help":"File containing URLs to download (\"-\" for stdin), one URL per line. Lines starting with \"#\", \";\" or \"]\" are considered as comments and ignored","negation":"--no-batch-file"},{"id":"cache-dir","flag":"--cache-dir","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"cachedir","kind":"value","metavar":"DIR","choices":null,"default":null,"help":"Location in the filesystem where yt-dlp can store some downloaded information (such as client ids and signatures) permanently. By default ${XDG_CACHE_HOME}/yt-dlp","negation":"--no-cache-dir"},{"id":"clean-info-json","flag":"--clean-info-json","short":null,"aliases":["--clean-infojson"],"stage":"store","group":"Filesystem Options","dest":"clean_infojson","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Remove some internal metadata such as filenames from the infojson (default)","negation":"--no-clean-info-json"},{"id":"continue","flag":"--continue","short":"-c","aliases":[],"stage":"store","group":"Filesystem Options","dest":"continue_dl","kind":"flag","metavar":null,"choices":null,"default":true,"help":"Resume partially downloaded files/fragments (default)","negation":"--no-continue"},{"id":"force-overwrites","flag":"--force-overwrites","short":null,"aliases":["--yes-overwrites"],"stage":"store","group":"Filesystem Options","dest":"overwrites","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Overwrite all video and metadata files. This option includes --no-continue","negation":"--no-force-overwrites"},{"id":"load-info-json","flag":"--load-info-json","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"load_info_filename","kind":"value","metavar":"FILE","choices":null,"default":null,"help":"JSON file containing the video information (created with the \"--write-info-json\" option)","negation":null},{"id":"mtime","flag":"--mtime","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"updatetime","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Use the Last-modified header to set the file modification time","negation":"--no-mtime"},{"id":"no-overwrites","flag":"--no-overwrites","short":"-w","aliases":[],"stage":"store","group":"Filesystem Options","dest":"overwrites","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Do not overwrite any files","negation":null},{"id":"output","flag":"--output","short":"-o","aliases":[],"stage":"store","group":"Filesystem Options","dest":"outtmpl","kind":"value","metavar":"[TYPES:]TEMPLATE","choices":null,"default":{},"help":"Output filename template; see \"OUTPUT TEMPLATE\" for details","negation":null},{"id":"output-na-placeholder","flag":"--output-na-placeholder","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"outtmpl_na_placeholder","kind":"value","metavar":"TEXT","choices":null,"default":"NA","help":"Placeholder for unavailable fields in --output (default: \"NA\")","negation":null},{"id":"part","flag":"--part","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"nopart","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Use .part files instead of writing directly into output file (default)","negation":"--no-part"},{"id":"paths","flag":"--paths","short":"-P","aliases":[],"stage":"store","group":"Filesystem Options","dest":"paths","kind":"value","metavar":"[TYPES:]PATH","choices":null,"default":{},"help":"The paths where the files should be downloaded. Specify the type of file and the path separated by a colon \":\". All the same TYPES as --output are supported. Additionally, you can also provide \"home\" (default) and \"temp\" paths. All intermediary files are first downloaded to the temp path and then the final files are moved over to the home path after download is finished. This option is ignored if --output is an absolute path","negation":null},{"id":"restrict-filenames","flag":"--restrict-filenames","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"restrictfilenames","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Restrict filenames to only ASCII characters, and avoid \"&\" and spaces in filenames","negation":"--no-restrict-filenames"},{"id":"rm-cache-dir","flag":"--rm-cache-dir","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"rm_cachedir","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Delete all filesystem cache files","negation":null},{"id":"trim-filenames","flag":"--trim-filenames","short":null,"aliases":["--trim-file-names"],"stage":"store","group":"Filesystem Options","dest":"trim_file_name","kind":"value","metavar":"LENGTH","choices":null,"default":0,"help":"Limit the filename length (excluding extension) to the specified number of characters","negation":null},{"id":"windows-filenames","flag":"--windows-filenames","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"windowsfilenames","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Force filenames to be Windows-compatible","negation":"--no-windows-filenames"},{"id":"write-comments","flag":"--write-comments","short":null,"aliases":["--get-comments"],"stage":"store","group":"Filesystem Options","dest":"getcomments","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Retrieve video comments to be placed in the infojson. The comments are fetched even without this option if the extraction is known to be quick (Alias: --get-comments)","negation":"--no-write-comments"},{"id":"write-description","flag":"--write-description","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"writedescription","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write video description to a .description file","negation":"--no-write-description"},{"id":"write-desktop-link","flag":"--write-desktop-link","short":null,"aliases":[],"stage":"store","group":"Internet Shortcut Options","dest":"writedesktoplink","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write a .desktop Linux internet shortcut","negation":null},{"id":"write-info-json","flag":"--write-info-json","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"writeinfojson","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Write video metadata to a .info.json file (this may contain personal information)","negation":"--no-write-info-json"},{"id":"write-link","flag":"--write-link","short":null,"aliases":[],"stage":"store","group":"Internet Shortcut Options","dest":"writelink","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write an internet shortcut file, depending on the current platform (.url, .webloc or .desktop). The URL may be cached by the OS","negation":null},{"id":"write-playlist-metafiles","flag":"--write-playlist-metafiles","short":null,"aliases":[],"stage":"store","group":"Filesystem Options","dest":"allow_playlist_files","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Write playlist metadata in addition to the video metadata when using --write-info-json, --write-description etc. (default)","negation":"--no-write-playlist-metafiles"},{"id":"write-url-link","flag":"--write-url-link","short":null,"aliases":[],"stage":"store","group":"Internet Shortcut Options","dest":"writeurllink","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write a .url Windows internet shortcut. The OS caches the URL based on the file path","negation":null},{"id":"write-webloc-link","flag":"--write-webloc-link","short":null,"aliases":[],"stage":"store","group":"Internet Shortcut Options","dest":"writewebloclink","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write a .webloc macOS internet shortcut","negation":null},{"id":"console-title","flag":"--console-title","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"consoletitle","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Display progress in console titlebar","negation":null},{"id":"dump-json","flag":"--dump-json","short":"-j","aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"dumpjson","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Quiet, but print JSON information for each video. Simulate unless --no-simulate is used. See \"OUTPUT TEMPLATE\" for a description of available keys","negation":null},{"id":"dump-pages","flag":"--dump-pages","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"dump_intermediate_pages","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Print downloaded pages encoded using base64 to debug problems (very verbose)","negation":null},{"id":"dump-single-json","flag":"--dump-single-json","short":"-J","aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"dump_single_json","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Quiet, but print JSON information for each URL or infojson passed. Simulate unless --no-simulate is used. If the URL refers to a playlist, the whole playlist information is dumped in a single line","negation":null},{"id":"force-write-archive","flag":"--force-write-archive","short":null,"aliases":["--force-write-download-archive","--force-download-archive"],"stage":"report","group":"Verbosity and Simulation Options","dest":"force_write_download_archive","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Force download archive entries to be written as far as no errors occur, even if -s or another simulation option is used (Alias: --force-download-archive)","negation":null},{"id":"ignore-no-formats-error","flag":"--ignore-no-formats-error","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"ignore_no_formats_error","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Ignore \"No video formats\" error. Useful for extracting metadata even if the videos are not actually available for download (experimental)","negation":"--no-ignore-no-formats-error"},{"id":"newline","flag":"--newline","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"progress_with_newline","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Output progress bar as new lines","negation":null},{"id":"no-warnings","flag":"--no-warnings","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"no_warnings","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Ignore warnings","negation":null},{"id":"print","flag":"--print","short":"-O","aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"forceprint","kind":"value","metavar":"[WHEN:]TEMPLATE","choices":null,"default":{},"help":"Field name or output template to print to screen, optionally prefixed with when to print it, separated by a \":\". Supported values of \"WHEN\" are the same as that of --use-postprocessor (default: video). Implies --quiet. Implies --simulate unless --no-simulate or later stages of WHEN are used. This option can be used multiple times","negation":null},{"id":"print-to-file","flag":"--print-to-file","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"print_to_file","kind":"value","metavar":"[WHEN:]TEMPLATE FILE","choices":null,"default":{},"help":"Append given template to the file. The values of WHEN and TEMPLATE are the same as that of --print. FILE uses the same syntax as the output template. This option can be used multiple times","negation":null},{"id":"print-traffic","flag":"--print-traffic","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"debug_printtraffic","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Display sent and read HTTP traffic","negation":null},{"id":"progress","flag":"--progress","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"noprogress","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Show progress bar, even if in quiet mode","negation":"--no-progress"},{"id":"progress-delta","flag":"--progress-delta","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"progress_delta","kind":"value","metavar":"SECONDS","choices":null,"default":0,"help":"Time between progress output (default: 0)","negation":null},{"id":"progress-template","flag":"--progress-template","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"progress_template","kind":"value","metavar":"[TYPES:]TEMPLATE","choices":null,"default":{},"help":"Template for progress outputs, optionally prefixed with one of \"download:\" (default), \"download-title:\" (the console title), \"postprocess:\", or \"postprocess-title:\". The video's fields are accessible under the \"info\" key and the progress attributes are accessible under \"progress\" key. E.g. --console-title --progress-template \"download-title:%(info.id)s-%(progress.eta)s\"","negation":null},{"id":"quiet","flag":"--quiet","short":"-q","aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"quiet","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Activate quiet mode. If used with --verbose, print the log to stderr","negation":"--no-quiet"},{"id":"simulate","flag":"--simulate","short":"-s","aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"simulate","kind":"flag","metavar":null,"choices":null,"default":null,"help":"Do not download the video and do not write anything to disk","negation":"--no-simulate"},{"id":"skip-download","flag":"--skip-download","short":null,"aliases":["--no-download"],"stage":"report","group":"Verbosity and Simulation Options","dest":"skip_download","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Do not download the video but write all related files (Alias: --no-download)","negation":null},{"id":"verbose","flag":"--verbose","short":"-v","aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"verbose","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Print various debugging information","negation":null},{"id":"write-pages","flag":"--write-pages","short":null,"aliases":[],"stage":"report","group":"Verbosity and Simulation Options","dest":"write_pages","kind":"flag","metavar":null,"choices":null,"default":false,"help":"Write downloaded intermediary pages to files in the current directory to debug problems","negation":null}]};
+
+/* ══ 스키마 파생 ═════════════════════════════ */
+const $ = s => document.querySelector(s);
+const STAGES = SCHEMA.stages;
+const OPTS = SCHEMA.options;
+const BY_ID = Object.fromEntries(OPTS.map(o => [o.id, o]));
+const STAGE_ORDER = STAGES.map(s => s.id);
+const STAGE = Object.fromEntries(STAGES.map(s => [s.id, s]));
+const BY_STAGE = Object.fromEntries(STAGE_ORDER.map(s => [s, OPTS.filter(o => o.stage === s)]));
+
+// 파이프라인을 왼쪽에서 오른쪽으로 훑을 때 색이 한 바퀴 도는 순서.
+const ACCENT = {
+  run:'#4B2ED4', connect:'#0F6FB8', extract:'#0E7C86', select:'#137A57',
+  format:'#6E7A12', download:'#A66A00', process:'#B4471F', store:'#A6265E', report:'#5B5566',
+};
+const IO_ACCENT = { src:'#137A57', out:'#141C19' };
+const accentOf = n => n.type === 'stage' ? ACCENT[n.stage] : IO_ACCENT[n.id];
+
+// 플래그 문자열 → 옵션 (역방향 파싱용). 별칭·단축·부정형까지 전부 색인.
+const BY_FLAG = {};
+for (const o of OPTS) {
+  BY_FLAG[o.flag] = { opt: o, negated: false };
+  if (o.short) BY_FLAG[o.short] = { opt: o, negated: false };
+  for (const a of o.aliases) BY_FLAG[a] = { opt: o, negated: false };
+  if (o.negation) BY_FLAG[o.negation] = { opt: o, negated: true };
+}
+
+// 한국어 의도 → yt-dlp 어휘. introspection이 절대 못 주는 층이라 손으로 채운다.
+const KO = {
+  '자막':'sub subtitle srt','자동자막':'auto-sub automatic','번역':'sub translate',
+  '썸네일':'thumbnail','표지':'thumbnail cover','화질':'format quality resolution height',
+  '해상도':'height width resolution format','포맷':'format container','코덱':'vcodec acodec format-sort',
+  '음원':'audio extract-audio','오디오':'audio','소리':'audio','음성':'audio',
+  '영상만':'video-only format','재생목록':'playlist','플레이리스트':'playlist',
+  '채널':'playlist flat-playlist','구간':'download-sections chapter split',
+  '자르기':'download-sections split-chapters','챕터':'chapter',
+  '광고':'sponsorblock','스폰서':'sponsorblock','건너뛰':'sponsorblock skip',
+  '쿠키':'cookies browser','로그인':'username password cookies netrc','인증':'auth username password',
+  '프록시':'proxy socket source-address','우회':'proxy geo impersonate',
+  '차단':'geo proxy impersonate','지역':'geo xff','아이피':'source-address proxy',
+  '속도':'rate-limit throttled concurrent','제한':'limit rate','동시':'concurrent fragments',
+  '재시도':'retries retry','이어받기':'continue part','중단':'abort break',
+  '중복':'download-archive no-overwrites','기록':'archive','아카이브':'archive',
+  '파일명':'output paths restrict-filenames windows-filenames','경로':'paths output home',
+  '이름':'output filename','폴더':'paths output batch',
+  '병합':'merge-output-format remux recode','변환':'recode remux audio-format',
+  '메타데이터':'metadata embed-metadata parse-metadata','태그':'metadata',
+  '자바스크립트':'extractor-args player','확장':'extractor-args plugin',
+  '로그':'verbose print quiet progress dump','조용':'quiet no-warnings',
+  '미리보기':'simulate print list-formats dump-json','목록':'list-formats list-subs print',
+  '테스트':'simulate skip-download','받지않':'skip-download simulate',
+  '느림':'concurrent rate-limit downloader','에러':'ignore-errors abort verbose retries',
+  '403':'impersonate extractor-args cookies user-agent','429':'sleep-requests rate-limit retries',
+  '기다':'sleep wait-for-video','라이브':'live-from-start wait-for-video',
+};
+function expand(t){
+  const out=[t];
+  for(const k in KO) if(k.includes(t)||t.includes(k)) out.push(...KO[k].split(' '));
+  return out;
+}
+const HAY = Object.fromEntries(OPTS.map(o =>
+  [o.id, (o.flag + ' ' + (o.short || '') + ' ' + o.aliases.join(' ') + ' ' + o.help).toLowerCase()]
+));
+function search(q, pool) {
+  const s = q.trim().toLowerCase();
+  if (!s) return null;
+  const terms = s.split(/\s+/).map(expand);
+  return (pool || OPTS).filter(o => terms.every(g => g.some(t => HAY[o.id].includes(t))));
+}
+
+/* ══ 그래프 상태 ═════════════════════════════ */
+const NODE_W = 300, HEAD_H = 34;
+const STORE_KEY = 'ytstudio.graph.v2';
+
+let state, view, seq;
+const ui = { lit: null, sel: null, picker: null, unknown: [], drag: null, wire: null };
+
+function blankGraph() {
+  return {
+    nodes: {
+      src: { id:'src', type:'source', x: 60,  y: 190, urls: '' },
+      out: { id:'out', type:'sink',   x: 700, y: 190 },
+    },
+    edges: [{ from:'src', to:'out' }],
+  };
+}
+function resetState() {
+  state = blankGraph();
+  view = { x: 0, y: 0, k: 1 };
+  seq = 1;
+  ui.unknown = []; ui.sel = null; ui.picker = null;
+}
+resetState();
+
+const nid = () => 'n' + (seq++);
+const stageIdx = id => STAGE_ORDER.indexOf(id);
+const nodeList = () => Object.values(state.nodes);
+const stageNode = sid => nodeList().find(n => n.type === 'stage' && n.stage === sid);
+const valuesOf = n => (n.values ||= {});
+const setCount = n => n.type === 'stage'
+  ? Object.keys(valuesOf(n)).filter(k => valuesOf(n)[k] !== '').length : 0;
+
+/* ── 그래프 질의 ─────────────────────────── */
+function adjacency() {
+  const out = {}, inn = {};
+  for (const n of nodeList()) { out[n.id] = []; inn[n.id] = []; }
+  for (const e of state.edges) {
+    if (out[e.from] && inn[e.to]) { out[e.from].push(e.to); inn[e.to].push(e.from); }
+  }
+  return { out, inn };
+}
+function reach(start, adj) {
+  const seen = new Set(), st = [start];
+  while (st.length) {
+    const v = st.pop();
+    if (seen.has(v)) continue;
+    seen.add(v);
+    for (const w of adj[v] || []) st.push(w);
+  }
+  return seen;
+}
+/** 소스에서 출발해 명령어 노드까지 실제로 도달하는 노드들을, 실행 순서대로. */
+function livePath() {
+  const { out, inn } = adjacency();
+  const fwd = reach('src', out), bwd = reach('out', inn);
+  const live = nodeList().map(n => n.id).filter(id => fwd.has(id) && bwd.has(id));
+  const set = new Set(live);
+  const cmp = (a, b) => (state.nodes[a].x - state.nodes[b].x)
+    || (stageIdx(state.nodes[a].stage) - stageIdx(state.nodes[b].stage));
+  const indeg = {};
+  for (const id of live) indeg[id] = inn[id].filter(p => set.has(p)).length;
+  let q = live.filter(id => indeg[id] === 0);
+  const order = [];
+  while (q.length) {
+    q.sort(cmp);
+    const v = q.shift();
+    order.push(v);
+    for (const w of out[v]) if (set.has(w) && --indeg[w] === 0) q.push(w);
+  }
+  return order;
+}
+function liveSet() { return new Set(livePath()); }
+function creates_cycle(from, to) {
+  const { out } = adjacency();
+  return reach(to, out).has(from);          // to 에서 from 으로 돌아올 수 있으면 순환
+}
+function connect(from, to) {
+  if (from === to) return false;
+  if (state.edges.some(e => e.from === from && e.to === to)) return false;
+  if (creates_cycle(from, to)) return false;
+  state.edges.push({ from, to });
+  return true;
+}
+
+/* ── 노드 만들기 / 지우기 ────────────────── */
+function addStageNode(sid, x, y) {
+  const found = stageNode(sid);
+  if (found) return found;
+  const n = { id: nid(), type: 'stage', stage: sid, x, y, values: {} };
+  state.nodes[n.id] = n;
+  spliceIntoChain(n);
+  return n;
+}
+/** 새 노드를 단계 순서에 맞는 자리에 끼워 넣는다. 사슬이 아니면 그냥 매달아 둔다. */
+function spliceIntoChain(n) {
+  const chain = [];
+  const { out } = adjacency();
+  let cur = 'src';
+  const seen = new Set();
+  while (cur && !seen.has(cur)) {
+    seen.add(cur);
+    chain.push(cur);
+    if (cur === 'out') break;
+    const next = (out[cur] || []).filter(id => id !== n.id);
+    if (next.length !== 1) return;          // 단순 사슬이 아니다 → 손으로 잇게 둔다
+    cur = next[0];
+  }
+  if (chain[chain.length - 1] !== 'out') return;
+  const rank = id => id === 'src' ? -1 : id === 'out' ? 99 : stageIdx(state.nodes[id].stage);
+  let i = 0;
+  while (i < chain.length - 1 && rank(chain[i + 1]) < stageIdx(n.stage)) i++;
+  const prev = chain[i], next = chain[i + 1];
+  state.edges = state.edges.filter(e => !(e.from === prev && e.to === next));
+  state.edges.push({ from: prev, to: n.id }, { from: n.id, to: next });
+}
+function removeNode(id) {
+  if (id === 'src' || id === 'out') return;
+  // 지운 노드의 앞뒤를 이어 붙여 사슬이 끊기지 않게 한다.
+  const before = state.edges.filter(e => e.to === id).map(e => e.from);
+  const after = state.edges.filter(e => e.from === id).map(e => e.to);
+  state.edges = state.edges.filter(e => e.from !== id && e.to !== id);
+  for (const a of before) for (const b of after) connect(a, b);
+  delete state.nodes[id];
+  if (ui.sel === id) ui.sel = null;
+  if (ui.picker && ui.picker.node === id) ui.picker = null;
+}
+
+/* ── 좌표 변환 ───────────────────────────── */
+const vp = () => $('#viewport').getBoundingClientRect();
+function toWorld(clientX, clientY) {
+  const r = vp();
+  return { x: (clientX - r.left - view.x) / view.k, y: (clientY - r.top - view.y) / view.k };
+}
+const portPos = n => ({
+  inX: n.x, outX: n.x + NODE_W, y: n.y + HEAD_H / 2,
+});
+
+/* ══ 명령어 조립 ═════════════════════════════ */
+const SAFE = /^[A-Za-z0-9._:,\/=+@%^-]+$/;
+const quote = v => SAFE.test(v) ? v : '"' + v.replace(/([\\"$`])/g, '\\$1') + '"';
+
+/** 살아 있는 경로를 순서대로 훑으며 토큰을 뽑는다. 노드 순서가 곧 플래그 순서다. */
+function buildTokens() {
+  const toks = [];
+  for (const id of livePath()) {
+    const n = state.nodes[id];
+    if (n.type !== 'stage') continue;
+    const vals = valuesOf(n);
+    for (const o of BY_STAGE[n.stage]) {
+      if (!(o.id in vals) || vals[o.id] === '') continue;
+      const v = vals[o.id];
+      if (v === true) toks.push({ node: n.id, opt: o, text: o.short || o.flag });
+      else if (v === false) { if (o.negation) toks.push({ node: n.id, opt: o, text: o.negation }); }
+      else if (o.kind === 'repeatable') {
+        for (const line of String(v).split('\n').map(s => s.trim()).filter(Boolean))
+          toks.push({ node: n.id, opt: o, text: (o.short || o.flag) + ' ' + quote(line) });
+      } else toks.push({ node: n.id, opt: o, text: (o.short || o.flag) + ' ' + quote(String(v)) });
+    }
+  }
+  return toks;
+}
+const urlList = () => (state.nodes.src.urls || '').split('\n').map(s => s.trim()).filter(Boolean);
+function commandString() {
+  return ['yt-dlp', ...buildTokens().map(t => t.text), ...urlList().map(quote)].join(' ');
+}
+function confString() {
+  return buildTokens().map(t => t.text).join('\n') + '\n';
+}
+
+/* ══ 렌더 ════════════════════════════════════ */
+function applyView() {
+  const t = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
+  $('#node-layer').style.transform = t;
+  $('#wire-layer').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
+  $('#viewport').style.backgroundSize = (22 * view.k) + 'px ' + (22 * view.k) + 'px';
+  $('#viewport').style.backgroundPosition = view.x + 'px ' + view.y + 'px';
+  $('#zoom-label').textContent = Math.round(view.k * 100) + '%';
+}
+
+function wirePath(x1, y1, x2, y2) {
+  const dx = Math.max(34, Math.min(150, Math.abs(x2 - x1) * 0.5));
+  return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
+}
+
+function renderWires() {
+  const layer = $('#wire-layer');
+  const live = liveSet();
+  layer.innerHTML = '';
+  for (const e of state.edges) {
+    const a = state.nodes[e.from], b = state.nodes[e.to];
+    if (!a || !b) continue;
+    const pa = portPos(a), pb = portPos(b);
+    const d = wirePath(pa.outX, pa.y, pb.inX, pb.y);
+    const on = live.has(e.from) && live.has(e.to);
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'wire-g');
+    g.style.pointerEvents = 'auto';
+    // 삭제는 viewport 의 pointerdown 에서 처리한다. 팬이 포인터를 캡처해 버리면
+    // click 이 viewport 로 되돌아가기 때문에 여기에 onclick 을 달면 안 걸린다.
+    g.dataset.from = e.from;
+    g.dataset.to = e.to;
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hit.setAttribute('class', 'wire-hit'); hit.setAttribute('d', d);
+    hit.innerHTML = '<title>클릭해서 연결 끊기</title>';
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('class', 'wire' + (on ? '' : ' dead'));
+    p.setAttribute('d', d);
+    if (on) p.style.stroke = accentOf(a);
+    g.append(hit, p);
+    layer.append(g);
+  }
+  if (ui.wire) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('class', 'wire-temp');
+    p.setAttribute('d', wirePath(ui.wire.x1, ui.wire.y1, ui.wire.x2, ui.wire.y2));
+    layer.append(p);
+  }
+}
+
+function triControl(n, o) {
+  const cur = valuesOf(n)[o.id];
+  const tri = document.createElement('div');
+  tri.className = 'tri';
+  const states = o.negation
+    ? [['켜기', true, o.flag], ['끄기', false, o.negation]]
+    : [['켜기', true, o.flag]];
+  for (const [label, val, tip] of states) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label; b.title = tip;
+    b.setAttribute('aria-pressed', String(cur === val));
+    b.onclick = () => { valuesOf(n)[o.id] = val; render(); };
+    tri.append(b);
+  }
+  return tri;
+}
+
+function optRow(n, o) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.dataset.opt = o.id;
+  const top = document.createElement('div');
+  top.className = 'row-top';
+  top.innerHTML = `<span class="row-flag">${o.flag}`
+    + (o.short ? ` <span class="short">${o.short}</span>` : '') + `</span>`;
+  const x = document.createElement('button');
+  x.className = 'row-x'; x.type = 'button'; x.textContent = '✕';
+  x.title = '이 옵션 빼기';
+  x.onclick = () => { delete valuesOf(n)[o.id]; render(); };
+  top.append(x);
+  row.append(top);
+
+  if (o.help) {
+    const h = document.createElement('div');
+    h.className = 'row-help'; h.textContent = o.help; h.title = o.help;
+    row.append(h);
+  }
+
+  const ctl = document.createElement('div');
+  ctl.className = 'row-ctl';
+  const cur = valuesOf(n)[o.id];
+
+  if (o.kind === 'flag') {
+    ctl.append(triControl(n, o));
+  } else if (o.kind === 'choice') {
+    const sel = document.createElement('select');
+    sel.innerHTML = '<option value="">(기본)</option>'
+      + o.choices.map(c => `<option${c === cur ? ' selected' : ''}>${c}</option>`).join('');
+    sel.onchange = () => { valuesOf(n)[o.id] = sel.value; renderAfterEdit(); };
+    ctl.append(sel);
+  } else {
+    const el = document.createElement(o.kind === 'repeatable' ? 'textarea' : 'input');
+    if (o.kind !== 'repeatable') el.type = 'text';
+    el.value = cur === undefined || cur === true || cur === false ? '' : cur;
+    el.placeholder = o.kind === 'repeatable'
+      ? (o.metavar || 'VALUE') + ' — 한 줄에 하나'
+      : (o.metavar || (o.default != null ? String(o.default) : 'VALUE'));
+    el.oninput = () => { valuesOf(n)[o.id] = el.value; renderAfterEdit(); };
+    ctl.append(el);
+  }
+  row.append(ctl);
+
+  row.onmouseenter = () => { ui.lit = o.id; paintLit(); };
+  row.onmouseleave = () => { ui.lit = null; paintLit(); };
+  return row;
+}
+
+function pickerList(n, q) {
+  const vals = valuesOf(n);
+  const pool = BY_STAGE[n.stage].filter(o => !(o.id in vals));
+  return (search(q, pool) || pool);
+}
+function renderPickerList(n, ul, q) {
+  const hits = pickerList(n, q);
+  ul.innerHTML = '';
+  if (!hits.length) {
+    ul.innerHTML = '<li class="none">남은 옵션이 없다.</li>';
+    return;
+  }
+  for (const o of hits.slice(0, 60)) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<div class="pf">${o.flag}${o.short ? ' <span class="short">' + o.short + '</span>' : ''}</div>`
+      + `<div class="ph">${escapeHtml(o.help)}</div>`;
+    b.onclick = () => {
+      valuesOf(n)[o.id] = o.kind === 'flag' ? true : '';
+      ui.picker = null;
+      render();
+    };
+    li.append(b);
+    ul.append(li);
+  }
+}
+
+function nodeEl(n, live) {
+  const el = document.createElement('div');
+  el.className = 'node' + (n.type === 'stage' ? '' : ' io')
+    + (live.has(n.id) ? '' : ' bypass') + (ui.sel === n.id ? ' sel' : '');
+  el.dataset.id = n.id;
+  el.style.setProperty('--a', accentOf(n));
+  el.style.left = n.x + 'px';
+  el.style.top = n.y + 'px';
+
+  const head = document.createElement('div');
+  head.className = 'node-head';
+  const label = n.type === 'stage'
+    ? `<span class="node-tag">[${n.stage}]</span><span class="node-ko">${STAGE[n.stage].label}<span class="node-badge">우회</span></span>`
+    : n.id === 'src'
+      ? `<span class="node-tag">[source]</span><span class="node-ko">소스<span class="node-badge">끊김</span></span>`
+      : `<span class="node-tag">[command]</span><span class="node-ko">명령어<span class="node-badge">끊김</span></span>`;
+  head.innerHTML = label + `<span class="node-n" data-n="${setCount(n)}">${setCount(n)}</span>`;
+
+  const fold = document.createElement('button');
+  fold.className = 'node-x'; fold.type = 'button';
+  fold.textContent = n.collapsed ? '▸' : '▾';
+  fold.title = n.collapsed ? '펴기' : '접기';
+  fold.onclick = ev => { ev.stopPropagation(); n.collapsed = !n.collapsed;
+    if (ui.picker && ui.picker.node === n.id) ui.picker = null;
+    render(); };
+  head.append(fold);
+
+  if (n.type === 'stage') {
+    const x = document.createElement('button');
+    x.className = 'node-x'; x.type = 'button'; x.textContent = '✕';
+    x.title = '노드 지우기';
+    x.onclick = ev => { ev.stopPropagation(); removeNode(n.id); render(); };
+    head.append(x);
+  } else {
+    head.append(document.createElement('span'));
+  }
+  head.title = n.type === 'stage' ? STAGE[n.stage].blurb : '';
+  head.ondblclick = () => { n.collapsed = !n.collapsed;
+    if (ui.picker && ui.picker.node === n.id) ui.picker = null;
+    render(); };
+  el.append(head);
+  if (n.collapsed) el.classList.add('collapsed');
+
+  const body = document.createElement('div');
+  body.className = 'node-body';
+
+  if (n.id === 'src') {
+    const ta = document.createElement('textarea');
+    ta.value = n.urls || '';
+    ta.spellcheck = false;
+    ta.placeholder = 'https://…  — 한 줄에 하나';
+    ta.oninput = () => { n.urls = ta.value; renderAfterEdit(); };
+    body.append(ta);
+    const note = document.createElement('div');
+    note.className = 'node-note';
+    note.textContent = '명령어 맨 뒤에 붙는 대상 URL.';
+    body.append(note);
+  } else if (n.id === 'out') {
+    const toks = buildTokens();
+    const stat = document.createElement('div');
+    stat.className = 'sink-stat';
+    stat.innerHTML = `<span>토큰 ${toks.length}</span>`
+      + `<span>단계 ${new Set(toks.map(t => t.node)).size}</span>`
+      + `<span>URL ${urlList().length}</span>`;
+    const note = document.createElement('div');
+    note.className = 'node-note';
+    note.textContent = '여기까지 이어진 노드만 아래 명령어에 들어간다.';
+    body.append(note, stat);
+  } else {
+    const vals = valuesOf(n);
+    const rows = BY_STAGE[n.stage].filter(o => o.id in vals);
+    if (!rows.length) {
+      const note = document.createElement('div');
+      note.className = 'node-note';
+      note.textContent = STAGE[n.stage].blurb + ' — 아직 고른 옵션이 없다.';
+      body.append(note);
+    }
+    for (const o of rows) body.append(optRow(n, o));
+
+    if (ui.picker && ui.picker.node === n.id) {
+      const box = document.createElement('div');
+      box.className = 'picker';
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.spellcheck = false;
+      inp.placeholder = STAGE[n.stage].label + ' 옵션 검색…';
+      inp.value = ui.picker.q;
+      const ul = document.createElement('ul');
+      inp.oninput = () => { ui.picker.q = inp.value; renderPickerList(n, ul, inp.value); };
+      inp.onkeydown = ev => {
+        if (ev.key === 'Escape') { ev.stopPropagation(); ui.picker = null; render(); }
+      };
+      box.append(inp, ul);
+      body.append(box);
+      renderPickerList(n, ul, ui.picker.q);
+      queueMicrotask(() => inp.focus());
+    } else {
+      const add = document.createElement('button');
+      add.className = 'add'; add.type = 'button'; add.textContent = '+ 옵션';
+      add.onclick = () => { ui.picker = { node: n.id, q: '' }; render(); };
+      body.append(add);
+    }
+  }
+  if (!n.collapsed) el.append(body);
+
+  if (n.id !== 'src') {
+    const pin = document.createElement('span');
+    pin.className = 'port in'; pin.dataset.node = n.id; pin.dataset.side = 'in';
+    pin.title = '입력';
+    el.append(pin);
+  }
+  if (n.id !== 'out') {
+    const pout = document.createElement('span');
+    pout.className = 'port out'; pout.dataset.node = n.id; pout.dataset.side = 'out';
+    pout.title = '출력 — 여기서 끌어다 다른 노드 입력에 놓아라';
+    el.append(pout);
+  }
+
+  el.onpointerdown = () => { ui.sel = n.id; paintSel(); };
+  return el;
+}
+
+function renderNodes() {
+  const layer = $('#node-layer');
+  const live = liveSet();
+  layer.innerHTML = '';
+  for (const n of nodeList()) layer.append(nodeEl(n, live));
+  $('#hint').hidden = nodeList().some(n => n.type === 'stage');
+}
+
+function renderPalette() {
+  const list = $('#pal-list');
+  list.innerHTML = '';
+  for (const s of STAGES) {
+    const placed = stageNode(s.id);
+    const b = document.createElement('button');
+    b.className = 'pal-item' + (placed ? ' placed' : '');
+    b.type = 'button';
+    b.dataset.stage = s.id;
+    b.style.setProperty('--a', ACCENT[s.id]);
+    b.title = s.blurb + (placed ? ' · 이미 캔버스에 있다' : '');
+    b.innerHTML = `<span class="dot"></span>`
+      + `<span class="tag">[<b>${s.id}</b>]<span class="ko">${s.label}</span></span>`
+      + (placed && setCount(placed) ? `<span class="n">${setCount(placed)}</span>` : '<span></span>');
+    list.append(b);
+  }
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
+}
+function highlight(text, terms) {
+  let html = escapeHtml(text);
+  for (const t of terms) {
+    if (!t) continue;
+    html = html.replace(new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
+  }
+  return html;
+}
+
+function renderHits() {
+  const box = $('#hits');
+  const q = $('#q').value;
+  const hits = search(q);
+  if (!hits) { box.hidden = true; box.innerHTML = ''; return; }
+  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean).flatMap(expand);
+  box.hidden = false;
+  box.innerHTML = `<div class="hits-head">${hits.length}개 일치 · 고르면 해당 단계 노드에 들어간다</div>`;
+  for (const o of hits.slice(0, 80)) {
+    const holder = stageNode(o.stage);
+    const on = holder && o.id in valuesOf(holder);
+    const b = document.createElement('button');
+    b.className = 'hit'; b.type = 'button';
+    b.innerHTML = `<span><span class="hit-flag">${highlight(o.flag, terms)}`
+      + (o.short ? ` <span class="short">${o.short}</span>` : '') + `</span>`
+      + `<span class="hit-help">${highlight(o.help, terms)}</span></span>`
+      + (on ? `<span class="hit-on">✓ 배치됨</span>`
+            : `<span class="hit-stage" style="color:${ACCENT[o.stage]}">${o.stage}</span>`);
+    b.onclick = () => {
+      const n = addStageNode(o.stage, ...freeSpot());
+      valuesOf(n)[o.id] = o.kind === 'flag' ? true : '';
+      $('#q').value = ''; renderHits();
+      render();
+      focusNode(n.id);
+    };
+    box.append(b);
+  }
+}
+
+function renderCmd() {
+  const box = $('#cmd');
+  const toks = buildTokens();
+  box.innerHTML = '';
+  box.append(Object.assign(document.createElement('span'), { className:'prompt', textContent:'$ ' }));
+  box.append(Object.assign(document.createElement('span'), { textContent:'yt-dlp' }));
+  for (const t of toks) {
+    box.append(document.createTextNode(' '));
+    const el = document.createElement('span');
+    el.className = 'tok' + (ui.lit === t.opt.id ? ' lit' : '');
+    el.dataset.opt = t.opt.id;
+    el.dataset.node = t.node;
+    el.textContent = t.text;
+    el.title = t.opt.flag + ' — [' + t.opt.stage + '] ' + STAGE[t.opt.stage].label + ' 노드';
+    box.append(el);
+  }
+  for (const u of urlList()) {
+    box.append(document.createTextNode(' '));
+    box.append(Object.assign(document.createElement('span'), { className:'tok url', textContent: quote(u) }));
+  }
+
+  const n = $('#notes');
+  const live = liveSet();
+  const bypassed = nodeList().filter(x => x.type === 'stage' && !live.has(x.id));
+  const parts = [];
+  if (ui.unknown.length) {
+    parts.push('<b>읽지 못한 토큰:</b> ' + ui.unknown.map(escapeHtml).join(' · '));
+  }
+  if (toks.length) {
+    parts.push(toks.length + '개 옵션 · ' + new Set(toks.map(t => t.node)).size + '개 노드 · 플래그 순서는 그래프 순서를 따른다');
+  } else if (!ui.unknown.length) {
+    parts.push('아직 잡힌 옵션이 없다. 왼쪽 단계를 캔버스에 놓고 소스 → 명령어로 이어라.');
+  }
+  if (bypassed.length) {
+    parts.push('<b>우회 중:</b> ' + bypassed.map(x => '[' + x.stage + ']').join(' ') + ' — 경로에서 끊겨 있어 반영되지 않는다');
+  }
+  n.innerHTML = parts.join(' · ');
+}
+
+function paintLit() {
+  for (const el of document.querySelectorAll('.tok[data-opt]'))
+    el.classList.toggle('lit', el.dataset.opt === ui.lit);
+  for (const el of document.querySelectorAll('.row'))
+    el.classList.toggle('lit', el.dataset.opt === ui.lit);
+  const holder = ui.lit ? stageNode(BY_ID[ui.lit].stage) : null;
+  for (const el of document.querySelectorAll('.node'))
+    el.classList.toggle('lit', !!holder && el.dataset.id === holder.id);
+}
+function paintSel() {
+  for (const el of document.querySelectorAll('.node'))
+    el.classList.toggle('sel', el.dataset.id === ui.sel);
+}
+/** 텍스트 입력 중에는 노드를 다시 그리지 않는다 — 포커스가 날아간다. */
+function renderAfterEdit() {
+  renderCmd(); renderPalette(); renderWires();
+  for (const el of document.querySelectorAll('.node')) {
+    const n = state.nodes[el.dataset.id];
+    const badge = el.querySelector('.node-n');
+    if (n && badge) { badge.textContent = setCount(n); badge.dataset.n = setCount(n); }
+  }
+  save();
+}
+function render() {
+  renderNodes(); renderWires(); renderCmd(); renderPalette(); applyView(); save();
+}
+
+/* ══ 배치 ════════════════════════════════════ */
+function freeSpot() {
+  // 캔버스 중앙 부근에서 겹치지 않는 자리를 찾는다.
+  const r = vp();
+  let x = (r.width / 2 - view.x) / view.k - NODE_W / 2;
+  let y = (r.height / 2 - view.y) / view.k - 60;
+  const taken = () => nodeList().some(n => Math.abs(n.x - x) < 40 && Math.abs(n.y - y) < 40);
+  let guard = 0;
+  while (taken() && guard++ < 40) { x += 34; y += 30; }
+  return [Math.round(x), Math.round(y)];
+}
+function autolayout() {
+  const order = livePath();
+  const rest = nodeList().map(n => n.id).filter(id => !order.includes(id));
+  const GAP_X = NODE_W + 78, TOP = 90;
+  order.forEach((id, i) => {
+    const n = state.nodes[id];
+    n.x = 40 + i * GAP_X;
+    n.y = TOP + (i % 2) * 74;
+  });
+  rest.forEach((id, i) => {
+    const n = state.nodes[id];
+    n.x = 40 + i * GAP_X;
+    n.y = TOP + 430;
+  });
+  fitView();
+  render();
+}
+function autowire() {
+  // 소스 → 단계(순서대로) → 명령어 한 줄로 다시 엮는다.
+  const chain = ['src',
+    ...nodeList().filter(n => n.type === 'stage')
+      .sort((a, b) => stageIdx(a.stage) - stageIdx(b.stage)).map(n => n.id),
+    'out'];
+  state.edges = [];
+  for (let i = 0; i < chain.length - 1; i++) state.edges.push({ from: chain[i], to: chain[i + 1] });
+  render();
+}
+function fitView() {
+  const ns = nodeList();
+  if (!ns.length) return;
+  const r = vp();
+  // 노드 높이는 내용에 따라 다르다. 상수로 때려 맞히지 말고 DOM 에서 실측한다.
+  const heightOf = id => {
+    const el = document.querySelector(`.node[data-id="${id}"]`);
+    return el ? el.offsetHeight : 140;
+  };
+  const xs = ns.map(n => n.x), ys = ns.map(n => n.y);
+  const minX = Math.min(...xs) - 40, maxX = Math.max(...xs) + NODE_W + 40;
+  const minY = Math.min(...ys) - 40;
+  const maxY = Math.max(...ns.map(n => n.y + heightOf(n.id))) + 40;
+  const k = Math.max(0.3, Math.min(1.1, Math.min(r.width / (maxX - minX), r.height / (maxY - minY))));
+  view.k = k;
+  view.x = (r.width - (maxX - minX) * k) / 2 - minX * k;
+  view.y = (r.height - (maxY - minY) * k) / 2 - minY * k;
+  applyView();
+}
+function focusNode(id) {
+  const n = state.nodes[id];
+  if (!n) return;
+  const r = vp();
+  view.x = r.width / 2 - (n.x + NODE_W / 2) * view.k;
+  view.y = r.height / 3 - n.y * view.k;
+  applyView(); renderWires();
+}
+
+/* ══ 포인터: 팬 · 노드 이동 · 배선 ═══════════ */
+const viewport = $('#viewport');
+
+viewport.addEventListener('pointerdown', e => {
+  const port = e.target.closest('.port');
+  const head = e.target.closest('.node-head');
+  const wire = e.target.closest('.wire-g');
+
+  if (wire && !port && !head) {
+    e.preventDefault();
+    const { from, to } = wire.dataset;
+    state.edges = state.edges.filter(x => !(x.from === from && x.to === to));
+    render();
+    return;
+  }
+
+  if (port) {
+    e.preventDefault(); e.stopPropagation();
+    const n = state.nodes[port.dataset.node];
+    const p = portPos(n);
+    const from = port.dataset.side;
+    ui.wire = {
+      from: n.id, side: from,
+      x1: from === 'out' ? p.outX : p.inX, y1: p.y,
+      x2: from === 'out' ? p.outX : p.inX, y2: p.y,
+    };
+    viewport.classList.add('wiring');
+    viewport.setPointerCapture(e.pointerId);
+    renderWires();
+    return;
+  }
+
+  // 헤더 위의 버튼(접기·삭제)은 자기 onclick 으로 처리한다.
+  // 여기서 드래그를 시작하면 포인터 캡처가 click 을 viewport 로 가로챈다.
+  if (head && e.target.closest('button')) return;
+
+  if (head) {
+    const el = head.closest('.node');
+    const n = state.nodes[el.dataset.id];
+    const w = toWorld(e.clientX, e.clientY);
+    ui.drag = { id: n.id, dx: w.x - n.x, dy: w.y - n.y, el };
+    ui.sel = n.id; paintSel();
+    viewport.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    return;
+  }
+
+  if (e.target.closest('.node') || e.target.closest('.hud')) return;
+  ui.pan = { x: e.clientX - view.x, y: e.clientY - view.y };
+  ui.sel = null; paintSel();
+  viewport.classList.add('panning');
+  viewport.setPointerCapture(e.pointerId);
+});
+
+viewport.addEventListener('pointermove', e => {
+  if (ui.wire) {
+    const w = toWorld(e.clientX, e.clientY);
+    ui.wire.x2 = w.x; ui.wire.y2 = w.y;
+    // 커서 아래 포트 강조
+    for (const p of document.querySelectorAll('.port')) p.classList.remove('hot');
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const port = hit && hit.closest && hit.closest('.port');
+    if (port && port.dataset.side !== ui.wire.side) port.classList.add('hot');
+    renderWires();
+    return;
+  }
+  if (ui.drag) {
+    const w = toWorld(e.clientX, e.clientY);
+    const n = state.nodes[ui.drag.id];
+    n.x = Math.round(w.x - ui.drag.dx);
+    n.y = Math.round(w.y - ui.drag.dy);
+    ui.drag.el.style.left = n.x + 'px';
+    ui.drag.el.style.top = n.y + 'px';
+    renderWires();
+    return;
+  }
+  if (ui.pan) {
+    view.x = e.clientX - ui.pan.x;
+    view.y = e.clientY - ui.pan.y;
+    applyView();
+  }
+});
+
+function endPointer(e) {
+  if (ui.wire) {
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const port = hit && hit.closest && hit.closest('.port');
+    if (port && port.dataset.side !== ui.wire.side) {
+      const other = port.dataset.node;
+      const ok = ui.wire.side === 'out'
+        ? connect(ui.wire.from, other)
+        : connect(other, ui.wire.from);
+      if (!ok) flashNote('이을 수 없다 — 이미 이어져 있거나 순환이 된다.');
+    }
+    for (const p of document.querySelectorAll('.port')) p.classList.remove('hot');
+    ui.wire = null;
+    viewport.classList.remove('wiring');
+    render();
+  }
+  if (ui.drag) { ui.drag = null; render(); }
+  if (ui.pan) { ui.pan = null; viewport.classList.remove('panning'); save(); }
+}
+viewport.addEventListener('pointerup', endPointer);
+viewport.addEventListener('pointercancel', endPointer);
+
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = vp();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const k2 = Math.max(0.3, Math.min(2, view.k * Math.exp(-e.deltaY * 0.0016)));
+  view.x = mx - (mx - view.x) * (k2 / view.k);
+  view.y = my - (my - view.y) * (k2 / view.k);
+  view.k = k2;
+  applyView(); save();
+}, { passive: false });
+
+function zoomBy(f) {
+  const r = vp();
+  const mx = r.width / 2, my = r.height / 2;
+  const k2 = Math.max(0.3, Math.min(2, view.k * f));
+  view.x = mx - (mx - view.x) * (k2 / view.k);
+  view.y = my - (my - view.y) * (k2 / view.k);
+  view.k = k2;
+  applyView(); save();
+}
+$('#zoom-in').onclick = () => zoomBy(1.2);
+$('#zoom-out').onclick = () => zoomBy(1 / 1.2);
+$('#zoom-reset').onclick = fitView;
+$('#fit').onclick = fitView;
+$('#autolayout').onclick = autolayout;
+$('#autowire').onclick = autowire;
+
+/* ── 팔레트에서 캔버스로 끌어다 놓기 ─────── */
+$('#pal-list').addEventListener('pointerdown', e => {
+  const item = e.target.closest('.pal-item');
+  if (!item || item.classList.contains('placed')) {
+    if (item) { focusNode(stageNode(item.dataset.stage).id); }
+    return;
+  }
+  const sid = item.dataset.stage;
+  const start = { x: e.clientX, y: e.clientY };
+  let ghost = null;
+  item.setPointerCapture(e.pointerId);
+
+  const move = ev => {
+    if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
+      ghost = document.createElement('div');
+      ghost.className = 'pal-ghost';
+      ghost.style.setProperty('--a', ACCENT[sid]);
+      ghost.textContent = `[${sid}] ${STAGE[sid].label}`;
+      document.body.append(ghost);
+    }
+    if (ghost) { ghost.style.left = (ev.clientX + 12) + 'px'; ghost.style.top = (ev.clientY + 12) + 'px'; }
+  };
+  const up = ev => {
+    item.removeEventListener('pointermove', move);
+    item.removeEventListener('pointerup', up);
+    if (ghost) ghost.remove();
+    const r = vp();
+    const inside = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
+    let pos;
+    if (ghost && inside) {
+      const w = toWorld(ev.clientX, ev.clientY);
+      pos = [Math.round(w.x - NODE_W / 2), Math.round(w.y - HEAD_H / 2)];
+    } else if (ghost) {
+      return;                                   // 캔버스 밖에 떨어뜨렸다 — 없던 일로
+    } else {
+      pos = freeSpot();                          // 그냥 클릭 → 화면 가운데
+    }
+    const n = addStageNode(sid, pos[0], pos[1]);
+    ui.sel = n.id;
+    render();
+    if ($('#palette').classList.contains('open')) $('#palette').classList.remove('open');
+  };
+  item.addEventListener('pointermove', move);
+  item.addEventListener('pointerup', up);
+});
+
+/* ── 명령어 ↔ 그래프 상호 강조 ───────────── */
+$('#cmd').addEventListener('mouseover', e => {
+  const t = e.target.closest('.tok[data-opt]');
+  if (t) { ui.lit = t.dataset.opt; paintLit(); }
+});
+$('#cmd').addEventListener('mouseout', () => { ui.lit = null; paintLit(); });
+
+/* ══ 역방향: 명령어 → 그래프 ═════════════════ */
+function tokenize(s) {
+  const out = []; let cur = '', q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      if (c === '\\' && q === '"') { cur += s[++i] ?? ''; }
+      else if (c === q) q = null;
+      else cur += c;
+    } else if (c === '"' || c === "'") q = c;
+    else if (/\s/.test(c)) { if (cur) { out.push(cur); cur = ''; } }
+    else cur += c;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+function importCommand(text) {
+  const toks = tokenize(text.replace(/\\\n/g, ' '));
+  if (toks[0] && /yt-dlp|youtube-dl/.test(toks[0])) toks.shift();
+
+  const urls = [];
+  const picked = {};            // stage → { optId: value }
+  const unknown = [];
+
+  for (let i = 0; i < toks.length; i++) {
+    let t = toks[i];
+    if (!t.startsWith('-')) { urls.push(t); continue; }
+    let inline = null;
+    if (t.includes('=') && t.startsWith('--')) { const k = t.indexOf('='); inline = t.slice(k + 1); t = t.slice(0, k); }
+    const hit = BY_FLAG[t];
+    if (!hit) { unknown.push(t); continue; }
+    const { opt, negated } = hit;
+    const bag = (picked[opt.stage] ||= {});
+    if (opt.kind === 'flag') { bag[opt.id] = !negated; continue; }
+    const v = inline ?? toks[++i];
+    if (v === undefined) { unknown.push(t); continue; }
+    if (opt.kind === 'repeatable' && bag[opt.id]) bag[opt.id] += '\n' + v;
+    else bag[opt.id] = v;
+  }
+
+  const keep = state.nodes.src.urls;
+  resetState();
+  state.nodes.src.urls = urls.length ? urls.join('\n') : keep;
+  ui.unknown = unknown;
+
+  for (const sid of STAGE_ORDER) {
+    if (!picked[sid]) continue;
+    const n = addStageNode(sid, 0, 0);
+    Object.assign(valuesOf(n), picked[sid]);
+  }
+  autowire();
+  autolayout();
+}
+
+/* ══ 저장 ════════════════════════════════════ */
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); } catch {}
+  }, 250);
+}
+function snapshot() {
+  return { v: 2, seq, view, nodes: state.nodes, edges: state.edges };
+}
+function restore(data) {
+  if (!data || !data.nodes || !data.nodes.src || !data.nodes.out) return false;
+  state = { nodes: data.nodes, edges: (data.edges || []).slice() };
+  for (const n of nodeList()) if (n.type === 'stage' && !STAGE[n.stage]) delete state.nodes[n.id];
+  state.edges = state.edges.filter(e => state.nodes[e.from] && state.nodes[e.to]);
+  view = Object.assign({ x: 0, y: 0, k: 1 }, data.view);
+  seq = data.seq || (nodeList().length + 1);
+  ui.unknown = []; ui.sel = null; ui.picker = null;
+  return true;
+}
+function load() {
+  try { return restore(JSON.parse(localStorage.getItem(STORE_KEY) || 'null')); }
+  catch { return false; }
+}
+
+/* ══ 배선 ════════════════════════════════════ */
+$('#ver').textContent = 'yt-dlp ' + SCHEMA.ytdlp_version + ' 스키마 · ' + OPTS.length + '개 옵션 · ' + STAGES.length + '개 단계';
+$('#q').oninput = renderHits;
+$('#q').onkeydown = e => {
+  if (e.key === 'Escape') { $('#q').value = ''; renderHits(); }
+};
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.field') && !e.target.closest('.hits')) $('#hits').hidden = true;
+}, true);
+$('#q').onfocus = renderHits;
+
+$('#reset').onclick = () => {
+  if (!confirm('그래프를 전부 지운다. 계속할까?')) return;
+  resetState(); render(); fitView();
+};
+$('#import').onclick = () => $('#dlg-import').showModal();
+$('#do-import').onclick = () => { importCommand($('#paste').value); $('#dlg-import').close(); };
+$('#graph-io').onclick = () => {
+  $('#graph-text').value = JSON.stringify(snapshot(), null, 1);
+  $('#dlg-graph').showModal();
+};
+$('#graph-load').onclick = () => {
+  try {
+    if (restore(JSON.parse($('#graph-text').value))) { render(); fitView(); $('#dlg-graph').close(); }
+    else alert('그래프 형식이 아니다.');
+  } catch (err) { alert('JSON을 읽지 못했다: ' + err.message); }
+};
+$('#graph-copy').onclick = e => copy($('#graph-text').value, e.target);
+$('#pal-toggle').onclick = () => $('#palette').classList.toggle('open');
+
+document.addEventListener('keydown', e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if (e.key === '/' && !typing) { e.preventDefault(); $('#q').focus(); }
+  if (e.key === 'Escape') {
+    if (ui.picker) { ui.picker = null; render(); }
+    else if (ui.sel) { ui.sel = null; paintSel(); }
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && ui.sel) {
+    e.preventDefault(); removeNode(ui.sel); render();
+  }
+});
+
+let noteTimer = null;
+function flashNote(msg) {
+  const n = $('#notes');
+  n.innerHTML = '<b>' + escapeHtml(msg) + '</b>';
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(renderCmd, 2200);
+}
+
+async function copy(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.append(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  const old = btn.textContent; btn.textContent = '복사됨';
+  setTimeout(() => btn.textContent = old, 1200);
+}
+$('#copy-cmd').onclick = e => copy(commandString(), e.target);
+$('#copy-conf').onclick = e => copy(confString(), e.target);
+
+addEventListener('resize', () => { applyView(); renderWires(); });
+
+/* ── 시작 ────────────────────────────────── */
+if (!load()) { resetState(); }
+render();
+if (!localStorage.getItem(STORE_KEY)) fitView();
+</script>
+</body>
+</html>
