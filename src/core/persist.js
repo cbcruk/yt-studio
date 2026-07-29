@@ -14,23 +14,22 @@ const TRANSIENT = ['_tidy'];
 
 export function snapshot(state, seq, mode) {
   const clean = JSON.parse(JSON.stringify(state));
-  for (const g of [clean, clean.format]) {
-    if (!g) continue;
+  // 내부 전용 플래그는 저장물로 새면 안 된다. 서브그래프가 몇 개든 훑는다.
+  for (const g of [clean, ...Object.values(clean).filter(v => v && v.nodes)])
     for (const k of TRANSIENT) delete g[k];
-  }
   return { v: 3, seq, mode, state: clean };
 }
 
 /**
  * 스냅샷 → { state, seq, mode }. 읽을 수 없으면 null.
- * deps: { blankFormat, isValidStage }
+ * deps: { subgraphs: [{ key, root, blank }], isValidStage }
  */
-export function restore(data, { blankFormat, isValidStage } = {}) {
+export function restore(data, { subgraphs = [], isValidStage } = {}) {
   if (!data) return null;
 
-  // v2 는 { v:2, seq, view, nodes, edges } 로 포맷 서브그래프가 없었다.
+  // v2 는 { v:2, seq, view, nodes, edges } 로 서브그래프가 아예 없었다.
   let s = data.state;
-  if (!s && data.nodes) s = { nodes: data.nodes, edges: data.edges || [], view: data.view, format: null };
+  if (!s && data.nodes) s = { nodes: data.nodes, edges: data.edges || [], view: data.view };
   if (!s || !s.nodes || !s.nodes.src || !s.nodes.out) return null;
 
   if (isValidStage) {
@@ -42,17 +41,20 @@ export function restore(data, { blankFormat, isValidStage } = {}) {
   pruneEdges(s);
   s.view = Object.assign({ x: 0, y: 0, k: 1 }, s.view);
 
-  const f = s.format;
-  if (!f || !f.nodes || !f.nodes.fout) {
-    s.format = blankFormat ? blankFormat() : { nodes: {}, edges: [], view: { x: 0, y: 0, k: 1 } };
-  } else {
-    pruneEdges(s.format);
-    s.format.view = Object.assign({ x: 0, y: 0, k: 1 }, f.view);
+  let extra = 0;
+  for (const { key, root, blank } of subgraphs) {
+    const g = s[key];
+    if (!g || !g.nodes || !g.nodes[root]) { s[key] = blank(); }
+    else {
+      pruneEdges(g);
+      g.view = Object.assign({ x: 0, y: 0, k: 1 }, g.view);
+    }
+    extra += Object.keys(s[key].nodes).length;
   }
 
-  const seq = data.seq
-    || (Object.keys(s.nodes).length + Object.keys(s.format.nodes).length + 1);
-  const mode = data.mode === 'format' ? 'format' : 'pipeline';
+  const seq = data.seq || (Object.keys(s.nodes).length + extra + 1);
+  const modes = new Set(['pipeline', ...subgraphs.map(x => x.key)]);
+  const mode = modes.has(data.mode) ? data.mode : 'pipeline';
   return { state: s, seq, mode };
 }
 

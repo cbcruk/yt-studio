@@ -25,6 +25,8 @@ MODULES = [
     "src/core/format-graph.js",
     "src/core/pipeline.js",
     "src/core/layout.js",
+    "src/core/output-template.js",
+    "src/core/output-graph.js",
     "src/core/persist.js",
     "src/ui/node-kinds.js",
     "src/ui/graph-kinds.js",

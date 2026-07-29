@@ -22,7 +22,7 @@ try {
   process.exit(1);
 }
 
-const SUITES = ['e2e/pipeline.mjs', 'e2e/format.mjs'].filter(wanted);
+const SUITES = ['e2e/pipeline.mjs', 'e2e/format.mjs', 'e2e/output.mjs'].filter(wanted);
 const totals = [];
 
 for (const file of SUITES) {

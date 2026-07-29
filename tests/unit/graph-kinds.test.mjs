@@ -10,6 +10,7 @@ import { readFile } from 'node:fs/promises';
 import { initSchema } from '../../src/core/schema.js';
 import { blankPipeline } from '../../src/core/pipeline.js';
 import { blankFormat, treeToGraph, FOUT } from '../../src/core/format-graph.js';
+import { blankOutput, outputToGraph, OOUT } from '../../src/core/output-graph.js';
 import { parseFormat } from '../../src/core/format-grammar.js';
 
 initSchema(JSON.parse(await readFile(new URL('../../schema.json', import.meta.url), 'utf8')));
@@ -18,10 +19,11 @@ const { graphKind, allGraphKinds, subgraphFor, defineGraphBehavior } =
 
 let seq = 0;
 const nid = () => 'k' + (++seq);
-const fullState = () => Object.assign(blankPipeline(), { format: blankFormat() });
+const fullState = () => Object.assign(blankPipeline(),
+  { format: blankFormat(), output: blankOutput() });
 
 test('두 종류가 등록돼 있고 서술자가 빠짐없다', () => {
-  assert.deepEqual(allGraphKinds().map(k => k.id).sort(), ['format', 'pipeline']);
+  assert.deepEqual(allGraphKinds().map(k => k.id).sort(), ['format', 'output', 'pipeline']);
   const required = ['graphOf', 'viewOf', 'live', 'order', 'exclusiveIn', 'wireOrdinals',
                     'search', 'canAutowire', 'chrome', 'palette', 'isEmpty', 'emptyHint',
                     'statusNotes', 'holderOf'];
@@ -34,8 +36,35 @@ test('graphOf / viewOf 가 상태에서 자기 몫을 꺼낸다', () => {
   const s = fullState();
   assert.equal(graphKind('pipeline').graphOf(s), s);
   assert.equal(graphKind('format').graphOf(s), s.format);
+  assert.equal(graphKind('output').graphOf(s), s.output);
   assert.equal(graphKind('pipeline').viewOf(s), s.view);
   assert.equal(graphKind('format').viewOf(s), s.format.view);
+  assert.equal(graphKind('output').viewOf(s), s.output.view);
+});
+
+test('서브그래프는 문자열 ↔ 그래프 계약을 갖는다', () => {
+  for (const id of ['format', 'output']) {
+    const k = graphKind(id);
+    for (const f of ['compile', 'fromString', 'blank', 'adopt', 'opensFrom'])
+      assert.ok(k[f], `${id} 에 ${f} 가 없다`);
+  }
+  // 파이프라인은 자기가 원본이라 되돌릴 문자열이 없다
+  assert.equal(graphKind('pipeline').opensFrom, undefined);
+
+  // 계약이 실제로 왕복하는가
+  const s = fullState();
+  graphKind('output').adopt(s, graphKind('output').fromString('%(title)s.%(ext)s', { nid }));
+  assert.equal(graphKind('output').compile(s), '%(title)s.%(ext)s');
+  graphKind('format').adopt(s, graphKind('format').fromString('bv+ba', { nid }));
+  assert.equal(graphKind('format').compile(s), 'bv+ba');
+});
+
+test('출력 템플릿은 가로 순서, 포맷은 세로 순서', () => {
+  assert.equal(graphKind('format').operandsOf.length >= 1, true);
+  const og = outputToGraph('%(title)s.%(ext)s', { nid });
+  const ids = graphKind('output').order(og);
+  const xs = ids.map(i => og.nodes[i].x);
+  assert.deepEqual(xs, [...xs].sort((a, b) => a - b), '가로 순서가 아니다');
 });
 
 test('"살아 있다"의 정의가 종류마다 다르다', () => {
@@ -123,7 +152,8 @@ test('--format 행에서 포맷 서브그래프가 열린다', () => {
   assert.ok(sub, '--format 에 문이 없다');
   assert.equal(sub.id, 'format');
   assert.ok(sub.opensFrom.label);
-  assert.equal(subgraphFor('output'), null, '아무 옵션에나 문이 달렸다');
+  assert.equal(subgraphFor('output').id, 'output', '--output 에 문이 없다');
+  assert.equal(subgraphFor('paths'), null, '아무 옵션에나 문이 달렸다');
 });
 
 test('defineGraphBehavior 로 DOM 쪽 동작을 얹을 수 있다', () => {

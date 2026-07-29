@@ -14,7 +14,14 @@
  */
 import { BY_ID } from '../core/schema.js';
 import { pipelineLive, livePath, stageNode, SRC, OUT } from '../core/pipeline.js';
-import { formatLive, formatExpr, formatIssues, operands, FOUT } from '../core/format-graph.js';
+import {
+  formatLive, formatExpr, formatIssues, operands, treeToGraph, blankFormat, FOUT,
+} from '../core/format-graph.js';
+import { parseFormat } from '../core/format-grammar.js';
+import {
+  outputLive, outputExpr, outputIssues, outputPreview, pieceNodes,
+  outputToGraph, blankOutput, OOUT,
+} from '../core/output-graph.js';
 import { tagOfType } from './node-kinds.js';
 
 const GRAPHS = {};
@@ -37,6 +44,8 @@ const GRAPHS = {};
  *   statusNotes(g, ctx)      하단 노트 → [{ label?, body }]
  *   holderOf(state, optId)   옵션을 들고 있는 노드 (상호 강조용)
  *   opensFrom     { option, label, title }  이 서브그래프로 들어가는 옵션 행
+ *   compile(state) / fromString(raw, opts) / blank() / adopt(state, g)
+ *                 옵션 문자열 ↔ 서브그래프. 서브그래프에만 있다.
  */
 export function defineGraph(id, spec) {
   GRAPHS[id] = Object.assign({ id }, spec);
@@ -146,4 +155,59 @@ defineGraph('format', {
   },
 
   holderOf: () => null,         // 명령어 토큰은 파이프라인 노드에만 매인다
+
+  compile: s => formatExpr(s.format),
+  fromString: (raw, opts) => treeToGraph(parseFormat(raw), opts),
+  blank: blankFormat,
+  adopt: (s, g) => { s.format = g; },
+});
+
+defineGraph('output', {
+  label: '[store] 출력 템플릿',
+  graphOf: s => s.output,
+  viewOf: s => s.output.view,
+
+  live: outputLive,
+  // 표현식이 아니라 수열이다. 순서는 가로 위치가 정한다.
+  order: g => pieceNodes(g).map(n => n.id),
+  endpoints: { end: OOUT },
+  exclusiveIn: [],
+  wireOrdinals: true,
+  operandsOf: pieceNodes,
+
+  search: false,
+  canAutowire: false,
+  parent: 'pipeline',
+  chrome: { crumb: true, sub: true },
+  crumbDetail: s => outputPreview(s.output),
+  opensFrom: {
+    option: 'output',
+    label: '그래프 ↗',
+    title: '출력 템플릿을 노드 서브그래프로 편집한다',
+  },
+
+  palette: {
+    head: '템플릿 조각',
+    hint: '<b>-o 출력</b>에 이어진 조각만 파일명이 된다. '
+        + '조각의 순서는 <b>가로 위치</b>를 따른다.',
+  },
+
+  isEmpty: g => Object.keys(g.nodes).length <= 1,
+  emptyHint: '출력 템플릿 서브그래프가 비어 있다.<br>'
+           + '왼쪽에서 <b>필드</b>와 <b>글자</b>를 놓고 <b>-o 출력</b>에 이어라.<br>'
+           + '왼쪽에 있는 조각이 파일명 앞쪽에 온다.',
+
+  statusNotes(g) {
+    const issues = outputIssues(g, tagOfType);
+    return issues.length
+      ? [{ label: '서브그래프', body: issues.join(' · ') }]
+      : [{ body: '출력 템플릿 편집 중 · 미리보기 ' + (outputPreview(g) || '(비어 있음)') }];
+  },
+
+  holderOf: () => null,
+
+  compile: s => outputExpr(s.output),
+  fromString: (raw, opts) => outputToGraph(raw, opts),
+  blank: blankOutput,
+  adopt: (s, g) => { s.output = g; },
 });

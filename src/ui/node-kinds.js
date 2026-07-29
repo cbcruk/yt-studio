@@ -11,8 +11,12 @@
  */
 import { STAGE } from '../core/schema.js';
 import { FORMAT_OPS } from '../core/format-grammar.js';
+import { FIELD_HELP } from '../core/output-template.js';
 
 const call = (v, n) => (typeof v === 'function' ? v(n) : v);
+
+/** 기본 노드 폭. 종류마다 width 로 덮어쓸 수 있다. */
+export const DEFAULT_W = 300;
 
 /** 파이프라인을 왼쪽에서 오른쪽으로 훑을 때 색이 한 바퀴 도는 순서. */
 export const STAGE_ACCENT = {
@@ -31,6 +35,7 @@ const KINDS = {};
  *   ports      { in, out }             포트 유무
  *   protected  true 면 지울 수 없다
  *   io         true 면 흐려지지 않는다 (계속 만져야 하는 노드)
+ *   width      가로 폭(px). 없으면 DEFAULT_W
  *   badge      (node)=>number          헤더의 숫자
  *   bypass     문자열                   경로에서 끊겼을 때의 배지 문구
  *   palette    number                  팔레트 노출 순서. 없으면 안 나온다
@@ -52,6 +57,8 @@ export const badgeOf = n => kindOf(n).badge(n) || 0;
 export const hasIn = n => kindOf(n).ports.in;
 export const hasOut = n => kindOf(n).ports.out;
 export const isIO = n => !!kindOf(n).io;
+export const widthOf = n => kindOf(n).width || DEFAULT_W;
+export const widthOfType = t => (KINDS[t] && KINDS[t].width) || DEFAULT_W;
 export const bypassLabelOf = n => kindOf(n).bypass || '끊김';
 
 /** 종류 이름만 아는 곳(문제 진단 메시지 등)을 위한 표기. */
@@ -138,5 +145,32 @@ defineKind('fout', {
   graph: 'format', fixedId: 'fout', protected: true, io: true,
   tag: 'format', label: '-f 출력', accent: '#141C19',
   blurb: '여기 이어진 표현식이 --format 값이 된다',
+  ports: { in: true, out: false },
+});
+
+/* ── 출력 템플릿 조각 ────────────────────── */
+
+defineKind('text', {
+  graph: 'output', palette: 0,
+  tag: 'text', label: '글자', accent: '#5B5566',
+  blurb: '파일명에 그대로 들어가는 글자',
+  width: 170,                  // 구분자 한두 글자에 300px 은 낭비다
+  ports: { in: false, out: true },
+});
+
+defineKind('field', {
+  graph: 'output', palette: 1,
+  tag: 'field', label: '필드', accent: '#0E7C86',
+  blurb: '영상에서 값을 꺼내 채운다',
+  width: 250,
+  ports: { in: false, out: true },
+  badge: n => (n.fallback != null ? 1 : 0) + (n.strf ? 1 : 0),
+});
+
+defineKind('oout', {
+  graph: 'output', fixedId: 'oout', protected: true, io: true,
+  tag: 'output', label: '-o 출력', accent: '#141C19',
+  blurb: '여기 이어진 조각들이 --output 값이 된다',
+  width: 280,
   ports: { in: true, out: false },
 });

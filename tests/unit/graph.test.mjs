@@ -14,6 +14,7 @@ import {
 import { parseFormat } from '../../src/core/format-grammar.js';
 import { tidyColumns, bounds, fitTo, zoomAt, freeSpot } from '../../src/core/layout.js';
 import { snapshot, restore } from '../../src/core/persist.js';
+import { blankOutput, OOUT } from '../../src/core/output-graph.js';
 
 /** a→b→c 사슬. */
 const chain = () => ({
@@ -168,7 +169,7 @@ test('tidyColumns 는 같은 열에서 노드를 겹치지 않게 민다', () =>
 
 test('bounds 는 실측 높이를 쓴다', () => {
   const g = { nodes: { a: { id: 'a', x: 0, y: 0 } }, edges: [] };
-  const box = bounds(g, () => 500, { nodeW: 300, pad: 0 });
+  const box = bounds(g, () => 500, { widthOf: () => 300, pad: 0 });
   assert.deepEqual(box, { minX: 0, maxX: 300, minY: 0, maxY: 500 });
 });
 
@@ -196,16 +197,22 @@ test('freeSpot 은 겹치는 자리를 피한다', () => {
 });
 
 /* ── persist.js ──────────────────────────── */
+const SUBS = { subgraphs: [
+  { key: 'format', root: FOUT, blank: blankFormat },
+  { key: 'output', root: OOUT, blank: blankOutput },
+] };
+
 const stateFixture = () => ({
   nodes: { src: { id: 'src', type: 'source', urls: 'https://a' }, out: { id: 'out', type: 'sink' } },
   edges: [{ from: 'src', to: 'out' }],
   view: { x: 1, y: 2, k: 0.5 },
   format: blankFormat(),
+  output: blankOutput(),
 });
 
 test('스냅샷 왕복', () => {
   const s = stateFixture();
-  const r = restore(snapshot(s, 7, 'format'), { blankFormat });
+  const r = restore(snapshot(s, 7, 'format'), SUBS);
   assert.equal(r.seq, 7);
   assert.equal(r.mode, 'format');
   assert.equal(r.state.nodes.src.urls, 'https://a');
@@ -226,22 +233,22 @@ test('v2 스냅샷(포맷 서브그래프 이전)도 읽는다', () => {
     nodes: { src: { id: 'src', type: 'source' }, out: { id: 'out', type: 'sink' } },
     edges: [{ from: 'src', to: 'out' }],
   };
-  const r = restore(v2, { blankFormat });
+  const r = restore(v2, SUBS);
   assert.ok(r, 'v2 를 못 읽었다');
   assert.equal(r.mode, 'pipeline');
   assert.ok(r.state.format.nodes.fout, '빈 서브그래프가 채워지지 않았다');
 });
 
 test('망가진 스냅샷은 null', () => {
-  assert.equal(restore(null, { blankFormat }), null);
-  assert.equal(restore({}, { blankFormat }), null);
-  assert.equal(restore({ state: { nodes: {} } }, { blankFormat }), null);
+  assert.equal(restore(null, SUBS), null);
+  assert.equal(restore({}, SUBS), null);
+  assert.equal(restore({ state: { nodes: {} } }, SUBS), null);
 });
 
 test('없는 노드를 가리키는 엣지는 복원할 때 걷어낸다', () => {
   const s = stateFixture();
   s.edges.push({ from: 'src', to: 'ghost' });
-  const r = restore(snapshot(s, 1, 'pipeline'), { blankFormat });
+  const r = restore(snapshot(s, 1, 'pipeline'), SUBS);
   assert.equal(r.state.edges.length, 1);
 });
 
@@ -249,7 +256,7 @@ test('모르는 단계의 노드는 버린다 — 스키마가 바뀌어도 안 
   const s = stateFixture();
   s.nodes.old = { id: 'old', type: 'stage', stage: 'ghost-stage' };
   const r = restore(snapshot(s, 1, 'pipeline'), {
-    blankFormat, isValidStage: x => x !== 'ghost-stage',
+    ...SUBS, isValidStage: x => x !== 'ghost-stage',
   });
   assert.equal(r.state.nodes.old, undefined);
 });
@@ -263,18 +270,22 @@ test('노드 레지스트리가 모든 종류를 안다', async () => {
   initSchema(raw);
   const K = await import('../../src/ui/node-kinds.js');
 
-  for (const type of ['source', 'sink', 'stage', 'stream', 'merge', 'fallback', 'multi', 'fout']) {
+  for (const type of ['source', 'sink', 'stage', 'stream', 'merge', 'fallback', 'multi', 'fout',
+                      'text', 'field', 'oout']) {
     assert.ok(K.kindByType(type), `${type} 이 등록되지 않았다`);
   }
 
   // 끝점은 지울 수 없다
-  assert.deepEqual([...K.protectedIds()].sort(), ['fout', 'out', 'src']);
+  assert.deepEqual([...K.protectedIds()].sort(), ['fout', 'oout', 'out', 'src']);
 
   // 포트는 그래프의 끝을 막는다
   assert.equal(K.hasIn({ type: 'source' }), false, '소스에 입력이 있다');
   assert.equal(K.hasOut({ type: 'sink' }), false, '명령어에 출력이 있다');
   assert.equal(K.hasIn({ type: 'stream' }), false, '스트림에 입력이 있다');
   assert.equal(K.hasOut({ type: 'fout' }), false, '-f 출력에 출력이 있다');
+  assert.equal(K.hasIn({ type: 'text' }), false, '글자 조각에 입력이 있다');
+  assert.equal(K.hasIn({ type: 'field' }), false, '필드 조각에 입력이 있다');
+  assert.equal(K.hasOut({ type: 'oout' }), false, '-o 출력에 출력이 있다');
 
   // 단계 노드는 자기 stage 에서 표기·색을 끌어온다
   const n = { type: 'stage', stage: 'format' };
@@ -304,6 +315,9 @@ test('팔레트 항목이 레지스트리에서 나온다', async () => {
 
   const fmt = K.paletteItems('format');
   assert.deepEqual(fmt.map(i => i.key), ['stream', 'merge', 'fallback', 'multi']);
+  const out = K.paletteItems('output');
+  assert.deepEqual(out.map(i => i.key), ['text', 'field']);
   // 끝점은 팔레트에 안 나온다 — 캔버스에 이미 하나씩 있다
   assert.ok(!fmt.some(i => i.key === 'fout'));
+  assert.ok(!out.some(i => i.key === 'oout'));
 });

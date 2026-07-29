@@ -69,12 +69,38 @@ multi    := fallback (',' …)*     bv,ba
 - 필터는 셀렉터에만 붙는다 — yt-dlp 문법이 그렇기 때문이다. `?`(값을 모르는
   포맷도 통과)는 필터마다 독립이다.
 
+## 출력 템플릿 서브그래프
+
+`-o` 는 트리는 아니지만 리터럴과 필드 참조가 번갈아 놓인 **수열**이다. 그래서
+`--output` 행의 **그래프 ↗** 로 들어가면 조각들이 왼쪽에서 오른쪽으로 늘어선다.
+
+```
+[field]  [text]  [field]           [text]  [field]     [-o 출력]
+uploader   /      title              .       ext        chapter: …
+```
+
+| 노드 | 하는 일 |
+|---|---|
+| `[field]` | `%(name>날짜서식\|없을때)자릿수변환` — 영상에서 값을 꺼낸다 |
+| `[text]` | 파일명에 그대로 들어가는 글자 (`/`, `-`, `.`) |
+| `[output]` | `-o` 출력. `TYPES:` 접두어(chapter, subtitle …)를 여기서 고른다 |
+
+- **순서는 가로 위치를 따른다.** 조각을 왼쪽으로 끌면 파일명 앞쪽으로 간다.
+  조각끼리는 잇지 않으므로 입력 포트가 없다 — 전부 `-o 출력`으로 직접 들어간다.
+- **모르는 문법이 섞여도 문자열이 상하지 않는다.** 객체 순회(`%(tags.0)s`), 산술
+  (`%(n_entries+1-playlist_index)d`), 대안(`%(release_date,upload_date)s`)은 UI 로
+  다루지 않지만 원문 그대로 왕복한다. 괄호 안쪽을 `|` → `>` 순서로 자르고 같은
+  순서로 붙이므로 무손실이다.
+- **아는 `TYPES:` 만 잘라 낸다.** `C:/dl/%(title)s.%(ext)s` 같은 윈도 경로를
+  접두어로 오인하지 않는다.
+- 확장자(`ext`) 필드가 빠지면 알려 준다 — 흔한 실수다.
+
 ## 조작
 
 | 하는 일 | 방법 |
 |---|---|
 | 단계 노드 만들기 | 왼쪽 팔레트에서 캔버스로 드래그, 또는 클릭 |
-| 포맷 서브그래프 | `--format` 행의 `그래프 ↗` · 나올 때는 `← 파이프라인` 또는 `Esc` |
+| 서브그래프 | `--format` · `--output` 행의 `그래프 ↗` · 나올 때는 `← 파이프라인` 또는 `Esc` |
 | 옵션 넣기 | 노드 안 `+ 옵션` → 검색 → 선택 |
 | 옵션 찾기 | 상단 검색(`/` 키). 고르면 해당 단계 노드에 자동으로 들어간다 |
 | 잇기 | 노드 오른쪽 포트에서 다른 노드 왼쪽 포트로 드래그 |
@@ -98,17 +124,19 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   graph.js           adjacency · reach · connect · removeNode · topoOrder
   format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
   format-graph.js    트리 ↔ 그래프 · 문제 진단
+  output-template.js -o 파서 · 컴파일러 · 필드/변환 어휘
+  output-graph.js    수열 ↔ 그래프 · 미리보기 · 문제 진단
   pipeline.js        livePath · buildTokens · 명령어 조립/해석
   layout.js          정돈 · 화면 맞춤 · 줌 계산 (높이는 인자로 받는다)
   persist.js         스냅샷 · 복원 · 마이그레이션
 src/ui/
   node-kinds.js      노드 종류 레지스트리
-  graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷)
+  graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력)
 app.template.html    캔버스 · 렌더 · 포인터 · 배선
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
-tests/unit/          브라우저 없이 도는 56종
-tests/e2e/           실제로 조작해 보는 47종
+tests/unit/          브라우저 없이 도는 75종
+tests/e2e/           실제로 조작해 보는 62종
 ```
 
 **번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
@@ -125,7 +153,7 @@ tests/e2e/           실제로 조작해 보는 47종
 만드는 동안(`compositionstart`~`compositionend`)에는 그 노드를 비켜 간다 — 조합
 중에 DOM 을 갈아엎으면 한글이 깨지기 때문이다.
 
-**그래프 종류를 추가하려면**(예: `-o` 출력 템플릿을 서브그래프로) `graph-kinds.js`
+**그래프 종류를 추가하려면** `graph-kinds.js`
 에 `defineGraph` 한 항목이면 된다. "무엇이 살아 있는가"(`live`), 순서(`order`),
 팔레트 문구, 하단 노트, 어느 옵션 행에서 열리는가(`opensFrom`)를 선언하고,
 캔버스를 실제로 만지는 일(`sync`·`relayout`)만 `defineGraphBehavior`

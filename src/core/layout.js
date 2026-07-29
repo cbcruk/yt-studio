@@ -34,12 +34,12 @@ export function tidyColumns(g, heightOf, { gap = 26, operandsOf } = {}) {
 }
 
 /** 모든 노드를 담는 세계 좌표 사각형. */
-export function bounds(g, heightOf, { nodeW = 300, pad = 40 } = {}) {
+export function bounds(g, heightOf, { widthOf = () => 300, pad = 40 } = {}) {
   const ns = Object.values(g.nodes);
   if (!ns.length) return null;
   return {
     minX: Math.min(...ns.map(n => n.x)) - pad,
-    maxX: Math.max(...ns.map(n => n.x)) + nodeW + pad,
+    maxX: Math.max(...ns.map(n => n.x + widthOf(n.id))) + pad,
     minY: Math.min(...ns.map(n => n.y)) - pad,
     maxY: Math.max(...ns.map(n => n.y + heightOf(n.id))) + pad,
   };
