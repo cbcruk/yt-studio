@@ -9,7 +9,7 @@
  * 예전에는 이 차이를 렌더 함수 13개가 각자 `if (inFormat())` 로 물었다.
  * 그 질문을 여기 표 하나로 모아, 렌더는 `kind.live(g)` 만 부르게 한다.
  *
- * 선언은 이 파일에, DOM 을 만지는 동작(정렬·편집 후 동기화)은
+ * 선언은 이 파일에, DOM 을 만지는 동작(정렬·되돌려쓰기)은
  * defineGraphBehavior 로 앱이 등록한다. node-kinds.js 와 같은 방식이다.
  */
 import { BY_ID } from '../core/schema.js';

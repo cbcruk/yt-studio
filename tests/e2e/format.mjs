@@ -67,6 +67,46 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     return await fmtVal();
   });
 
+  await step('필터를 치는 동안 -f 출력 노드와 브레드크럼이 저절로 따라온다', async () => {
+    const val = p.locator('.filt-row input[type=text]').first();
+    await val.click();
+    await val.fill('');
+    await p.keyboard.type('4320', { delay: 12 });
+    await p.waitForTimeout(200);
+
+    assert(await val.inputValue() === '4320', '입력이 잘렸다: ' + await val.inputValue());
+    const still = await p.evaluate(() =>
+      document.activeElement.dataset && document.activeElement.dataset.ctl);
+    assert(still === 'filt:0:val', '포커스가 떠났다: ' + still);
+
+    // 예전에는 이 셋을 renderAfterEdit 가 손으로 갱신했다.
+    const foutText = (await p.textContent('#fout-expr')).trim();
+    const crumb = (await p.textContent('#crumb .here')).replace(/\s+/g, ' ');
+    assert(foutText === 'bv*[height<=4320]+ba', '-f 출력 노드: ' + foutText);
+    assert(crumb.includes('bv*[height<=4320]+ba'), '브레드크럼: ' + crumb);
+    assert((await cmd()).includes('bv*[height<=4320]+ba'), '명령어: ' + await cmd());
+
+    await val.fill('1080');
+    await p.waitForTimeout(200);
+    return foutText;
+  });
+
+  await step('필터 필드를 바꾸면 연산자 목록이 따라 바뀐다', async () => {
+    const s1 = p.locator('.node').filter({ hasText: '[stream]' }).first();
+    const key = s1.locator('.filt-row select').first();
+    const op = s1.locator('.filt-row select').nth(1);
+    const numOps = await op.locator('option').count();
+    await key.selectOption('ext');            // 숫자 필드 → 문자열 필드
+    await p.waitForTimeout(200);
+    const strOps = await op.locator('option').count();
+    assert(strOps !== numOps, `연산자 목록이 그대로다 (${numOps} → ${strOps})`);
+    const opts = await op.locator('option').allTextContents();
+    assert(opts.includes('로 시작'), '문자열 연산자가 없다: ' + opts.join(','));
+    await key.selectOption('height');
+    await p.waitForTimeout(200);
+    return `${numOps}개 → ${strOps}개`;
+  });
+
   await step('연산자 바꾸기 (≤ → =)', async () => {
     await p.locator('.filt-row select').nth(1).selectOption('=');
     await p.waitForTimeout(200);

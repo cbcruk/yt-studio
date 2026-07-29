@@ -53,6 +53,81 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     return c.trim();
   });
 
+  await step('연타해도 포커스가 안 날아간다', async () => {
+    const inp = p.locator('.row[data-opt=format] input');
+    await inp.click();
+    await inp.fill('');
+    // 한 글자씩 실제로 친다. 렌더가 DOM 을 갈아엎으면 첫 글자 뒤 포커스를 잃고
+    // 나머지가 안 들어간다.
+    await p.keyboard.type('bv*[height<=1080]+ba', { delay: 12 });
+    await p.waitForTimeout(200);
+    const v = await inp.inputValue();
+    assert(v === 'bv*[height<=1080]+ba', `입력이 잘렸다: "${v}"`);
+    const still = await p.evaluate(() =>
+      document.activeElement.dataset && document.activeElement.dataset.ctl);
+    assert(still === 'opt:format', '포커스가 떠났다: ' + still);
+    assert((await cmd()).includes('bv*[height<=1080]+ba'), '명령어 미반영: ' + await cmd());
+    return v;
+  });
+
+  await step('가운데에 끼워 넣어도 캐럿이 제자리', async () => {
+    const inp = p.locator('.row[data-opt=format] input');
+    await inp.fill('abcd');
+    await inp.click();
+    await p.evaluate(() => {
+      const el = document.querySelector('.row[data-opt=format] input');
+      el.focus(); el.setSelectionRange(2, 2);
+    });
+    await p.keyboard.type('XY', { delay: 12 });
+    await p.waitForTimeout(150);
+    const v = await inp.inputValue();
+    assert(v === 'abXYcd', `캐럿이 밀렸다: "${v}"`);
+    const caret = await p.evaluate(() => document.activeElement.selectionStart);
+    assert(caret === 4, `캐럿 위치 ${caret} (기대 4)`);
+    await inp.fill('bv*[height<=1080]+ba');
+    await p.waitForTimeout(150);
+    return `${v} · 캐럿 ${caret}`;
+  });
+
+  await step('조합(IME) 중인 필드는 다시 그리지 않는다', async () => {
+    const inp = p.locator('.row[data-opt=format] input');
+    await inp.click();
+    await inp.fill('bv');
+
+    // 지금 DOM 노드에 표식을 남긴다. 다시 그려지면 표식이 사라진다.
+    await p.evaluate(() => {
+      document.querySelector('.row[data-opt=format] input').__mark = 'ime';
+    });
+
+    // 한글 조합 시작 → 조합 중 입력 → 이 사이에는 DOM 을 건드리면 안 된다.
+    const survived = await p.evaluate(() => {
+      const el = document.querySelector('.row[data-opt=format] input');
+      el.focus();
+      el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      el.value = 'bv가';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      const same = document.querySelector('.row[data-opt=format] input');
+      return same.__mark === 'ime' && same === el;
+    });
+    assert(survived, '조합 중에 필드가 다시 그려졌다 — 음절이 깨진다');
+
+    // 조합이 끝나면 평소대로 돌아온다.
+    const rebuilt = await p.evaluate(() => {
+      const el = document.querySelector('.row[data-opt=format] input');
+      el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      el.value = 'bv+ba';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      const same = document.querySelector('.row[data-opt=format] input');
+      return same.__mark === undefined;
+    });
+    assert(rebuilt, '조합이 끝났는데도 계속 비켜 간다');
+    assert((await cmd()).includes('bv+ba'), '명령어 미반영: ' + await cmd());
+
+    await inp.fill('bv*[height<=1080]+ba');
+    await p.waitForTimeout(150);
+    return '조합 중 보존 → 조합 후 재생성';
+  });
+
   await step('와이어 끊기 → 우회 + 명령어에서 빠짐', async () => {
     const box = await p.locator('.wire-hit').first().boundingBox();
     // 첫 와이어(src→format)의 중간 지점 클릭
