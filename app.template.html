@@ -47,7 +47,19 @@
   .top-spacer{flex:1}
   .topact{display:flex;gap:8px;flex-wrap:wrap}
 
+  /* 서브그래프 브레드크럼 */
+  .crumb{display:flex;align-items:center;gap:8px;font-size:12px}
+  .crumb[hidden]{display:none}
+  .crumb .sep{color:var(--dim)}
+  .crumb .here{font:500 13px/1 var(--display);color:var(--fmt,#6E7A12)}
+  .crumb .back{
+    border:1px solid var(--rule);background:transparent;border-radius:3px;
+    padding:4px 9px;cursor:pointer;white-space:nowrap;
+  }
+  .crumb .back:hover{border-color:var(--signal);color:var(--signal)}
+
   .field{position:relative;display:flex;align-items:center;gap:8px;flex:1 1 300px;min-width:220px}
+  .field[hidden]{display:none}
   .field label{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
   .field input{
     flex:1;background:var(--ground);border:1px solid var(--rule);border-radius:3px;
@@ -64,7 +76,6 @@
   .btn:focus-visible{outline:2px solid var(--signal);outline-offset:1px}
   .btn.primary{background:var(--ink);color:var(--ground);border-color:var(--ink)}
   .btn.primary:hover{background:var(--signal);border-color:var(--signal);color:#fff}
-  .btn.mini{padding:3px 7px;font-size:11px}
 
   /* ── search overlay ─────────────────────── */
   .hits{
@@ -100,6 +111,7 @@
   }
   .pal-head{padding:0 14px 8px;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
   .pal-hint{padding:0 14px 12px;color:var(--dim);font-size:11px;line-height:1.5}
+  .pal-hint b{color:var(--ink);font-weight:500}
   .pal-item{
     display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:7px;
     width:100%;text-align:left;border:0;background:none;padding:6px 14px;cursor:grab;
@@ -127,21 +139,21 @@
   /* ── canvas ─────────────────────────────── */
   .viewport{
     flex:1;position:relative;overflow:hidden;min-width:0;touch-action:none;
-    background:
-      radial-gradient(circle at 1px 1px, var(--rule) 1px, transparent 0);
+    background:radial-gradient(circle at 1px 1px, var(--rule) 1px, transparent 0);
     background-size:22px 22px;
-    background-position:0 0;
     cursor:grab;
   }
   .viewport.panning{cursor:grabbing}
   .viewport.wiring{cursor:crosshair}
+  /* 서브그래프 안이라는 걸 캔버스 자체가 말해 준다 */
+  .viewport.sub{background-color:#F1F0E6}
   .wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  .wires g{pointer-events:none}
   .wire-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
   .wire{fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
   .wire.dead{stroke:var(--rule);stroke-dasharray:5 5}
   .wire-g:hover .wire{stroke:var(--warn);stroke-width:3}
   .wire-temp{fill:none;stroke:var(--signal);stroke-width:2;stroke-dasharray:5 4}
+  .wire-ord{font:500 10px var(--mono);fill:var(--dim);pointer-events:none}
 
   /* 레이어 자체는 클릭을 통과시킨다 — 아래 깔린 와이어를 집을 수 있어야 한다. */
   .nodes{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
@@ -151,7 +163,7 @@
     border:1px solid var(--rule);border-radius:5px;
     box-shadow:0 2px 0 #141c190a, 0 10px 24px #141c1910;
   }
-  /* 경로에서 끊긴 단계는 흐리게. 소스·명령어 노드는 계속 만져야 하므로 테두리만 바꾼다. */
+  /* 경로에서 끊긴 노드는 흐리게. 소스·명령어 노드는 계속 만져야 하므로 테두리만 바꾼다. */
   .node.bypass{border-style:dashed}
   .node.bypass:not(.io){opacity:.5}
   .node.sel{border-color:var(--a);box-shadow:0 0 0 2px color-mix(in srgb,var(--a) 30%,transparent),0 10px 24px #141c1914}
@@ -172,7 +184,7 @@
   .node-x:hover{color:var(--warn);background:#B02E1F14}
   .node-body{padding:6px 8px 8px;max-height:340px;overflow-y:auto}
   .node-note{color:var(--dim);font-size:11px;padding:4px 2px 6px;line-height:1.5}
-  .node.bypass .node-badge{
+  .node-badge{
     display:inline-block;margin-left:2px;font-size:10px;letter-spacing:.08em;
     color:var(--warn);border:1px solid var(--warn);border-radius:9px;padding:0 6px;
   }
@@ -183,12 +195,11 @@
     background:var(--panel);border:2px solid var(--a);cursor:crosshair;z-index:3;
     top:calc(var(--head-h)/2);
   }
-  .port:hover,.port.hot{background:var(--a);transform:translateY(-50%) scale(1.25)}
   .port.in{left:-7px;transform:translateY(-50%)}
   .port.out{right:-7px;transform:translateY(-50%)}
-  .port:hover,.port.hot{transform:translateY(-50%) scale(1.3)}
+  .port:hover,.port.hot{background:var(--a);transform:translateY(-50%) scale(1.3)}
 
-  /* option rows inside a node */
+  /* 파이프라인 노드 안의 옵션 행 */
   .row{border-top:1px solid var(--rule);padding:7px 2px 8px}
   .row:first-child{border-top:0}
   .row.lit{background:var(--signal-wash);box-shadow:inset 3px 0 0 var(--signal)}
@@ -197,6 +208,11 @@
   .row-flag .short{color:var(--signal);font-weight:500}
   .row-x{border:0;background:none;color:var(--dim);cursor:pointer;padding:0 3px;line-height:1;border-radius:3px}
   .row-x:hover{color:var(--warn);background:#B02E1F14}
+  .row-sub{
+    border:1px solid var(--rule);background:var(--ground);border-radius:3px;
+    padding:1px 7px;font-size:11px;color:var(--dim);cursor:pointer;white-space:nowrap;
+  }
+  .row-sub:hover{border-color:#6E7A12;color:#6E7A12}
   .row-help{color:var(--dim);font-size:11px;margin:2px 0 5px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .row-ctl input[type=text],.row-ctl select,.row-ctl textarea{
@@ -237,8 +253,7 @@
     display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
   .picker .none{padding:8px;color:var(--dim);font-size:11px}
 
-  /* source / sink nodes */
-  .node.io .node-head{cursor:grab}
+  /* source / sink 노드 */
   .node.io textarea{
     width:100%;background:var(--ground);border:1px solid var(--rule);border-radius:3px;
     padding:6px 8px;font-size:12px;resize:vertical;min-height:58px;line-height:1.5;
@@ -246,6 +261,44 @@
   .node.io textarea:focus-visible{outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
   .sink-stat{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .sink-stat span{border:1px solid var(--rule);border-radius:9px;padding:1px 8px;font-size:11px;color:var(--dim)}
+
+  /* ── 포맷 서브그래프 노드 ────────────────── */
+  .fsel{display:flex;flex-direction:column;gap:5px}
+  .fsel select,.fsel input{
+    width:100%;background:var(--ground);border:1px solid var(--rule);
+    border-radius:3px;padding:5px 7px;font-size:12px;
+  }
+  .fsel select:focus-visible,.fsel input:focus-visible{
+    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
+  .fsel .why{color:var(--dim);font-size:11px;line-height:1.45}
+
+  .filt{border-top:1px solid var(--rule);margin-top:7px;padding-top:7px}
+  .filt-head{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+  .filt-head span{color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;flex:1}
+  .filt-row{display:grid;grid-template-columns:1fr 62px 1fr auto auto;gap:4px;margin-bottom:4px;align-items:center}
+  .filt-row.exists{grid-template-columns:1fr 62px auto}
+  .filt-q{display:flex;align-items:center;color:var(--dim);font-size:11px;cursor:pointer;user-select:none}
+  .filt-q input{width:auto;margin:0 2px 0 0}
+  .filt-q:has(input:checked){color:var(--set);font-weight:600}
+  .filt-row select,.filt-row input{
+    min-width:0;background:var(--ground);border:1px solid var(--rule);
+    border-radius:3px;padding:4px 5px;font-size:11px;
+  }
+  .filt-row select:focus-visible,.filt-row input:focus-visible{
+    outline:2px solid var(--signal);outline-offset:1px;border-color:transparent}
+  .filt-loose{display:flex;align-items:center;gap:5px;color:var(--dim);font-size:11px;margin-top:2px}
+  .filt-loose input{width:auto}
+
+  .ops{color:var(--dim);font-size:11px;line-height:1.6}
+  .ops ol{margin:5px 0 0;padding-left:20px}
+  .ops ol li{margin-bottom:2px;color:var(--ink);word-break:break-all}
+  .ops .warn{color:var(--warn)}
+  .fout-expr{
+    background:var(--ground);border:1px solid var(--rule);border-radius:3px;
+    padding:8px 9px;font-size:12px;line-height:1.6;word-break:break-all;min-height:34px;
+  }
+  .fout-expr:empty::before{content:"아직 아무것도 이어지지 않았다";color:var(--dim)}
+  .fout-issue{color:var(--warn);font-size:11px;margin-top:6px;line-height:1.5}
 
   /* canvas HUD */
   .hud{
@@ -310,9 +363,9 @@
     .palette.open{transform:none}
     .main{position:relative}
     .field{flex-basis:100%}
+    #pal-toggle{display:inline-block}
   }
   #pal-toggle{display:none}
-  @media (max-width:860px){#pal-toggle{display:inline-block}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -323,14 +376,21 @@
     <div class="wordmark">yt-dlp <em>스튜디오</em></div>
     <div class="ver" id="ver"></div>
   </div>
-  <div class="field">
+
+  <div class="crumb" id="crumb" hidden>
+    <button class="back" id="crumb-back">← 파이프라인</button>
+    <span class="sep">/</span>
+    <span class="here">[format] 포맷 셀렉터 <code id="crumb-expr"></code></span>
+  </div>
+
+  <div class="field" id="field-q">
     <label for="q">검색</label>
     <input id="q" type="text" placeholder="자막 · sub · thumbnail · 403  ( / 키 )" spellcheck="false" autocomplete="off">
     <div class="hits" id="hits" hidden></div>
   </div>
   <div class="top-spacer"></div>
   <div class="topact">
-    <button class="btn" id="pal-toggle">단계</button>
+    <button class="btn" id="pal-toggle">노드</button>
     <button class="btn" id="import">명령어 읽기</button>
     <button class="btn" id="graph-io">그래프 JSON</button>
     <button class="btn" id="reset">초기화</button>
@@ -338,9 +398,9 @@
 </header>
 
 <div class="main">
-  <aside class="palette" id="palette" aria-label="단계 팔레트">
-    <div class="pal-head">실행 단계</div>
-    <div class="pal-hint">캔버스로 끌어다 놓거나 클릭해서 노드를 만든다. 소스에서 명령어까지 <b>이어진 노드만</b> 결과에 들어간다.</div>
+  <aside class="palette" id="palette" aria-label="노드 팔레트">
+    <div class="pal-head" id="pal-head">실행 단계</div>
+    <div class="pal-hint" id="pal-hint"></div>
     <div id="pal-list"></div>
     <hr class="pal-sep">
     <div class="pal-act">
@@ -353,10 +413,7 @@
   <div class="viewport" id="viewport">
     <svg class="wires" id="wires"><g id="wire-layer"></g></svg>
     <div class="nodes" id="node-layer"></div>
-    <div class="ghost-hint" id="hint">
-      <div>캔버스가 비어 있다.<br>왼쪽 <b>실행 단계</b>를 끌어다 놓고 <b>소스 → 명령어</b> 사이에 이어라.<br>
-      또는 위의 <b>명령어 읽기</b>로 기존 명령어를 그래프로 되돌려라.</div>
-    </div>
+    <div class="ghost-hint" id="hint"></div>
     <div class="hud">
       <button id="zoom-out" title="축소">−</button>
       <span class="zoom" id="zoom-label">100%</span>
@@ -380,8 +437,8 @@
 <dialog id="dlg-import">
   <form method="dialog" class="dlg">
     <h3>명령어 읽기</h3>
-    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. 모르는 플래그는 아래 노트에 남는다.</p>
-    <textarea id="paste" spellcheck="false" placeholder='yt-dlp -f "bv*[height&lt;=1080]+ba" --embed-subs --sub-langs ko,en -o "%(title)s.%(ext)s" https://...'></textarea>
+    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. <code>-f</code> 값은 포맷 서브그래프로도 풀어 놓는다. 모르는 플래그는 아래 노트에 남는다.</p>
+    <textarea id="paste" spellcheck="false" placeholder='yt-dlp -f "bv*[height&lt;=1080]+ba/b" --embed-subs --sub-langs ko,en -o "%(title)s.%(ext)s" https://...'></textarea>
     <div class="dlg-act">
       <button class="btn" value="cancel">취소</button>
       <button class="btn primary" id="do-import" value="ok" type="button">그래프로 되돌리기</button>
@@ -392,7 +449,7 @@
 <dialog id="dlg-graph">
   <form method="dialog" class="dlg">
     <h3>그래프 JSON</h3>
-    <p>지금 그래프를 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
+    <p>파이프라인과 포맷 서브그래프를 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
     <textarea id="graph-text" spellcheck="false"></textarea>
     <div class="dlg-act">
       <button class="btn" value="cancel">닫기</button>
@@ -420,7 +477,6 @@ const ACCENT = {
   format:'#6E7A12', download:'#A66A00', process:'#B4471F', store:'#A6265E', report:'#5B5566',
 };
 const IO_ACCENT = { src:'#137A57', out:'#141C19' };
-const accentOf = n => n.type === 'stage' ? ACCENT[n.stage] : IO_ACCENT[n.id];
 
 // 플래그 문자열 → 옵션 (역방향 파싱용). 별칭·단축·부정형까지 전부 색인.
 const BY_FLAG = {};
@@ -474,43 +530,212 @@ function search(q, pool) {
   return (pool || OPTS).filter(o => terms.every(g => g.some(t => HAY[o.id].includes(t))));
 }
 
+/* ══ 포맷 셀렉터 문법 ════════════════════════
+   yt-dlp 의 -f 는 평평한 문자열이 아니라 실제 표현식이다.
+     atom     := 셀렉터 필터*        예) bv*[height<=1080]
+     merge    := atom ('+' atom)*    예) bv+ba
+     fallback := merge ('/' merge)*  예) bv+ba/b   ==  (bv+ba)/b
+     multi    := fallback (',' …)*
+   이 우선순위가 곧 서브그래프의 노드 종류가 된다.
+   ═════════════════════════════════════════ */
+const FTYPE = {
+  stream:   { label:'스트림',  tag:'stream',   accent:'#137A57', blurb:'어떤 스트림을 고를지' },
+  merge:    { label:'병합',    tag:'+',        accent:'#0F6FB8', blurb:'영상과 음성을 한 파일로 합친다' },
+  fallback: { label:'폴백',    tag:'/',        accent:'#A66A00', blurb:'앞의 것이 없으면 다음 것' },
+  multi:    { label:'동시',    tag:',',        accent:'#A6265E', blurb:'여러 포맷을 한꺼번에 받는다' },
+  fout:     { label:'-f 출력', tag:'format',   accent:'#141C19', blurb:'여기 이어진 표현식이 --format 값이 된다' },
+};
+const FOP_TYPES = ['merge', 'fallback', 'multi'];
+
+const SELECTORS = [
+  ['영상 + 음성 (한 파일)', [
+    ['b',  'best — 영상·음성이 같이 든 것 중 최고'],
+    ['b*', 'best* — 종류 안 가리고 최고'],
+    ['w',  'worst — 같이 든 것 중 최저'],
+    ['w*', 'worst* — 종류 안 가리고 최저'],
+  ]],
+  ['영상만', [
+    ['bv',  'bestvideo — 영상만 든 것 중 최고'],
+    ['bv*', 'bestvideo* — 영상이 든 것 중 최고 (음성 동봉 허용)'],
+    ['wv',  'worstvideo — 영상만 든 것 중 최저'],
+    ['wv*', 'worstvideo* — 영상이 든 것 중 최저'],
+  ]],
+  ['음성만', [
+    ['ba',  'bestaudio — 음성만 든 것 중 최고'],
+    ['ba*', 'bestaudio* — 음성이 든 것 중 최고 (영상 동봉 허용)'],
+    ['wa',  'worstaudio — 음성만 든 것 중 최저'],
+    ['wa*', 'worstaudio* — 음성이 든 것 중 최저'],
+  ]],
+];
+const SEL_HELP = Object.fromEntries(SELECTORS.flatMap(([, items]) => items));
+const SEL_SET = new Set(Object.keys(SEL_HELP));
+
+// yt-dlp 문서의 필터 필드. num/str 에 따라 쓸 수 있는 연산자가 다르다.
+const FKEYS = [
+  ['height','세로 해상도','num'], ['width','가로 해상도','num'], ['fps','프레임','num'],
+  ['tbr','전체 비트레이트','num'], ['vbr','영상 비트레이트','num'], ['abr','음성 비트레이트','num'],
+  ['asr','샘플레이트','num'], ['audio_channels','음성 채널 수','num'],
+  ['filesize','파일 크기','num'], ['filesize_approx','대략 크기','num'], ['aspect_ratio','화면비','num'],
+  ['ext','확장자','str'], ['vcodec','영상 코덱','str'], ['acodec','음성 코덱','str'],
+  ['container','컨테이너','str'], ['protocol','프로토콜','str'], ['format_id','포맷 ID','str'],
+  ['format_note','포맷 노트','str'], ['resolution','해상도','str'], ['language','언어','str'],
+  ['dynamic_range','다이내믹 레인지','str'],
+];
+const FKEY_TYPE = Object.fromEntries(FKEYS.map(([k, , t]) => [k, t]));
+const NUM_OPS = [['<','<'],['<=','≤'],['>','>'],['>=','≥'],['=','='],['!=','≠']];
+const STR_OPS = [['=','='],['!=','≠'],['^=','로 시작'],['$=','로 끝남'],['*=','포함'],['~=','정규식'],
+                 ['!^=','로 시작 안 함'],['!$=','로 끝나지 않음'],['!*=','포함 안 함'],['!~=','정규식 불일치']];
+const EXIST_OPS = [['has','있음'],['hasnot','없음']];
+const OP_LABEL = Object.fromEntries([...NUM_OPS, ...STR_OPS, ...EXIST_OPS]);
+
+function parseFilterBody(body) {
+  const b = body.trim();
+  if (!b) throw new Error('빈 필터');
+  const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
+  if (m) return { key: m[1], op: m[2], loose: m[3] === '?', value: m[4].trim() };
+  if (/^![A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b.slice(1), op: 'hasnot', value: '' };
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b, op: 'has', value: '' };
+  throw new Error(`필터를 읽지 못했다: [${body}]`);
+}
+
+/** 포맷 셀렉터 문자열 → 트리. 못 읽으면 던진다. */
+function parseFormat(src) {
+  const s = (src || '').trim();
+  if (!s) return null;
+  let i = 0;
+  const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; };
+  const peek = () => s[i];
+
+  const expr = () => multi();
+  function multi() {
+    const kids = [fallback()]; ws();
+    while (peek() === ',') { i++; kids.push(fallback()); ws(); }
+    return kids.length === 1 ? kids[0] : { t:'multi', kids };
+  }
+  function fallback() {
+    const kids = [merge()]; ws();
+    while (peek() === '/') { i++; kids.push(merge()); ws(); }
+    return kids.length === 1 ? kids[0] : { t:'fallback', kids };
+  }
+  function merge() {
+    const kids = [atom()]; ws();
+    while (peek() === '+') { i++; kids.push(atom()); ws(); }
+    return kids.length === 1 ? kids[0] : { t:'merge', kids };
+  }
+  function atom() {
+    ws();
+    if (peek() === '(') {
+      i++; const inner = expr(); ws();
+      if (peek() !== ')') throw new Error("')' 가 닫히지 않았다");
+      i++; ws();
+      if (peek() === '[') throw new Error('그룹에 바로 붙은 필터는 아직 그래프로 못 읽는다');
+      return inner;
+    }
+    const start = i;
+    while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s[i])) i++;
+    if (i === start) throw new Error(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`);
+    const name = s.slice(start, i);
+    const filters = [];
+    ws();
+    while (peek() === '[') {
+      i++;
+      const j = s.indexOf(']', i);
+      if (j < 0) throw new Error("']' 가 닫히지 않았다");
+      filters.push(parseFilterBody(s.slice(i, j)));
+      i = j + 1; ws();
+    }
+    return { t:'sel', name, filters };
+  }
+
+  const tree = expr(); ws();
+  if (i < s.length) throw new Error(`읽고 남은 글자: "${s.slice(i)}"`);
+  return tree;
+}
+
+const PREC = { multi:0, fallback:1, merge:2, sel:3 };
+function emitFilter(f) {
+  if (f.op === 'has') return '[' + f.key + ']';
+  if (f.op === 'hasnot') return '[!' + f.key + ']';
+  return '[' + f.key + f.op + (f.loose ? '?' : '') + f.value + ']';
+}
+function emitTree(n) {
+  if (!n) return '';
+  if (n.t === 'sel') return n.name + (n.filters || []).map(emitFilter).join('');
+  const sep = { merge:'+', fallback:'/', multi:',' }[n.t];
+  return n.kids.map(k => {
+    const s = emitTree(k);
+    return PREC[k.t] < PREC[n.t] ? '(' + s + ')' : s;   // 우선순위가 낮으면 괄호로 묶는다
+  }).join(sep);
+}
+
 /* ══ 그래프 상태 ═════════════════════════════ */
 const NODE_W = 300, HEAD_H = 34;
-const STORE_KEY = 'ytstudio.graph.v2';
+const STORE_KEY = 'ytstudio.graph.v3';
+const PROTECTED = new Set(['src', 'out', 'fout']);
 
 let state, view, seq;
-const ui = { lit: null, sel: null, picker: null, unknown: [], drag: null, wire: null };
+const ui = {
+  mode: 'pipeline', lit: null, sel: null, picker: null,
+  unknown: [], drag: null, wire: null, pan: null, fmtWarn: '',
+};
 
-function blankGraph() {
+function blankFormat() {
+  return {
+    nodes: { fout: { id:'fout', type:'fout', x:560, y:210 } },
+    edges: [],
+    view: { x:0, y:0, k:1 },
+  };
+}
+function blankState() {
   return {
     nodes: {
       src: { id:'src', type:'source', x: 60,  y: 190, urls: '' },
       out: { id:'out', type:'sink',   x: 700, y: 190 },
     },
     edges: [{ from:'src', to:'out' }],
+    view: { x:0, y:0, k:1 },
+    format: blankFormat(),
   };
 }
 function resetState() {
-  state = blankGraph();
-  view = { x: 0, y: 0, k: 1 };
+  state = blankState();
   seq = 1;
-  ui.unknown = []; ui.sel = null; ui.picker = null;
+  ui.mode = 'pipeline';
+  view = state.view;
+  ui.unknown = []; ui.sel = null; ui.picker = null; ui.fmtWarn = '';
 }
 resetState();
 
+/** 지금 편집 중인 그래프. 파이프라인이거나 포맷 서브그래프거나. */
+const graph = () => ui.mode === 'format' ? state.format : state;
+const inFormat = () => ui.mode === 'format';
+
 const nid = () => 'n' + (seq++);
 const stageIdx = id => STAGE_ORDER.indexOf(id);
-const nodeList = () => Object.values(state.nodes);
-const stageNode = sid => nodeList().find(n => n.type === 'stage' && n.stage === sid);
+const nodeList = (g = graph()) => Object.values(g.nodes);
+const stageNode = sid => nodeList(state).find(n => n.type === 'stage' && n.stage === sid);
 const valuesOf = n => (n.values ||= {});
-const setCount = n => n.type === 'stage'
-  ? Object.keys(valuesOf(n)).filter(k => valuesOf(n)[k] !== '').length : 0;
+const filtersOf = n => (n.filters ||= []);
 
-/* ── 그래프 질의 ─────────────────────────── */
-function adjacency() {
+function accentOf(n) {
+  if (n.type === 'stage') return ACCENT[n.stage];
+  if (FTYPE[n.type]) return FTYPE[n.type].accent;
+  return IO_ACCENT[n.id] || ACCENT.run;
+}
+function setCount(n) {
+  if (n.type === 'stage') {
+    const v = valuesOf(n);
+    return Object.keys(v).filter(k => v[k] !== '').length;
+  }
+  if (n.type === 'stream') return filtersOf(n).length;
+  return 0;
+}
+
+/* ── 그래프 질의 (모드 공용) ─────────────── */
+function adjacency(g = graph()) {
   const out = {}, inn = {};
-  for (const n of nodeList()) { out[n.id] = []; inn[n.id] = []; }
-  for (const e of state.edges) {
+  for (const n of nodeList(g)) { out[n.id] = []; inn[n.id] = []; }
+  for (const e of g.edges) {
     if (out[e.from] && inn[e.to]) { out[e.from].push(e.to); inn[e.to].push(e.from); }
   }
   return { out, inn };
@@ -527,9 +752,9 @@ function reach(start, adj) {
 }
 /** 소스에서 출발해 명령어 노드까지 실제로 도달하는 노드들을, 실행 순서대로. */
 function livePath() {
-  const { out, inn } = adjacency();
+  const { out, inn } = adjacency(state);
   const fwd = reach('src', out), bwd = reach('out', inn);
-  const live = nodeList().map(n => n.id).filter(id => fwd.has(id) && bwd.has(id));
+  const live = nodeList(state).map(n => n.id).filter(id => fwd.has(id) && bwd.has(id));
   const set = new Set(live);
   const cmp = (a, b) => (state.nodes[a].x - state.nodes[b].x)
     || (stageIdx(state.nodes[a].stage) - stageIdx(state.nodes[b].stage));
@@ -545,24 +770,41 @@ function livePath() {
   }
   return order;
 }
-function liveSet() { return new Set(livePath()); }
-function creates_cycle(from, to) {
-  const { out } = adjacency();
-  return reach(to, out).has(from);          // to 에서 from 으로 돌아올 수 있으면 순환
+/** 현재 모드에서 "살아 있는" 노드. 포맷 그래프는 -f 출력에 닿는지가 기준이다. */
+function liveIds() {
+  if (inFormat()) return reach('fout', adjacency(state.format).inn);
+  return new Set(livePath());
 }
-function connect(from, to) {
+function createsCycle(g, from, to) {
+  return reach(to, adjacency(g).out).has(from);   // to 에서 from 으로 돌아오면 순환
+}
+function connect(from, to, g = graph()) {
   if (from === to) return false;
-  if (state.edges.some(e => e.from === from && e.to === to)) return false;
-  if (creates_cycle(from, to)) return false;
-  state.edges.push({ from, to });
+  if (!g.nodes[from] || !g.nodes[to]) return false;
+  if (g.edges.some(e => e.from === from && e.to === to)) return false;
+  if (createsCycle(g, from, to)) return false;
+  // -f 출력은 표현식 하나만 받는다. 새로 이으면 기존 것을 밀어낸다.
+  if (to === 'fout') g.edges = g.edges.filter(e => e.to !== 'fout');
+  g.edges.push({ from, to });
   return true;
 }
+function removeNode(id, g = graph()) {
+  if (PROTECTED.has(id)) return;
+  // 지운 노드의 앞뒤를 이어 붙여 사슬이 끊기지 않게 한다.
+  const before = g.edges.filter(e => e.to === id).map(e => e.from);
+  const after = g.edges.filter(e => e.from === id).map(e => e.to);
+  g.edges = g.edges.filter(e => e.from !== id && e.to !== id);
+  for (const a of before) for (const b of after) connect(a, b, g);
+  delete g.nodes[id];
+  if (ui.sel === id) ui.sel = null;
+  if (ui.picker && ui.picker.node === id) ui.picker = null;
+}
 
-/* ── 노드 만들기 / 지우기 ────────────────── */
+/* ── 파이프라인 전용 ─────────────────────── */
 function addStageNode(sid, x, y) {
   const found = stageNode(sid);
   if (found) return found;
-  const n = { id: nid(), type: 'stage', stage: sid, x, y, values: {} };
+  const n = { id: nid(), type:'stage', stage: sid, x, y, values: {} };
   state.nodes[n.id] = n;
   spliceIntoChain(n);
   return n;
@@ -570,7 +812,7 @@ function addStageNode(sid, x, y) {
 /** 새 노드를 단계 순서에 맞는 자리에 끼워 넣는다. 사슬이 아니면 그냥 매달아 둔다. */
 function spliceIntoChain(n) {
   const chain = [];
-  const { out } = adjacency();
+  const { out } = adjacency(state);
   let cur = 'src';
   const seen = new Set();
   while (cur && !seen.has(cur)) {
@@ -589,16 +831,118 @@ function spliceIntoChain(n) {
   state.edges = state.edges.filter(e => !(e.from === prev && e.to === next));
   state.edges.push({ from: prev, to: n.id }, { from: n.id, to: next });
 }
-function removeNode(id) {
-  if (id === 'src' || id === 'out') return;
-  // 지운 노드의 앞뒤를 이어 붙여 사슬이 끊기지 않게 한다.
-  const before = state.edges.filter(e => e.to === id).map(e => e.from);
-  const after = state.edges.filter(e => e.from === id).map(e => e.to);
-  state.edges = state.edges.filter(e => e.from !== id && e.to !== id);
-  for (const a of before) for (const b of after) connect(a, b);
-  delete state.nodes[id];
-  if (ui.sel === id) ui.sel = null;
-  if (ui.picker && ui.picker.node === id) ui.picker = null;
+
+/* ── 포맷 서브그래프 전용 ────────────────── */
+/** 연산자 노드의 피연산자 순서 = 이어진 노드의 세로 위치. 위에서 아래로. */
+function operands(id, g = state.format) {
+  return g.edges.filter(e => e.to === id)
+    .map(e => g.nodes[e.from]).filter(Boolean)
+    .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+}
+/** 서브그래프 → 표현식 트리. */
+function graphToTree(id, g = state.format, seen = new Set()) {
+  const n = g.nodes[id];
+  if (!n || seen.has(id)) return null;
+  seen.add(id);
+  if (n.type === 'stream') {
+    if (!n.sel) return null;
+    return { t:'sel', name: n.sel, filters: filtersOf(n).filter(f => f.key) };
+  }
+  const kids = operands(id, g).map(k => graphToTree(k.id, g, new Set(seen))).filter(Boolean);
+  if (n.type === 'fout') return kids[0] || null;
+  if (!kids.length) return null;
+  if (kids.length === 1) return kids[0];     // 피연산자가 하나면 연산자는 통과시킨다
+  return { t: n.type, kids };
+}
+const formatExpr = (g = state.format) => emitTree(graphToTree('fout', g));
+
+/** 서브그래프에서 사람이 고칠 만한 문제들. */
+function formatIssues(g = state.format) {
+  const live = reach('fout', adjacency(g).inn);
+  const out = [];
+  for (const n of nodeList(g)) {
+    if (n.id === 'fout') continue;
+    if (!live.has(n.id)) { out.push(`[${FTYPE[n.type].tag}] 노드가 -f 출력에 이어지지 않았다`); continue; }
+    if (n.type === 'stream' && !n.sel) out.push('스트림 노드에 셀렉터가 비어 있다');
+    if (FOP_TYPES.includes(n.type) && operands(n.id, g).length < 2)
+      out.push(`[${FTYPE[n.type].tag}] 노드에 이어진 입력이 ${operands(n.id, g).length}개뿐이다 — 그냥 통과된다`);
+  }
+  return [...new Set(out)];
+}
+
+function addFormatNode(type, x, y, extra) {
+  const n = Object.assign({ id: nid(), type, x, y }, extra || {});
+  if (type === 'stream') { n.sel = n.sel || 'bv'; n.filters = n.filters || []; }
+  state.format.nodes[n.id] = n;
+  return n;
+}
+
+/** 표현식 트리 → 서브그래프. 오른쪽 끝이 -f 출력, 왼쪽으로 갈수록 깊어진다. */
+function treeToGraph(tree) {
+  const g = blankFormat();
+  const PX = NODE_W + 90, PY = 200;   // 열 간격은 노드 폭보다 넓어야 한다
+  g._tidy = true;                   // DOM 이 생기면 실측해서 다시 정돈하라는 표시
+  if (!tree) return g;
+
+  const depthOf = n => n.t === 'sel' ? 0 : 1 + Math.max(...n.kids.map(depthOf));
+  const maxDepth = depthOf(tree);
+  let slot = 0;
+
+  const walk = (n, depth) => {
+    if (n.t === 'sel') {
+      const id = nid();
+      g.nodes[id] = { id, type:'stream', sel:n.name, filters:n.filters || [], x:0, y: slot++ * PY, _d: depth };
+      return id;
+    }
+    const kids = n.kids.map(k => walk(k, depth + 1));
+    const id = nid();
+    const y = kids.reduce((a, k) => a + g.nodes[k].y, 0) / kids.length;
+    g.nodes[id] = { id, type:n.t, x:0, y, _d: depth };
+    for (const k of kids) g.edges.push({ from:k, to:id });
+    return id;
+  };
+  const rootId = walk(tree, 0);
+  for (const n of nodeList(g)) {
+    if (n.id === 'fout') continue;
+    n.x = (maxDepth - n._d) * PX;
+    n.y = Math.round(n.y) + 60;
+    delete n._d;
+  }
+  g.nodes.fout.x = (maxDepth + 1) * PX;
+  g.nodes.fout.y = Math.round(g.nodes[rootId].y);
+  g.edges.push({ from: rootId, to: 'fout' });
+  return g;
+}
+
+/** 노드 높이는 필터 개수에 따라 달라진다. 렌더된 뒤 실측해서 열마다 세로로 풀어 준다.
+ *  연산자는 피연산자들의 세로 중심으로 끌어오되, 겹치면 아래로 밀어 순서는 보존한다. */
+function tidyFormat(g = state.format) {
+  const H = id => {
+    const el = document.querySelector(`.node[data-id="${id}"]`);
+    return el ? el.offsetHeight : 190;
+  };
+  const cols = [...new Set(nodeList(g).map(n => Math.round(n.x)))].sort((a, b) => a - b);
+  for (const x of cols) {
+    const col = nodeList(g).filter(n => Math.round(n.x) === x);
+    for (const n of col) {
+      const ins = operands(n.id, g);
+      if (ins.length) {
+        const mid = ins.reduce((a, k) => a + k.y + H(k.id) / 2, 0) / ins.length;
+        n.y = Math.round(mid - H(n.id) / 2);
+      }
+    }
+    col.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < col.length; i++) {
+      const min = col[i - 1].y + H(col[i - 1].id) + 26;
+      if (col[i].y < min) col[i].y = Math.round(min);
+    }
+  }
+}
+
+/** 파이프라인의 --format 값을 서브그래프가 컴파일한 결과로 덮어쓴다. */
+function syncFormatValue() {
+  const n = stageNode('format');
+  if (n) valuesOf(n).format = formatExpr();
 }
 
 /* ── 좌표 변환 ───────────────────────────── */
@@ -607,9 +951,9 @@ function toWorld(clientX, clientY) {
   const r = vp();
   return { x: (clientX - r.left - view.x) / view.k, y: (clientY - r.top - view.y) / view.k };
 }
-const portPos = n => ({
-  inX: n.x, outX: n.x + NODE_W, y: n.y + HEAD_H / 2,
-});
+const portPos = n => ({ inX: n.x, outX: n.x + NODE_W, y: n.y + HEAD_H / 2 });
+const hasInPort = n => !(n.id === 'src' || n.type === 'stream');
+const hasOutPort = n => !(n.id === 'out' || n.type === 'fout');
 
 /* ══ 명령어 조립 ═════════════════════════════ */
 const SAFE = /^[A-Za-z0-9._:,\/=+@%^-]+$/;
@@ -625,74 +969,94 @@ function buildTokens() {
     for (const o of BY_STAGE[n.stage]) {
       if (!(o.id in vals) || vals[o.id] === '') continue;
       const v = vals[o.id];
-      if (v === true) toks.push({ node: n.id, opt: o, text: o.short || o.flag });
-      else if (v === false) { if (o.negation) toks.push({ node: n.id, opt: o, text: o.negation }); }
+      if (v === true) toks.push({ node:n.id, opt:o, text: o.short || o.flag });
+      else if (v === false) { if (o.negation) toks.push({ node:n.id, opt:o, text:o.negation }); }
       else if (o.kind === 'repeatable') {
         for (const line of String(v).split('\n').map(s => s.trim()).filter(Boolean))
-          toks.push({ node: n.id, opt: o, text: (o.short || o.flag) + ' ' + quote(line) });
-      } else toks.push({ node: n.id, opt: o, text: (o.short || o.flag) + ' ' + quote(String(v)) });
+          toks.push({ node:n.id, opt:o, text: (o.short || o.flag) + ' ' + quote(line) });
+      } else toks.push({ node:n.id, opt:o, text: (o.short || o.flag) + ' ' + quote(String(v)) });
     }
   }
   return toks;
 }
 const urlList = () => (state.nodes.src.urls || '').split('\n').map(s => s.trim()).filter(Boolean);
-function commandString() {
-  return ['yt-dlp', ...buildTokens().map(t => t.text), ...urlList().map(quote)].join(' ');
-}
-function confString() {
-  return buildTokens().map(t => t.text).join('\n') + '\n';
-}
+const commandString = () => ['yt-dlp', ...buildTokens().map(t => t.text), ...urlList().map(quote)].join(' ');
+const confString = () => buildTokens().map(t => t.text).join('\n') + '\n';
 
 /* ══ 렌더 ════════════════════════════════════ */
 function applyView() {
-  const t = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
-  $('#node-layer').style.transform = t;
+  $('#node-layer').style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
   $('#wire-layer').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
-  $('#viewport').style.backgroundSize = (22 * view.k) + 'px ' + (22 * view.k) + 'px';
-  $('#viewport').style.backgroundPosition = view.x + 'px ' + view.y + 'px';
+  const el = $('#viewport');
+  el.style.backgroundSize = (22 * view.k) + 'px ' + (22 * view.k) + 'px';
+  el.style.backgroundPosition = view.x + 'px ' + view.y + 'px';
   $('#zoom-label').textContent = Math.round(view.k * 100) + '%';
 }
-
 function wirePath(x1, y1, x2, y2) {
   const dx = Math.max(34, Math.min(150, Math.abs(x2 - x1) * 0.5));
   return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
 }
+const svgEl = t => document.createElementNS('http://www.w3.org/2000/svg', t);
 
 function renderWires() {
+  const g = graph();
   const layer = $('#wire-layer');
-  const live = liveSet();
+  const live = liveIds();
   layer.innerHTML = '';
-  for (const e of state.edges) {
-    const a = state.nodes[e.from], b = state.nodes[e.to];
+
+  // 연산자 노드는 입력 순서가 의미를 가지므로 와이어에 번호를 붙인다.
+  const ordinal = {};
+  if (inFormat()) {
+    for (const n of nodeList(g)) {
+      if (!FOP_TYPES.includes(n.type)) continue;
+      operands(n.id, g).forEach((k, i) => { ordinal[k.id + '>' + n.id] = i + 1; });
+    }
+  }
+
+  for (const e of g.edges) {
+    const a = g.nodes[e.from], b = g.nodes[e.to];
     if (!a || !b) continue;
     const pa = portPos(a), pb = portPos(b);
     const d = wirePath(pa.outX, pa.y, pb.inX, pb.y);
     const on = live.has(e.from) && live.has(e.to);
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    g.setAttribute('class', 'wire-g');
-    g.style.pointerEvents = 'auto';
+    const grp = svgEl('g');
+    grp.setAttribute('class', 'wire-g');
+    grp.style.pointerEvents = 'auto';
     // 삭제는 viewport 의 pointerdown 에서 처리한다. 팬이 포인터를 캡처해 버리면
     // click 이 viewport 로 되돌아가기 때문에 여기에 onclick 을 달면 안 걸린다.
-    g.dataset.from = e.from;
-    g.dataset.to = e.to;
-    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    grp.dataset.from = e.from;
+    grp.dataset.to = e.to;
+    const hit = svgEl('path');
     hit.setAttribute('class', 'wire-hit'); hit.setAttribute('d', d);
     hit.innerHTML = '<title>클릭해서 연결 끊기</title>';
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const p = svgEl('path');
     p.setAttribute('class', 'wire' + (on ? '' : ' dead'));
     p.setAttribute('d', d);
     if (on) p.style.stroke = accentOf(a);
-    g.append(hit, p);
-    layer.append(g);
+    grp.append(hit, p);
+
+    const ord = ordinal[e.from + '>' + e.to];
+    if (ord) {
+      const t = svgEl('text');
+      t.setAttribute('class', 'wire-ord');
+      t.setAttribute('x', pb.inX - 16);
+      t.setAttribute('y', pb.y - 6);
+      t.setAttribute('text-anchor', 'end');
+      t.textContent = ord;
+      grp.append(t);
+    }
+    layer.append(grp);
   }
+
   if (ui.wire) {
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const p = svgEl('path');
     p.setAttribute('class', 'wire-temp');
     p.setAttribute('d', wirePath(ui.wire.x1, ui.wire.y1, ui.wire.x2, ui.wire.y2));
     layer.append(p);
   }
 }
 
+/* ── 파이프라인 옵션 행 ──────────────────── */
 function triControl(n, o) {
   const cur = valuesOf(n)[o.id];
   const tri = document.createElement('div');
@@ -718,6 +1082,16 @@ function optRow(n, o) {
   top.className = 'row-top';
   top.innerHTML = `<span class="row-flag">${o.flag}`
     + (o.short ? ` <span class="short">${o.short}</span>` : '') + `</span>`;
+
+  // -f 는 그 자체가 표현식이다. 서브그래프로 들어가는 문을 여기 단다.
+  if (o.id === 'format') {
+    const sub = document.createElement('button');
+    sub.className = 'row-sub'; sub.type = 'button'; sub.textContent = '그래프 ↗';
+    sub.title = '포맷 셀렉터를 노드 서브그래프로 편집한다';
+    sub.onclick = ev => { ev.stopPropagation(); enterFormat(); };
+    top.append(sub);
+  }
+
   const x = document.createElement('button');
   x.className = 'row-x'; x.type = 'button'; x.textContent = '✕';
   x.title = '이 옵션 빼기';
@@ -763,15 +1137,12 @@ function optRow(n, o) {
 function pickerList(n, q) {
   const vals = valuesOf(n);
   const pool = BY_STAGE[n.stage].filter(o => !(o.id in vals));
-  return (search(q, pool) || pool);
+  return search(q, pool) || pool;
 }
 function renderPickerList(n, ul, q) {
   const hits = pickerList(n, q);
   ul.innerHTML = '';
-  if (!hits.length) {
-    ul.innerHTML = '<li class="none">남은 옵션이 없다.</li>';
-    return;
-  }
+  if (!hits.length) { ul.innerHTML = '<li class="none">남은 옵션이 없다.</li>'; return; }
   for (const o of hits.slice(0, 60)) {
     const li = document.createElement('li');
     const b = document.createElement('button');
@@ -788,10 +1159,176 @@ function renderPickerList(n, ul, q) {
   }
 }
 
+/* ── 포맷 노드 본문 ──────────────────────── */
+function filterRow(n, f, idx) {
+  const type = FKEY_TYPE[f.key] || 'str';
+  const exists = f.op === 'has' || f.op === 'hasnot';
+  const row = document.createElement('div');
+  row.className = 'filt-row' + (exists ? ' exists' : '');
+
+  const key = document.createElement('select');
+  key.innerHTML = FKEYS.map(([k, ko]) =>
+    `<option value="${k}"${k === f.key ? ' selected' : ''}>${ko}</option>`).join('');
+  key.title = '필터 필드';
+  key.onchange = () => {
+    f.key = key.value;
+    const t = FKEY_TYPE[f.key];
+    const allowed = (t === 'num' ? NUM_OPS : STR_OPS).map(o => o[0]);
+    if (!allowed.includes(f.op) && !['has', 'hasnot'].includes(f.op)) f.op = allowed[0];
+    render();
+  };
+
+  const op = document.createElement('select');
+  const opts = [...(type === 'num' ? NUM_OPS : STR_OPS), ...EXIST_OPS];
+  op.innerHTML = opts.map(([v, ko]) =>
+    `<option value="${v}"${v === f.op ? ' selected' : ''}>${ko}</option>`).join('');
+  op.title = '비교 연산';
+  op.onchange = () => { f.op = op.value; render(); };
+
+  row.append(key, op);
+
+  if (!exists) {
+    const val = document.createElement('input');
+    val.type = 'text';
+    val.value = f.value || '';
+    val.placeholder = type === 'num' ? '1080' : 'mp4';
+    val.oninput = () => { f.value = val.value; renderAfterEdit(); };
+
+    // yt-dlp 의 '?' 는 필터마다 따로 붙는다 ([height<=?1080]). 노드가 아니라 행에 둔다.
+    const q = document.createElement('label');
+    q.className = 'filt-q';
+    q.title = '이 필드 값을 모르는 포맷도 통과시킨다 (yt-dlp 의 ? 접미사)';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!f.loose;
+    cb.onchange = () => { f.loose = cb.checked; render(); };
+    q.append(cb, document.createTextNode('?'));
+
+    row.append(val, q);
+  }
+
+  const del = document.createElement('button');
+  del.className = 'row-x'; del.type = 'button'; del.textContent = '✕';
+  del.title = '필터 빼기';
+  del.onclick = () => { filtersOf(n).splice(idx, 1); render(); };
+  row.append(del);
+  return row;
+}
+
+function streamBody(n, body) {
+  const wrap = document.createElement('div');
+  wrap.className = 'fsel';
+
+  const custom = !SEL_SET.has(n.sel);
+  const sel = document.createElement('select');
+  sel.innerHTML = SELECTORS.map(([g, items]) =>
+    `<optgroup label="${g}">` + items.map(([v]) =>
+      `<option value="${v}"${v === n.sel ? ' selected' : ''}>${v}</option>`).join('') + '</optgroup>'
+  ).join('') + `<option value="__custom"${custom ? ' selected' : ''}>(직접 입력 — 포맷 ID·확장자)</option>`;
+  sel.title = '셀렉터';
+  sel.onchange = () => {
+    n.sel = sel.value === '__custom' ? '' : sel.value;
+    render();
+  };
+  wrap.append(sel);
+
+  if (custom) {
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.spellcheck = false;
+    inp.value = n.sel || '';
+    inp.placeholder = '137 · mp4 · 248 …';
+    inp.oninput = () => { n.sel = inp.value.trim(); renderAfterEdit(); };
+    wrap.append(inp);
+  } else {
+    const why = document.createElement('div');
+    why.className = 'why';
+    why.textContent = SEL_HELP[n.sel] || '';
+    wrap.append(why);
+  }
+  body.append(wrap);
+
+  const box = document.createElement('div');
+  box.className = 'filt';
+  const head = document.createElement('div');
+  head.className = 'filt-head';
+  head.innerHTML = '<span>필터</span>';
+  const add = document.createElement('button');
+  add.className = 'row-sub'; add.type = 'button'; add.textContent = '+ 필터';
+  add.onclick = () => { filtersOf(n).push({ key:'height', op:'<=', value:'1080' }); render(); };
+  head.append(add);
+  box.append(head);
+
+  filtersOf(n).forEach((f, i) => box.append(filterRow(n, f, i)));
+
+  if (filtersOf(n).some(f => !['has', 'hasnot'].includes(f.op))) {
+    box.insertAdjacentHTML('beforeend',
+      '<div class="filt-loose"><b>?</b> = 이 값을 모르는 포맷도 통과</div>');
+  }
+  body.append(box);
+}
+
+function opBody(n, body) {
+  const ins = operands(n.id);
+  const box = document.createElement('div');
+  box.className = 'ops';
+  box.innerHTML = `<div>${FTYPE[n.type].blurb} · 입력은 <b>세로 위치 순서</b>다.</div>`;
+  if (!ins.length) {
+    box.insertAdjacentHTML('beforeend', '<div class="warn">이어진 입력이 없다.</div>');
+  } else {
+    const ol = document.createElement('ol');
+    for (const k of ins) {
+      const li = document.createElement('li');
+      li.textContent = emitTree(graphToTree(k.id)) || '(비어 있음)';
+      ol.append(li);
+    }
+    box.append(ol);
+    if (ins.length === 1) {
+      box.insertAdjacentHTML('beforeend',
+        `<div class="warn">입력이 하나뿐이라 <code>${FTYPE[n.type].tag}</code> 는 그냥 통과된다.</div>`);
+    }
+  }
+  body.append(box);
+}
+
+function foutBody(n, body) {
+  const note = document.createElement('div');
+  note.className = 'node-note';
+  note.textContent = '여기 이어진 표현식이 --format 값이 된다.';
+  const expr = document.createElement('div');
+  expr.className = 'fout-expr';
+  expr.id = 'fout-expr';
+  expr.textContent = formatExpr();
+  body.append(note, expr);
+
+  const issues = formatIssues();
+  if (issues.length) {
+    const bad = document.createElement('div');
+    bad.className = 'fout-issue';
+    bad.id = 'fout-issue';
+    bad.textContent = '· ' + issues.join('\n· ');
+    bad.style.whiteSpace = 'pre-line';
+    body.append(bad);
+  }
+}
+
+/* ── 노드 ────────────────────────────────── */
+function headLabel(n) {
+  if (n.type === 'stage')
+    return `<span class="node-tag">[${n.stage}]</span><span class="node-ko">${STAGE[n.stage].label}<span class="node-badge">우회</span></span>`;
+  if (n.id === 'src')
+    return `<span class="node-tag">[source]</span><span class="node-ko">소스<span class="node-badge">끊김</span></span>`;
+  if (n.id === 'out')
+    return `<span class="node-tag">[command]</span><span class="node-ko">명령어<span class="node-badge">끊김</span></span>`;
+  const f = FTYPE[n.type];
+  return `<span class="node-tag">[${f.tag}]</span><span class="node-ko">${f.label}<span class="node-badge">끊김</span></span>`;
+}
+
 function nodeEl(n, live) {
+  const isIO = n.type === 'source' || n.type === 'sink' || n.type === 'fout';
   const el = document.createElement('div');
-  el.className = 'node' + (n.type === 'stage' ? '' : ' io')
-    + (live.has(n.id) ? '' : ' bypass') + (ui.sel === n.id ? ' sel' : '');
+  el.className = 'node' + (isIO ? ' io' : '')
+    + (live.has(n.id) ? '' : ' bypass') + (ui.sel === n.id ? ' sel' : '')
+    + (n.collapsed ? ' collapsed' : '');
   el.dataset.id = n.id;
   el.style.setProperty('--a', accentOf(n));
   el.style.left = n.x + 'px';
@@ -799,23 +1336,21 @@ function nodeEl(n, live) {
 
   const head = document.createElement('div');
   head.className = 'node-head';
-  const label = n.type === 'stage'
-    ? `<span class="node-tag">[${n.stage}]</span><span class="node-ko">${STAGE[n.stage].label}<span class="node-badge">우회</span></span>`
-    : n.id === 'src'
-      ? `<span class="node-tag">[source]</span><span class="node-ko">소스<span class="node-badge">끊김</span></span>`
-      : `<span class="node-tag">[command]</span><span class="node-ko">명령어<span class="node-badge">끊김</span></span>`;
-  head.innerHTML = label + `<span class="node-n" data-n="${setCount(n)}">${setCount(n)}</span>`;
+  head.innerHTML = headLabel(n) + `<span class="node-n" data-n="${setCount(n)}">${setCount(n)}</span>`;
 
+  const toggle = () => {
+    n.collapsed = !n.collapsed;
+    if (ui.picker && ui.picker.node === n.id) ui.picker = null;
+    render();
+  };
   const fold = document.createElement('button');
   fold.className = 'node-x'; fold.type = 'button';
   fold.textContent = n.collapsed ? '▸' : '▾';
   fold.title = n.collapsed ? '펴기' : '접기';
-  fold.onclick = ev => { ev.stopPropagation(); n.collapsed = !n.collapsed;
-    if (ui.picker && ui.picker.node === n.id) ui.picker = null;
-    render(); };
+  fold.onclick = ev => { ev.stopPropagation(); toggle(); };
   head.append(fold);
 
-  if (n.type === 'stage') {
+  if (!PROTECTED.has(n.id)) {
     const x = document.createElement('button');
     x.className = 'node-x'; x.type = 'button'; x.textContent = '✕';
     x.title = '노드 지우기';
@@ -824,12 +1359,10 @@ function nodeEl(n, live) {
   } else {
     head.append(document.createElement('span'));
   }
-  head.title = n.type === 'stage' ? STAGE[n.stage].blurb : '';
-  head.ondblclick = () => { n.collapsed = !n.collapsed;
-    if (ui.picker && ui.picker.node === n.id) ui.picker = null;
-    render(); };
+  head.title = n.type === 'stage' ? STAGE[n.stage].blurb
+             : FTYPE[n.type] ? FTYPE[n.type].blurb : '';
+  head.ondblclick = toggle;
   el.append(head);
-  if (n.collapsed) el.classList.add('collapsed');
 
   const body = document.createElement('div');
   body.className = 'node-body';
@@ -840,22 +1373,27 @@ function nodeEl(n, live) {
     ta.spellcheck = false;
     ta.placeholder = 'https://…  — 한 줄에 하나';
     ta.oninput = () => { n.urls = ta.value; renderAfterEdit(); };
-    body.append(ta);
     const note = document.createElement('div');
     note.className = 'node-note';
     note.textContent = '명령어 맨 뒤에 붙는 대상 URL.';
-    body.append(note);
+    body.append(ta, note);
   } else if (n.id === 'out') {
     const toks = buildTokens();
+    const note = document.createElement('div');
+    note.className = 'node-note';
+    note.textContent = '여기까지 이어진 노드만 아래 명령어에 들어간다.';
     const stat = document.createElement('div');
     stat.className = 'sink-stat';
     stat.innerHTML = `<span>토큰 ${toks.length}</span>`
       + `<span>단계 ${new Set(toks.map(t => t.node)).size}</span>`
       + `<span>URL ${urlList().length}</span>`;
-    const note = document.createElement('div');
-    note.className = 'node-note';
-    note.textContent = '여기까지 이어진 노드만 아래 명령어에 들어간다.';
     body.append(note, stat);
+  } else if (n.type === 'stream') {
+    streamBody(n, body);
+  } else if (FOP_TYPES.includes(n.type)) {
+    opBody(n, body);
+  } else if (n.type === 'fout') {
+    foutBody(n, body);
   } else {
     const vals = valuesOf(n);
     const rows = BY_STAGE[n.stage].filter(o => o.id in vals);
@@ -876,9 +1414,7 @@ function nodeEl(n, live) {
       inp.value = ui.picker.q;
       const ul = document.createElement('ul');
       inp.oninput = () => { ui.picker.q = inp.value; renderPickerList(n, ul, inp.value); };
-      inp.onkeydown = ev => {
-        if (ev.key === 'Escape') { ev.stopPropagation(); ui.picker = null; render(); }
-      };
+      inp.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); ui.picker = null; render(); } };
       box.append(inp, ul);
       body.append(box);
       renderPickerList(n, ul, ui.picker.q);
@@ -886,19 +1422,19 @@ function nodeEl(n, live) {
     } else {
       const add = document.createElement('button');
       add.className = 'add'; add.type = 'button'; add.textContent = '+ 옵션';
-      add.onclick = () => { ui.picker = { node: n.id, q: '' }; render(); };
+      add.onclick = () => { ui.picker = { node:n.id, q:'' }; render(); };
       body.append(add);
     }
   }
   if (!n.collapsed) el.append(body);
 
-  if (n.id !== 'src') {
+  if (hasInPort(n)) {
     const pin = document.createElement('span');
     pin.className = 'port in'; pin.dataset.node = n.id; pin.dataset.side = 'in';
     pin.title = '입력';
     el.append(pin);
   }
-  if (n.id !== 'out') {
+  if (hasOutPort(n)) {
     const pout = document.createElement('span');
     pout.className = 'port out'; pout.dataset.node = n.id; pout.dataset.side = 'out';
     pout.title = '출력 — 여기서 끌어다 다른 노드 입력에 놓아라';
@@ -911,15 +1447,48 @@ function nodeEl(n, live) {
 
 function renderNodes() {
   const layer = $('#node-layer');
-  const live = liveSet();
+  const live = liveIds();
   layer.innerHTML = '';
   for (const n of nodeList()) layer.append(nodeEl(n, live));
-  $('#hint').hidden = nodeList().some(n => n.type === 'stage');
+
+  const hint = $('#hint');
+  if (inFormat()) {
+    const bare = nodeList().length <= 1;
+    hint.hidden = !bare;
+    hint.innerHTML = '<div>포맷 셀렉터 서브그래프가 비어 있다.<br>왼쪽에서 <b>스트림</b>을 놓고 <b>-f 출력</b>에 이어라.<br>'
+      + '<b>병합 +</b> 로 영상·음성을 합치고, <b>폴백 /</b> 로 대안을 준다.</div>';
+  } else {
+    hint.hidden = nodeList().some(n => n.type === 'stage');
+    hint.innerHTML = '<div>캔버스가 비어 있다.<br>왼쪽 <b>실행 단계</b>를 끌어다 놓고 <b>소스 → 명령어</b> 사이에 이어라.<br>'
+      + '또는 위의 <b>명령어 읽기</b>로 기존 명령어를 그래프로 되돌려라.</div>';
+  }
 }
 
 function renderPalette() {
   const list = $('#pal-list');
   list.innerHTML = '';
+  $('#pal-head').textContent = inFormat() ? '포맷 노드' : '실행 단계';
+  $('#pal-hint').innerHTML = inFormat()
+    ? '<b>-f 출력</b>에 이어진 것만 표현식이 된다. 연산자 노드의 입력 순서는 <b>세로 위치</b>를 따른다.'
+    : '캔버스로 끌어다 놓거나 클릭해서 노드를 만든다. 소스에서 명령어까지 <b>이어진 노드만</b> 결과에 들어간다.';
+  $('#autowire').hidden = inFormat();
+
+  if (inFormat()) {
+    for (const type of ['stream', ...FOP_TYPES]) {
+      const f = FTYPE[type];
+      const b = document.createElement('button');
+      b.className = 'pal-item';
+      b.type = 'button';
+      b.dataset.fnode = type;
+      b.style.setProperty('--a', f.accent);
+      b.title = f.blurb;
+      b.innerHTML = `<span class="dot"></span>`
+        + `<span class="tag">[<b>${f.tag}</b>]<span class="ko">${f.label}</span></span><span></span>`;
+      list.append(b);
+    }
+    return;
+  }
+
   for (const s of STAGES) {
     const placed = stageNode(s.id);
     const b = document.createElement('button');
@@ -950,7 +1519,7 @@ function highlight(text, terms) {
 function renderHits() {
   const box = $('#hits');
   const q = $('#q').value;
-  const hits = search(q);
+  const hits = inFormat() ? null : search(q);
   if (!hits) { box.hidden = true; box.innerHTML = ''; return; }
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean).flatMap(expand);
   box.hidden = false;
@@ -998,21 +1567,40 @@ function renderCmd() {
   }
 
   const n = $('#notes');
-  const live = liveSet();
-  const bypassed = nodeList().filter(x => x.type === 'stage' && !live.has(x.id));
   const parts = [];
-  if (ui.unknown.length) {
-    parts.push('<b>읽지 못한 토큰:</b> ' + ui.unknown.map(escapeHtml).join(' · '));
-  }
-  if (toks.length) {
-    parts.push(toks.length + '개 옵션 · ' + new Set(toks.map(t => t.node)).size + '개 노드 · 플래그 순서는 그래프 순서를 따른다');
-  } else if (!ui.unknown.length) {
-    parts.push('아직 잡힌 옵션이 없다. 왼쪽 단계를 캔버스에 놓고 소스 → 명령어로 이어라.');
-  }
-  if (bypassed.length) {
-    parts.push('<b>우회 중:</b> ' + bypassed.map(x => '[' + x.stage + ']').join(' ') + ' — 경로에서 끊겨 있어 반영되지 않는다');
+  if (ui.unknown.length) parts.push('<b>읽지 못한 토큰:</b> ' + ui.unknown.map(escapeHtml).join(' · '));
+  if (ui.fmtWarn) parts.push('<b>' + escapeHtml(ui.fmtWarn) + '</b>');
+
+  if (inFormat()) {
+    const issues = formatIssues();
+    parts.push(issues.length
+      ? '<b>서브그래프:</b> ' + issues.map(escapeHtml).join(' · ')
+      : '포맷 서브그래프 편집 중 · -f 값은 그래프가 컴파일한 결과로 계속 덮어쓴다');
+  } else {
+    const live = liveIds();
+    const bypassed = nodeList(state).filter(x => x.type === 'stage' && !live.has(x.id));
+    if (toks.length) {
+      parts.push(toks.length + '개 옵션 · ' + new Set(toks.map(t => t.node)).size + '개 노드 · 플래그 순서는 그래프 순서를 따른다');
+    } else if (!ui.unknown.length) {
+      parts.push('아직 잡힌 옵션이 없다. 왼쪽 단계를 캔버스에 놓고 소스 → 명령어로 이어라.');
+    }
+    if (bypassed.length) {
+      parts.push('<b>우회 중:</b> ' + bypassed.map(x => '[' + x.stage + ']').join(' ') + ' — 경로에서 끊겨 있어 반영되지 않는다');
+    }
   }
   n.innerHTML = parts.join(' · ');
+}
+
+function renderCrumb() {
+  const c = $('#crumb');
+  c.hidden = !inFormat();
+  $('#field-q').hidden = inFormat();
+  $('#viewport').classList.toggle('sub', inFormat());
+  if (inFormat()) {
+    c.style.setProperty('--fmt', ACCENT.format);
+    const e = formatExpr();
+    $('#crumb-expr').textContent = e ? '· ' + e : '';
+  }
 }
 
 function paintLit() {
@@ -1020,7 +1608,7 @@ function paintLit() {
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
   for (const el of document.querySelectorAll('.row'))
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
-  const holder = ui.lit ? stageNode(BY_ID[ui.lit].stage) : null;
+  const holder = ui.lit && !inFormat() ? stageNode(BY_ID[ui.lit].stage) : null;
   for (const el of document.querySelectorAll('.node'))
     el.classList.toggle('lit', !!holder && el.dataset.id === holder.id);
 }
@@ -1028,23 +1616,70 @@ function paintSel() {
   for (const el of document.querySelectorAll('.node'))
     el.classList.toggle('sel', el.dataset.id === ui.sel);
 }
+
 /** 텍스트 입력 중에는 노드를 다시 그리지 않는다 — 포커스가 날아간다. */
 function renderAfterEdit() {
+  if (inFormat()) {
+    syncFormatValue();
+    const e = $('#fout-expr');
+    if (e) e.textContent = formatExpr();
+    $('#crumb-expr').textContent = formatExpr() ? '· ' + formatExpr() : '';
+  }
   renderCmd(); renderPalette(); renderWires();
   for (const el of document.querySelectorAll('.node')) {
-    const n = state.nodes[el.dataset.id];
+    const n = graph().nodes[el.dataset.id];
     const badge = el.querySelector('.node-n');
     if (n && badge) { badge.textContent = setCount(n); badge.dataset.n = setCount(n); }
   }
   save();
 }
 function render() {
-  renderNodes(); renderWires(); renderCmd(); renderPalette(); applyView(); save();
+  if (inFormat()) syncFormatValue();
+  renderCrumb(); renderNodes(); renderWires(); renderCmd(); renderPalette(); applyView(); save();
+}
+
+/* ══ 모드 전환 ═══════════════════════════════ */
+function setMode(m) {
+  if (m === ui.mode) return;
+  ui.mode = m;
+  view = (m === 'format' ? state.format.view : state.view);
+  ui.sel = null; ui.picker = null; ui.lit = null;
+  $('#hits').hidden = true;
+  render();
+}
+
+/** --format 문자열을 서브그래프로 풀어 놓고 들어간다.
+ *  이미 같은 값을 만들어 내는 그래프가 있으면 배치를 그대로 재사용한다. */
+function enterFormat() {
+  const holder = stageNode('format');
+  const raw = holder ? String(valuesOf(holder).format ?? '') : '';
+  ui.fmtWarn = '';
+
+  if (formatExpr() !== raw.trim()) {
+    let tree = null, err = null;
+    try { tree = parseFormat(raw); } catch (e) { err = e; }
+    if (err) {
+      const keep = confirm(
+        `"${raw}" 를 그래프로 읽지 못했다.\n\n${err.message}\n\n` +
+        `빈 서브그래프에서 새로 시작할까? (취소하면 문자열을 그대로 두고 돌아간다)`);
+      if (!keep) return;
+      state.format = blankFormat();
+      ui.fmtWarn = '읽지 못한 -f 문자열을 그래프가 덮어썼다: ' + raw;
+    } else {
+      state.format = treeToGraph(tree);
+    }
+  }
+  setMode('format');
+  if (state.format._tidy) {          // 방금 문자열에서 만든 그래프 → 실측해서 정돈
+    delete state.format._tidy;
+    tidyFormat();
+    render();
+  }
+  fitView();
 }
 
 /* ══ 배치 ════════════════════════════════════ */
 function freeSpot() {
-  // 캔버스 중앙 부근에서 겹치지 않는 자리를 찾는다.
   const r = vp();
   let x = (r.width / 2 - view.x) / view.k - NODE_W / 2;
   let y = (r.height / 2 - view.y) / view.k - 60;
@@ -1054,26 +1689,40 @@ function freeSpot() {
   return [Math.round(x), Math.round(y)];
 }
 function autolayout() {
+  const g = graph();
+  if (inFormat()) {
+    // 표현식은 트리다. 컴파일한 결과를 다시 펼치면 그게 곧 정돈된 배치다.
+    const tree = graphToTree('fout');
+    const fresh = treeToGraph(tree);
+    // 트리에 안 잡힌(끊긴) 노드는 아래쪽에 남겨 둔다.
+    const live = reach('fout', adjacency(g).inn);
+    const orphans = nodeList(g).filter(n => !live.has(n.id));
+    const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
+    orphans.forEach((n, i) => { n.x = i * (NODE_W + 90); n.y = maxY + 190; fresh.nodes[n.id] = n; });
+    for (const e of g.edges) if (fresh.nodes[e.from] && fresh.nodes[e.to]
+        && !fresh.edges.some(x => x.from === e.from && x.to === e.to)
+        && !live.has(e.from)) fresh.edges.push(e);
+    fresh.view = g.view;
+    delete fresh._tidy;
+    state.format = fresh;
+    view = state.format.view;
+    render();            // 실측하려면 일단 그려야 한다
+    tidyFormat();
+    render();
+    fitView();
+    return;
+  }
   const order = livePath();
-  const rest = nodeList().map(n => n.id).filter(id => !order.includes(id));
+  const rest = nodeList(g).map(n => n.id).filter(id => !order.includes(id));
   const GAP_X = NODE_W + 78, TOP = 90;
-  order.forEach((id, i) => {
-    const n = state.nodes[id];
-    n.x = 40 + i * GAP_X;
-    n.y = TOP + (i % 2) * 74;
-  });
-  rest.forEach((id, i) => {
-    const n = state.nodes[id];
-    n.x = 40 + i * GAP_X;
-    n.y = TOP + 430;
-  });
-  fitView();
-  render();
+  order.forEach((id, i) => { const n = g.nodes[id]; n.x = 40 + i * GAP_X; n.y = TOP + (i % 2) * 74; });
+  rest.forEach((id, i) => { const n = g.nodes[id]; n.x = 40 + i * GAP_X; n.y = TOP + 430; });
+  fitView(); render();
 }
 function autowire() {
-  // 소스 → 단계(순서대로) → 명령어 한 줄로 다시 엮는다.
+  if (inFormat()) return;
   const chain = ['src',
-    ...nodeList().filter(n => n.type === 'stage')
+    ...nodeList(state).filter(n => n.type === 'stage')
       .sort((a, b) => stageIdx(a.stage) - stageIdx(b.stage)).map(n => n.id),
     'out'];
   state.edges = [];
@@ -1087,11 +1736,11 @@ function fitView() {
   // 노드 높이는 내용에 따라 다르다. 상수로 때려 맞히지 말고 DOM 에서 실측한다.
   const heightOf = id => {
     const el = document.querySelector(`.node[data-id="${id}"]`);
-    return el ? el.offsetHeight : 140;
+    return el ? el.offsetHeight : 150;
   };
-  const xs = ns.map(n => n.x), ys = ns.map(n => n.y);
+  const xs = ns.map(n => n.x);
   const minX = Math.min(...xs) - 40, maxX = Math.max(...xs) + NODE_W + 40;
-  const minY = Math.min(...ys) - 40;
+  const minY = Math.min(...ns.map(n => n.y)) - 40;
   const maxY = Math.max(...ns.map(n => n.y + heightOf(n.id))) + 40;
   const k = Math.max(0.3, Math.min(1.1, Math.min(r.width / (maxX - minX), r.height / (maxY - minY))));
   view.k = k;
@@ -1100,7 +1749,7 @@ function fitView() {
   applyView();
 }
 function focusNode(id) {
-  const n = state.nodes[id];
+  const n = graph().nodes[id];
   if (!n) return;
   const r = vp();
   view.x = r.width / 2 - (n.x + NODE_W / 2) * view.k;
@@ -1119,21 +1768,18 @@ viewport.addEventListener('pointerdown', e => {
   if (wire && !port && !head) {
     e.preventDefault();
     const { from, to } = wire.dataset;
-    state.edges = state.edges.filter(x => !(x.from === from && x.to === to));
+    graph().edges = graph().edges.filter(x => !(x.from === from && x.to === to));
     render();
     return;
   }
 
   if (port) {
     e.preventDefault(); e.stopPropagation();
-    const n = state.nodes[port.dataset.node];
+    const n = graph().nodes[port.dataset.node];
     const p = portPos(n);
-    const from = port.dataset.side;
-    ui.wire = {
-      from: n.id, side: from,
-      x1: from === 'out' ? p.outX : p.inX, y1: p.y,
-      x2: from === 'out' ? p.outX : p.inX, y2: p.y,
-    };
+    const side = port.dataset.side;
+    const x = side === 'out' ? p.outX : p.inX;
+    ui.wire = { from:n.id, side, x1:x, y1:p.y, x2:x, y2:p.y };
     viewport.classList.add('wiring');
     viewport.setPointerCapture(e.pointerId);
     renderWires();
@@ -1146,9 +1792,9 @@ viewport.addEventListener('pointerdown', e => {
 
   if (head) {
     const el = head.closest('.node');
-    const n = state.nodes[el.dataset.id];
+    const n = graph().nodes[el.dataset.id];
     const w = toWorld(e.clientX, e.clientY);
-    ui.drag = { id: n.id, dx: w.x - n.x, dy: w.y - n.y, el };
+    ui.drag = { id:n.id, dx: w.x - n.x, dy: w.y - n.y, el };
     ui.sel = n.id; paintSel();
     viewport.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -1166,7 +1812,6 @@ viewport.addEventListener('pointermove', e => {
   if (ui.wire) {
     const w = toWorld(e.clientX, e.clientY);
     ui.wire.x2 = w.x; ui.wire.y2 = w.y;
-    // 커서 아래 포트 강조
     for (const p of document.querySelectorAll('.port')) p.classList.remove('hot');
     const hit = document.elementFromPoint(e.clientX, e.clientY);
     const port = hit && hit.closest && hit.closest('.port');
@@ -1176,7 +1821,7 @@ viewport.addEventListener('pointermove', e => {
   }
   if (ui.drag) {
     const w = toWorld(e.clientX, e.clientY);
-    const n = state.nodes[ui.drag.id];
+    const n = graph().nodes[ui.drag.id];
     n.x = Math.round(w.x - ui.drag.dx);
     n.y = Math.round(w.y - ui.drag.dy);
     ui.drag.el.style.left = n.x + 'px';
@@ -1207,6 +1852,7 @@ function endPointer(e) {
     viewport.classList.remove('wiring');
     render();
   }
+  // 세로 위치가 연산자의 피연산자 순서를 정하므로, 드래그가 끝나면 전부 다시 그린다.
   if (ui.drag) { ui.drag = null; render(); }
   if (ui.pan) { ui.pan = null; viewport.classList.remove('panning'); save(); }
 }
@@ -1239,15 +1885,15 @@ $('#zoom-reset').onclick = fitView;
 $('#fit').onclick = fitView;
 $('#autolayout').onclick = autolayout;
 $('#autowire').onclick = autowire;
+$('#crumb-back').onclick = () => setMode('pipeline');
 
 /* ── 팔레트에서 캔버스로 끌어다 놓기 ─────── */
 $('#pal-list').addEventListener('pointerdown', e => {
   const item = e.target.closest('.pal-item');
-  if (!item || item.classList.contains('placed')) {
-    if (item) { focusNode(stageNode(item.dataset.stage).id); }
-    return;
-  }
-  const sid = item.dataset.stage;
+  if (!item) return;
+  if (item.classList.contains('placed')) { focusNode(stageNode(item.dataset.stage).id); return; }
+
+  const sid = item.dataset.stage, ftype = item.dataset.fnode;
   const start = { x: e.clientX, y: e.clientY };
   let ghost = null;
   item.setPointerCapture(e.pointerId);
@@ -1256,8 +1902,8 @@ $('#pal-list').addEventListener('pointerdown', e => {
     if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
       ghost = document.createElement('div');
       ghost.className = 'pal-ghost';
-      ghost.style.setProperty('--a', ACCENT[sid]);
-      ghost.textContent = `[${sid}] ${STAGE[sid].label}`;
+      ghost.style.setProperty('--a', ftype ? FTYPE[ftype].accent : ACCENT[sid]);
+      ghost.textContent = ftype ? `[${FTYPE[ftype].tag}] ${FTYPE[ftype].label}` : `[${sid}] ${STAGE[sid].label}`;
       document.body.append(ghost);
     }
     if (ghost) { ghost.style.left = (ev.clientX + 12) + 'px'; ghost.style.top = (ev.clientY + 12) + 'px'; }
@@ -1273,14 +1919,14 @@ $('#pal-list').addEventListener('pointerdown', e => {
       const w = toWorld(ev.clientX, ev.clientY);
       pos = [Math.round(w.x - NODE_W / 2), Math.round(w.y - HEAD_H / 2)];
     } else if (ghost) {
-      return;                                   // 캔버스 밖에 떨어뜨렸다 — 없던 일로
+      return;                                    // 캔버스 밖에 떨어뜨렸다 — 없던 일로
     } else {
       pos = freeSpot();                          // 그냥 클릭 → 화면 가운데
     }
-    const n = addStageNode(sid, pos[0], pos[1]);
+    const n = ftype ? addFormatNode(ftype, pos[0], pos[1]) : addStageNode(sid, pos[0], pos[1]);
     ui.sel = n.id;
     render();
-    if ($('#palette').classList.contains('open')) $('#palette').classList.remove('open');
+    $('#palette').classList.remove('open');
   };
   item.addEventListener('pointermove', move);
   item.addEventListener('pointerup', up);
@@ -1344,6 +1990,14 @@ function importCommand(text) {
     const n = addStageNode(sid, 0, 0);
     Object.assign(valuesOf(n), picked[sid]);
   }
+
+  // -f 값도 서브그래프로 풀어 둔다. 못 읽으면 문자열 그대로 두고 알린다.
+  const fmt = picked.format && picked.format.format;
+  if (fmt) {
+    try { state.format = treeToGraph(parseFormat(fmt)); }
+    catch (e) { ui.fmtWarn = `-f "${fmt}" 는 서브그래프로 못 읽었다 (${e.message}) — 문자열 그대로 둔다`; }
+  }
+
   autowire();
   autolayout();
 }
@@ -1356,37 +2010,54 @@ function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); } catch {}
   }, 250);
 }
-function snapshot() {
-  return { v: 2, seq, view, nodes: state.nodes, edges: state.edges };
-}
+function snapshot() { return { v:3, seq, mode: ui.mode, state }; }
+
 function restore(data) {
-  if (!data || !data.nodes || !data.nodes.src || !data.nodes.out) return false;
-  state = { nodes: data.nodes, edges: (data.edges || []).slice() };
-  for (const n of nodeList()) if (n.type === 'stage' && !STAGE[n.stage]) delete state.nodes[n.id];
-  state.edges = state.edges.filter(e => state.nodes[e.from] && state.nodes[e.to]);
-  view = Object.assign({ x: 0, y: 0, k: 1 }, data.view);
-  seq = data.seq || (nodeList().length + 1);
-  ui.unknown = []; ui.sel = null; ui.picker = null;
+  if (!data) return false;
+  // v2 스냅샷(포맷 서브그래프 이전)도 받아 준다.
+  let s = data.state;
+  if (!s && data.nodes) s = { nodes: data.nodes, edges: data.edges || [], view: data.view, format: null };
+  if (!s || !s.nodes || !s.nodes.src || !s.nodes.out) return false;
+
+  s.edges = (s.edges || []).slice();
+  for (const n of Object.values(s.nodes)) if (n.type === 'stage' && !STAGE[n.stage]) delete s.nodes[n.id];
+  s.edges = s.edges.filter(e => s.nodes[e.from] && s.nodes[e.to]);
+  s.view = Object.assign({ x:0, y:0, k:1 }, s.view);
+
+  const f = s.format;
+  if (!f || !f.nodes || !f.nodes.fout) s.format = blankFormat();
+  else {
+    s.format.edges = (f.edges || []).filter(e => f.nodes[e.from] && f.nodes[e.to]);
+    s.format.view = Object.assign({ x:0, y:0, k:1 }, f.view);
+  }
+
+  state = s;
+  seq = data.seq || (Object.keys(s.nodes).length + Object.keys(s.format.nodes).length + 1);
+  ui.mode = data.mode === 'format' ? 'format' : 'pipeline';
+  view = ui.mode === 'format' ? state.format.view : state.view;
+  ui.unknown = []; ui.sel = null; ui.picker = null; ui.fmtWarn = '';
   return true;
 }
 function load() {
-  try { return restore(JSON.parse(localStorage.getItem(STORE_KEY) || 'null')); }
-  catch { return false; }
+  try {
+    const v3 = localStorage.getItem(STORE_KEY);
+    if (v3) return restore(JSON.parse(v3));
+    const v2 = localStorage.getItem('ytstudio.graph.v2');
+    return v2 ? restore(JSON.parse(v2)) : false;
+  } catch { return false; }
 }
 
 /* ══ 배선 ════════════════════════════════════ */
 $('#ver').textContent = 'yt-dlp ' + SCHEMA.ytdlp_version + ' 스키마 · ' + OPTS.length + '개 옵션 · ' + STAGES.length + '개 단계';
 $('#q').oninput = renderHits;
-$('#q').onkeydown = e => {
-  if (e.key === 'Escape') { $('#q').value = ''; renderHits(); }
-};
+$('#q').onkeydown = e => { if (e.key === 'Escape') { $('#q').value = ''; renderHits(); } };
+$('#q').onfocus = renderHits;
 document.addEventListener('pointerdown', e => {
   if (!e.target.closest('.field') && !e.target.closest('.hits')) $('#hits').hidden = true;
 }, true);
-$('#q').onfocus = renderHits;
 
 $('#reset').onclick = () => {
-  if (!confirm('그래프를 전부 지운다. 계속할까?')) return;
+  if (!confirm('파이프라인과 포맷 서브그래프를 전부 지운다. 계속할까?')) return;
   resetState(); render(); fitView();
 };
 $('#import').onclick = () => $('#dlg-import').showModal();
@@ -1406,10 +2077,11 @@ $('#pal-toggle').onclick = () => $('#palette').classList.toggle('open');
 
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-  if (e.key === '/' && !typing) { e.preventDefault(); $('#q').focus(); }
+  if (e.key === '/' && !typing && !inFormat()) { e.preventDefault(); $('#q').focus(); }
   if (e.key === 'Escape') {
     if (ui.picker) { ui.picker = null; render(); }
     else if (ui.sel) { ui.sel = null; paintSel(); }
+    else if (inFormat()) setMode('pipeline');
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && ui.sel) {
     e.preventDefault(); removeNode(ui.sel); render();
@@ -1418,8 +2090,7 @@ document.addEventListener('keydown', e => {
 
 let noteTimer = null;
 function flashNote(msg) {
-  const n = $('#notes');
-  n.innerHTML = '<b>' + escapeHtml(msg) + '</b>';
+  $('#notes').innerHTML = '<b>' + escapeHtml(msg) + '</b>';
   clearTimeout(noteTimer);
   noteTimer = setTimeout(renderCmd, 2200);
 }
@@ -1440,9 +2111,10 @@ $('#copy-conf').onclick = e => copy(confString(), e.target);
 addEventListener('resize', () => { applyView(); renderWires(); });
 
 /* ── 시작 ────────────────────────────────── */
-if (!load()) { resetState(); }
+const fresh = !load();
+if (fresh) resetState();
 render();
-if (!localStorage.getItem(STORE_KEY)) fitView();
+if (fresh) fitView();
 </script>
 </body>
 </html>
