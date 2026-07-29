@@ -39,7 +39,11 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     const node = p.locator('.node').filter({ hasText: '[format]' });
     await node.locator('.add').click();
     await p.waitForTimeout(120);
-    await node.locator('.picker input').fill('--format');
+    // 검색창은 열리는 그 순간에 포커스를 가져간다 — 바로 칠 수 있어야 한다.
+    const at = await p.evaluate(() =>
+      document.activeElement.dataset && document.activeElement.dataset.ctl);
+    assert(at === 'picker', '검색창에 포커스가 안 갔다: ' + at);
+    await p.keyboard.type('--format', { delay: 10 });
     await p.waitForTimeout(120);
     const first = node.locator('.picker li button').first();
     assert(await first.count() === 1, '피커 결과 없음');
@@ -89,43 +93,52 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     return `${v} · 캐럿 ${caret}`;
   });
 
-  await step('조합(IME) 중인 필드는 다시 그리지 않는다', async () => {
+  await step('조합(IME) 중에도 필드가 살아남는다', async () => {
     const inp = p.locator('.row[data-opt=format] input');
     await inp.click();
     await inp.fill('bv');
 
-    // 지금 DOM 노드에 표식을 남긴다. 다시 그려지면 표식이 사라진다.
+    // 지금 DOM 노드에 표식을 남긴다. 다시 만들어지면 표식이 사라진다.
     await p.evaluate(() => {
       document.querySelector('.row[data-opt=format] input').__mark = 'ime';
     });
 
-    // 한글 조합 시작 → 조합 중 입력 → 이 사이에는 DOM 을 건드리면 안 된다.
-    const survived = await p.evaluate(() => {
+    // 한글 조합 중 — IME 가 필드 안에서 음절을 만드는 사이다. 여기서 엘리먼트를
+    // 갈아 끼우거나 값을 되돌려 놓으면 음절이 통째로 깨진다.
+    const during = await p.evaluate(() => {
       const el = document.querySelector('.row[data-opt=format] input');
       el.focus();
       el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
       el.value = 'bv가';
       el.dispatchEvent(new Event('input', { bubbles: true }));
       const same = document.querySelector('.row[data-opt=format] input');
-      return same.__mark === 'ime' && same === el;
+      return {
+        kept: same === el && same.__mark === 'ime',
+        value: same.value,
+        focused: document.activeElement === same,
+      };
     });
-    assert(survived, '조합 중에 필드가 다시 그려졌다 — 음절이 깨진다');
+    assert(during.kept, '조합 중에 필드가 다시 만들어졌다 — 음절이 깨진다');
+    assert(during.value === 'bv가', '조합 중 값이 덮어써졌다: ' + during.value);
+    assert(during.focused, '조합 중에 포커스가 떠났다');
+    // 노드를 통째로 비켜 가지 않으므로 파생 표시는 조합 중에도 따라온다.
+    assert((await cmd()).includes('bv가'), '조합 중 명령어 미반영: ' + await cmd());
 
-    // 조합이 끝나면 평소대로 돌아온다.
-    const rebuilt = await p.evaluate(() => {
+    // 조합이 끝나도 같은 엘리먼트다. 예외 상태가 없으니 돌아올 것도 없다.
+    const after = await p.evaluate(() => {
       const el = document.querySelector('.row[data-opt=format] input');
       el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
       el.value = 'bv+ba';
       el.dispatchEvent(new Event('input', { bubbles: true }));
       const same = document.querySelector('.row[data-opt=format] input');
-      return same.__mark === undefined;
+      return same === el && same.__mark === 'ime';
     });
-    assert(rebuilt, '조합이 끝났는데도 계속 비켜 간다');
+    assert(after, '조합이 끝나자 필드가 갈렸다');
     assert((await cmd()).includes('bv+ba'), '명령어 미반영: ' + await cmd());
 
     await inp.fill('bv*[height<=1080]+ba');
     await p.waitForTimeout(150);
-    return '조합 중 보존 → 조합 후 재생성';
+    return '조합 중·후 같은 엘리먼트 · 값 보존 · 파생 표시 갱신';
   });
 
   await step('와이어 끊기 → 우회 + 명령어에서 빠짐', async () => {
@@ -221,6 +234,21 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     for (const frag of ['-f "bv*[height<=720]+ba"', '--embed-subs', '--sub-langs ko,en', '--sponsorblock-remove sponsor', '--cookies-from-browser chrome'])
       assert(c.includes(frag), `누락: ${frag}\n실제: ${c}`);
     return c;
+  });
+
+  await step('플래그 토글 (켜기 ⇄ 끄기)', async () => {
+    const row = p.locator('.row[data-opt=embed-subs]');
+    assert(await row.count() === 1, '--embed-subs 행이 없다');
+    await row.locator('[data-ctl="tri:embed-subs:false"]').click();
+    await p.waitForTimeout(200);
+    assert((await cmd()).includes('--no-embed-subs'), '끄기 미반영: ' + await cmd());
+    await row.locator('[data-ctl="tri:embed-subs:true"]').click();
+    await p.waitForTimeout(200);
+    const c = await cmd();
+    assert(c.includes('--embed-subs') && !c.includes('--no-embed-subs'), '켜기 미반영: ' + c);
+    const on = await row.locator('[data-ctl="tri:embed-subs:true"]').getAttribute('aria-pressed');
+    assert(on === 'true', '누른 표시가 안 따라온다: aria-pressed=' + on);
+    return '--embed-subs ⇄ --no-embed-subs';
   });
 
   await step('순환 연결 차단', async () => {

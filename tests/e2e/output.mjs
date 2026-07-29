@@ -37,6 +37,16 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     return kinds + ' → ' + await expr();
   });
 
+  await step('셀렉트는 처음 그릴 때부터 제값을 보여 준다', async () => {
+    // 템플릿 엔진은 자식 <option> 을 붙이기 전에 <select> 의 프로퍼티를 커밋한다.
+    // select 에 .value 를 걸면 첫 렌더에서 늘 첫 항목으로 떨어진다. 컴파일
+    // 결과만 보는 검사로는 안 걸리므로, 화면에 보이는 값을 직접 본다.
+    const shown = await p.evaluate(() =>
+      [...document.querySelectorAll('select[data-ctl=field]')].map(s => s.value).sort().join(','));
+    assert(shown === 'ext,title,uploader', '보이는 필드: ' + shown);
+    return shown;
+  });
+
   await step('브레드크럼에 사람이 읽는 미리보기가 뜬다', async () => {
     const here = (await p.textContent('#crumb .here')).replace(/\s+/g, ' ').trim();
     assert(here.startsWith('[store] 출력 템플릿'), '브레드크럼: ' + here);
@@ -226,5 +236,21 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     });
     assert(overlap.length === 0, '겹친 노드: ' + overlap.join(', '));
     return await expr();
+  });
+
+  await step('다듬기 셀렉트도 읽어 온 값을 그대로 보여 준다', async () => {
+    // 위 검사는 필드 셀렉트만 본다. 날짜 서식·변환은 기본값이 첫 항목이라
+    // 기본값으로는 버그가 가려진다. 기본이 아닌 값을 읽혀서 확인한다.
+    await setup('yt-dlp -o "%(upload_date>%Y%m%d)s - %(title).40S.%(ext)s" https://a');
+    await enter();
+    const shown = await p.evaluate(() => {
+      const vals = sel => [...document.querySelectorAll(`select[data-ctl=${sel}]`)]
+        .map(s => s.value).sort().join('|');
+      return { field: vals('field'), strf: vals('strf'), conv: vals('conv') };
+    });
+    assert(shown.strf === '||%Y%m%d', '날짜 서식: ' + shown.strf);
+    assert(shown.conv === 'S|s|s', '변환: ' + shown.conv);
+    assert(shown.field === 'ext|title|upload_date', '필드: ' + shown.field);
+    return `${shown.strf} · ${shown.conv}`;
   });
 }
