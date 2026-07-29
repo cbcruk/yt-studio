@@ -1,0 +1,14 @@
+{
+  "name": "ytstudio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "yt-dlp 옵션을 노드 그래프로 조립하는 단일 HTML 앱",
+  "type": "module",
+  "scripts": {
+    "build": "python3 build.py",
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}
