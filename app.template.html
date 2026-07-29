@@ -460,16 +460,16 @@
 </dialog>
 
 <script>
+/* 빌드가 src/core/*.js 를 여기 이어 붙인다. */
+/*__MODULES__*/
+
 const SCHEMA = /*__SCHEMA__*/{};
 
 /* ══ 스키마 파생 ═════════════════════════════ */
+// 색인·검색·KO 사전은 core/schema.js 에 있다.
+initSchema(SCHEMA);
+
 const $ = s => document.querySelector(s);
-const STAGES = SCHEMA.stages;
-const OPTS = SCHEMA.options;
-const BY_ID = Object.fromEntries(OPTS.map(o => [o.id, o]));
-const STAGE_ORDER = STAGES.map(s => s.id);
-const STAGE = Object.fromEntries(STAGES.map(s => [s.id, s]));
-const BY_STAGE = Object.fromEntries(STAGE_ORDER.map(s => [s, OPTS.filter(o => o.stage === s)]));
 
 // 파이프라인을 왼쪽에서 오른쪽으로 훑을 때 색이 한 바퀴 도는 순서.
 const ACCENT = {
@@ -477,67 +477,10 @@ const ACCENT = {
   format:'#6E7A12', download:'#A66A00', process:'#B4471F', store:'#A6265E', report:'#5B5566',
 };
 const IO_ACCENT = { src:'#137A57', out:'#141C19' };
-
-// 플래그 문자열 → 옵션 (역방향 파싱용). 별칭·단축·부정형까지 전부 색인.
-const BY_FLAG = {};
-for (const o of OPTS) {
-  BY_FLAG[o.flag] = { opt: o, negated: false };
-  if (o.short) BY_FLAG[o.short] = { opt: o, negated: false };
-  for (const a of o.aliases) BY_FLAG[a] = { opt: o, negated: false };
-  if (o.negation) BY_FLAG[o.negation] = { opt: o, negated: true };
-}
-
-// 한국어 의도 → yt-dlp 어휘. introspection이 절대 못 주는 층이라 손으로 채운다.
-const KO = {
-  '자막':'sub subtitle srt','자동자막':'auto-sub automatic','번역':'sub translate',
-  '썸네일':'thumbnail','표지':'thumbnail cover','화질':'format quality resolution height',
-  '해상도':'height width resolution format','포맷':'format container','코덱':'vcodec acodec format-sort',
-  '음원':'audio extract-audio','오디오':'audio','소리':'audio','음성':'audio',
-  '영상만':'video-only format','재생목록':'playlist','플레이리스트':'playlist',
-  '채널':'playlist flat-playlist','구간':'download-sections chapter split',
-  '자르기':'download-sections split-chapters','챕터':'chapter',
-  '광고':'sponsorblock','스폰서':'sponsorblock','건너뛰':'sponsorblock skip',
-  '쿠키':'cookies browser','로그인':'username password cookies netrc','인증':'auth username password',
-  '프록시':'proxy socket source-address','우회':'proxy geo impersonate',
-  '차단':'geo proxy impersonate','지역':'geo xff','아이피':'source-address proxy',
-  '속도':'rate-limit throttled concurrent','제한':'limit rate','동시':'concurrent fragments',
-  '재시도':'retries retry','이어받기':'continue part','중단':'abort break',
-  '중복':'download-archive no-overwrites','기록':'archive','아카이브':'archive',
-  '파일명':'output paths restrict-filenames windows-filenames','경로':'paths output home',
-  '이름':'output filename','폴더':'paths output batch',
-  '병합':'merge-output-format remux recode','변환':'recode remux audio-format',
-  '메타데이터':'metadata embed-metadata parse-metadata','태그':'metadata',
-  '자바스크립트':'extractor-args player','확장':'extractor-args plugin',
-  '로그':'verbose print quiet progress dump','조용':'quiet no-warnings',
-  '미리보기':'simulate print list-formats dump-json','목록':'list-formats list-subs print',
-  '테스트':'simulate skip-download','받지않':'skip-download simulate',
-  '느림':'concurrent rate-limit downloader','에러':'ignore-errors abort verbose retries',
-  '403':'impersonate extractor-args cookies user-agent','429':'sleep-requests rate-limit retries',
-  '기다':'sleep wait-for-video','라이브':'live-from-start wait-for-video',
-};
-function expand(t){
-  const out=[t];
-  for(const k in KO) if(k.includes(t)||t.includes(k)) out.push(...KO[k].split(' '));
-  return out;
-}
-const HAY = Object.fromEntries(OPTS.map(o =>
-  [o.id, (o.flag + ' ' + (o.short || '') + ' ' + o.aliases.join(' ') + ' ' + o.help).toLowerCase()]
-));
-function search(q, pool) {
-  const s = q.trim().toLowerCase();
-  if (!s) return null;
-  const terms = s.split(/\s+/).map(expand);
-  return (pool || OPTS).filter(o => terms.every(g => g.some(t => HAY[o.id].includes(t))));
-}
-
 /* ══ 포맷 셀렉터 문법 ════════════════════════
-   yt-dlp 의 -f 는 평평한 문자열이 아니라 실제 표현식이다.
-     atom     := 셀렉터 필터*        예) bv*[height<=1080]
-     merge    := atom ('+' atom)*    예) bv+ba
-     fallback := merge ('/' merge)*  예) bv+ba/b   ==  (bv+ba)/b
-     multi    := fallback (',' …)*
-   이 우선순위가 곧 서브그래프의 노드 종류가 된다.
-   ═════════════════════════════════════════ */
+   파서·컴파일러·어휘는 core/format-grammar.js 로 옮겼다. 브라우저 없이
+   단위 테스트되는 유일한 층이라 따로 떼어 둘 값어치가 있다.
+   노드 종류의 표기·색은 UI 관심사라 여기 남는다. */
 const FTYPE = {
   stream:   { label:'스트림',  tag:'stream',   accent:'#137A57', blurb:'어떤 스트림을 고를지' },
   merge:    { label:'병합',    tag:'+',        accent:'#0F6FB8', blurb:'영상과 음성을 한 파일로 합친다' },
@@ -545,133 +488,10 @@ const FTYPE = {
   multi:    { label:'동시',    tag:',',        accent:'#A6265E', blurb:'여러 포맷을 한꺼번에 받는다' },
   fout:     { label:'-f 출력', tag:'format',   accent:'#141C19', blurb:'여기 이어진 표현식이 --format 값이 된다' },
 };
-const FOP_TYPES = ['merge', 'fallback', 'multi'];
-
-const SELECTORS = [
-  ['영상 + 음성 (한 파일)', [
-    ['b',  'best — 영상·음성이 같이 든 것 중 최고'],
-    ['b*', 'best* — 종류 안 가리고 최고'],
-    ['w',  'worst — 같이 든 것 중 최저'],
-    ['w*', 'worst* — 종류 안 가리고 최저'],
-  ]],
-  ['영상만', [
-    ['bv',  'bestvideo — 영상만 든 것 중 최고'],
-    ['bv*', 'bestvideo* — 영상이 든 것 중 최고 (음성 동봉 허용)'],
-    ['wv',  'worstvideo — 영상만 든 것 중 최저'],
-    ['wv*', 'worstvideo* — 영상이 든 것 중 최저'],
-  ]],
-  ['음성만', [
-    ['ba',  'bestaudio — 음성만 든 것 중 최고'],
-    ['ba*', 'bestaudio* — 음성이 든 것 중 최고 (영상 동봉 허용)'],
-    ['wa',  'worstaudio — 음성만 든 것 중 최저'],
-    ['wa*', 'worstaudio* — 음성이 든 것 중 최저'],
-  ]],
-];
-const SEL_HELP = Object.fromEntries(SELECTORS.flatMap(([, items]) => items));
-const SEL_SET = new Set(Object.keys(SEL_HELP));
-
-// yt-dlp 문서의 필터 필드. num/str 에 따라 쓸 수 있는 연산자가 다르다.
-const FKEYS = [
-  ['height','세로 해상도','num'], ['width','가로 해상도','num'], ['fps','프레임','num'],
-  ['tbr','전체 비트레이트','num'], ['vbr','영상 비트레이트','num'], ['abr','음성 비트레이트','num'],
-  ['asr','샘플레이트','num'], ['audio_channels','음성 채널 수','num'],
-  ['filesize','파일 크기','num'], ['filesize_approx','대략 크기','num'], ['aspect_ratio','화면비','num'],
-  ['ext','확장자','str'], ['vcodec','영상 코덱','str'], ['acodec','음성 코덱','str'],
-  ['container','컨테이너','str'], ['protocol','프로토콜','str'], ['format_id','포맷 ID','str'],
-  ['format_note','포맷 노트','str'], ['resolution','해상도','str'], ['language','언어','str'],
-  ['dynamic_range','다이내믹 레인지','str'],
-];
-const FKEY_TYPE = Object.fromEntries(FKEYS.map(([k, , t]) => [k, t]));
-const NUM_OPS = [['<','<'],['<=','≤'],['>','>'],['>=','≥'],['=','='],['!=','≠']];
-const STR_OPS = [['=','='],['!=','≠'],['^=','로 시작'],['$=','로 끝남'],['*=','포함'],['~=','정규식'],
-                 ['!^=','로 시작 안 함'],['!$=','로 끝나지 않음'],['!*=','포함 안 함'],['!~=','정규식 불일치']];
-const EXIST_OPS = [['has','있음'],['hasnot','없음']];
-const OP_LABEL = Object.fromEntries([...NUM_OPS, ...STR_OPS, ...EXIST_OPS]);
-
-function parseFilterBody(body) {
-  const b = body.trim();
-  if (!b) throw new Error('빈 필터');
-  const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
-  if (m) return { key: m[1], op: m[2], loose: m[3] === '?', value: m[4].trim() };
-  if (/^![A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b.slice(1), op: 'hasnot', value: '' };
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b, op: 'has', value: '' };
-  throw new Error(`필터를 읽지 못했다: [${body}]`);
-}
-
-/** 포맷 셀렉터 문자열 → 트리. 못 읽으면 던진다. */
-function parseFormat(src) {
-  const s = (src || '').trim();
-  if (!s) return null;
-  let i = 0;
-  const ws = () => { while (i < s.length && /\s/.test(s[i])) i++; };
-  const peek = () => s[i];
-
-  const expr = () => multi();
-  function multi() {
-    const kids = [fallback()]; ws();
-    while (peek() === ',') { i++; kids.push(fallback()); ws(); }
-    return kids.length === 1 ? kids[0] : { t:'multi', kids };
-  }
-  function fallback() {
-    const kids = [merge()]; ws();
-    while (peek() === '/') { i++; kids.push(merge()); ws(); }
-    return kids.length === 1 ? kids[0] : { t:'fallback', kids };
-  }
-  function merge() {
-    const kids = [atom()]; ws();
-    while (peek() === '+') { i++; kids.push(atom()); ws(); }
-    return kids.length === 1 ? kids[0] : { t:'merge', kids };
-  }
-  function atom() {
-    ws();
-    if (peek() === '(') {
-      i++; const inner = expr(); ws();
-      if (peek() !== ')') throw new Error("')' 가 닫히지 않았다");
-      i++; ws();
-      if (peek() === '[') throw new Error('그룹에 바로 붙은 필터는 아직 그래프로 못 읽는다');
-      return inner;
-    }
-    const start = i;
-    while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s[i])) i++;
-    if (i === start) throw new Error(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`);
-    const name = s.slice(start, i);
-    const filters = [];
-    ws();
-    while (peek() === '[') {
-      i++;
-      const j = s.indexOf(']', i);
-      if (j < 0) throw new Error("']' 가 닫히지 않았다");
-      filters.push(parseFilterBody(s.slice(i, j)));
-      i = j + 1; ws();
-    }
-    return { t:'sel', name, filters };
-  }
-
-  const tree = expr(); ws();
-  if (i < s.length) throw new Error(`읽고 남은 글자: "${s.slice(i)}"`);
-  return tree;
-}
-
-const PREC = { multi:0, fallback:1, merge:2, sel:3 };
-function emitFilter(f) {
-  if (f.op === 'has') return '[' + f.key + ']';
-  if (f.op === 'hasnot') return '[!' + f.key + ']';
-  return '[' + f.key + f.op + (f.loose ? '?' : '') + f.value + ']';
-}
-function emitTree(n) {
-  if (!n) return '';
-  if (n.t === 'sel') return n.name + (n.filters || []).map(emitFilter).join('');
-  const sep = { merge:'+', fallback:'/', multi:',' }[n.t];
-  return n.kids.map(k => {
-    const s = emitTree(k);
-    return PREC[k.t] < PREC[n.t] ? '(' + s + ')' : s;   // 우선순위가 낮으면 괄호로 묶는다
-  }).join(sep);
-}
-
+const FOP_TYPES = FORMAT_OPS;
 /* ══ 그래프 상태 ═════════════════════════════ */
 const NODE_W = 300, HEAD_H = 34;
-const STORE_KEY = 'ytstudio.graph.v3';
-const PROTECTED = new Set(['src', 'out', 'fout']);
+const PROTECTED = new Set([SRC, OUT, FOUT]);
 
 let state, view, seq;
 const ui = {
@@ -679,24 +499,8 @@ const ui = {
   unknown: [], drag: null, wire: null, pan: null, fmtWarn: '',
 };
 
-function blankFormat() {
-  return {
-    nodes: { fout: { id:'fout', type:'fout', x:560, y:210 } },
-    edges: [],
-    view: { x:0, y:0, k:1 },
-  };
-}
-function blankState() {
-  return {
-    nodes: {
-      src: { id:'src', type:'source', x: 60,  y: 190, urls: '' },
-      out: { id:'out', type:'sink',   x: 700, y: 190 },
-    },
-    edges: [{ from:'src', to:'out' }],
-    view: { x:0, y:0, k:1 },
-    format: blankFormat(),
-  };
-}
+const blankState = () => Object.assign(blankPipeline(), { format: blankFormat() });
+
 function resetState() {
   state = blankState();
   seq = 1;
@@ -711,10 +515,14 @@ const graph = () => ui.mode === 'format' ? state.format : state;
 const inFormat = () => ui.mode === 'format';
 
 const nid = () => 'n' + (seq++);
-const stageIdx = id => STAGE_ORDER.indexOf(id);
 const nodeList = (g = graph()) => Object.values(g.nodes);
-const stageNode = sid => nodeList(state).find(n => n.type === 'stage' && n.stage === sid);
+const stageOf = sid => stageNode(state, sid);
 const valuesOf = n => (n.values ||= {});
+/** 렌더된 노드의 실제 높이. 레이아웃 계산에 넘겨 준다. */
+const measuredHeight = id => {
+  const el = document.querySelector(`.node[data-id="${id}"]`);
+  return el ? el.offsetHeight : 190;
+};
 const filtersOf = n => (n.filters ||= []);
 
 function accentOf(n) {
@@ -732,143 +540,38 @@ function setCount(n) {
 }
 
 /* ── 그래프 질의 (모드 공용) ─────────────── */
-function adjacency(g = graph()) {
-  const out = {}, inn = {};
-  for (const n of nodeList(g)) { out[n.id] = []; inn[n.id] = []; }
-  for (const e of g.edges) {
-    if (out[e.from] && inn[e.to]) { out[e.from].push(e.to); inn[e.to].push(e.from); }
-  }
-  return { out, inn };
-}
-function reach(start, adj) {
-  const seen = new Set(), st = [start];
-  while (st.length) {
-    const v = st.pop();
-    if (seen.has(v)) continue;
-    seen.add(v);
-    for (const w of adj[v] || []) st.push(w);
-  }
-  return seen;
-}
-/** 소스에서 출발해 명령어 노드까지 실제로 도달하는 노드들을, 실행 순서대로. */
-function livePath() {
-  const { out, inn } = adjacency(state);
-  const fwd = reach('src', out), bwd = reach('out', inn);
-  const live = nodeList(state).map(n => n.id).filter(id => fwd.has(id) && bwd.has(id));
-  const set = new Set(live);
-  const cmp = (a, b) => (state.nodes[a].x - state.nodes[b].x)
-    || (stageIdx(state.nodes[a].stage) - stageIdx(state.nodes[b].stage));
-  const indeg = {};
-  for (const id of live) indeg[id] = inn[id].filter(p => set.has(p)).length;
-  let q = live.filter(id => indeg[id] === 0);
-  const order = [];
-  while (q.length) {
-    q.sort(cmp);
-    const v = q.shift();
-    order.push(v);
-    for (const w of out[v]) if (set.has(w) && --indeg[w] === 0) q.push(w);
-  }
-  return order;
-}
-/** 현재 모드에서 "살아 있는" 노드. 포맷 그래프는 -f 출력에 닿는지가 기준이다. */
-function liveIds() {
-  if (inFormat()) return reach('fout', adjacency(state.format).inn);
-  return new Set(livePath());
-}
-function createsCycle(g, from, to) {
-  return reach(to, adjacency(g).out).has(from);   // to 에서 from 으로 돌아오면 순환
-}
-function connect(from, to, g = graph()) {
-  if (from === to) return false;
-  if (!g.nodes[from] || !g.nodes[to]) return false;
-  if (g.edges.some(e => e.from === from && e.to === to)) return false;
-  if (createsCycle(g, from, to)) return false;
-  // -f 출력은 표현식 하나만 받는다. 새로 이으면 기존 것을 밀어낸다.
-  if (to === 'fout') g.edges = g.edges.filter(e => e.to !== 'fout');
-  g.edges.push({ from, to });
-  return true;
-}
-function removeNode(id, g = graph()) {
-  if (PROTECTED.has(id)) return;
-  // 지운 노드의 앞뒤를 이어 붙여 사슬이 끊기지 않게 한다.
-  const before = g.edges.filter(e => e.to === id).map(e => e.from);
-  const after = g.edges.filter(e => e.from === id).map(e => e.to);
-  g.edges = g.edges.filter(e => e.from !== id && e.to !== id);
-  for (const a of before) for (const b of after) connect(a, b, g);
-  delete g.nodes[id];
+// 원시 연산은 core/graph.js, 의미론은 core/pipeline.js · core/format-graph.js.
+// 여기 남는 건 "지금 어느 모드냐"를 아는 얇은 층뿐이다.
+
+/** 현재 모드에서 살아 있는 노드. 파이프라인은 src→out, 포맷은 fout 도달성. */
+const liveIds = () => inFormat() ? formatLive(state.format) : pipelineLive(state);
+
+/** -f 출력은 표현식 하나만 받는다. */
+const EXCLUSIVE_IN = new Set([FOUT]);
+const wire = (from, to, g = graph()) => connect(g, from, to, { exclusiveIn: EXCLUSIVE_IN });
+const unwire = (from, to, g = graph()) => disconnect(g, from, to);
+
+function dropNode(id, g = graph()) {
+  const ok = removeNode(g, id, { protectedIds: PROTECTED, exclusiveIn: EXCLUSIVE_IN });
+  if (!ok) return false;
   if (ui.sel === id) ui.sel = null;
   if (ui.picker && ui.picker.node === id) ui.picker = null;
+  return true;
 }
-
 /* ── 파이프라인 전용 ─────────────────────── */
 function addStageNode(sid, x, y) {
-  const found = stageNode(sid);
+  const found = stageNode(state, sid);
   if (found) return found;
-  const n = { id: nid(), type:'stage', stage: sid, x, y, values: {} };
+  const n = { id: nid(), type: 'stage', stage: sid, x, y, values: {} };
   state.nodes[n.id] = n;
-  spliceIntoChain(n);
+  spliceIntoChain(state, n);
   return n;
 }
-/** 새 노드를 단계 순서에 맞는 자리에 끼워 넣는다. 사슬이 아니면 그냥 매달아 둔다. */
-function spliceIntoChain(n) {
-  const chain = [];
-  const { out } = adjacency(state);
-  let cur = 'src';
-  const seen = new Set();
-  while (cur && !seen.has(cur)) {
-    seen.add(cur);
-    chain.push(cur);
-    if (cur === 'out') break;
-    const next = (out[cur] || []).filter(id => id !== n.id);
-    if (next.length !== 1) return;          // 단순 사슬이 아니다 → 손으로 잇게 둔다
-    cur = next[0];
-  }
-  if (chain[chain.length - 1] !== 'out') return;
-  const rank = id => id === 'src' ? -1 : id === 'out' ? 99 : stageIdx(state.nodes[id].stage);
-  let i = 0;
-  while (i < chain.length - 1 && rank(chain[i + 1]) < stageIdx(n.stage)) i++;
-  const prev = chain[i], next = chain[i + 1];
-  state.edges = state.edges.filter(e => !(e.from === prev && e.to === next));
-  state.edges.push({ from: prev, to: n.id }, { from: n.id, to: next });
-}
-
 /* ── 포맷 서브그래프 전용 ────────────────── */
-/** 연산자 노드의 피연산자 순서 = 이어진 노드의 세로 위치. 위에서 아래로. */
-function operands(id, g = state.format) {
-  return g.edges.filter(e => e.to === id)
-    .map(e => g.nodes[e.from]).filter(Boolean)
-    .sort((a, b) => (a.y - b.y) || (a.x - b.x));
-}
-/** 서브그래프 → 표현식 트리. */
-function graphToTree(id, g = state.format, seen = new Set()) {
-  const n = g.nodes[id];
-  if (!n || seen.has(id)) return null;
-  seen.add(id);
-  if (n.type === 'stream') {
-    if (!n.sel) return null;
-    return { t:'sel', name: n.sel, filters: filtersOf(n).filter(f => f.key) };
-  }
-  const kids = operands(id, g).map(k => graphToTree(k.id, g, new Set(seen))).filter(Boolean);
-  if (n.type === 'fout') return kids[0] || null;
-  if (!kids.length) return null;
-  if (kids.length === 1) return kids[0];     // 피연산자가 하나면 연산자는 통과시킨다
-  return { t: n.type, kids };
-}
-const formatExpr = (g = state.format) => emitTree(graphToTree('fout', g));
-
-/** 서브그래프에서 사람이 고칠 만한 문제들. */
-function formatIssues(g = state.format) {
-  const live = reach('fout', adjacency(g).inn);
-  const out = [];
-  for (const n of nodeList(g)) {
-    if (n.id === 'fout') continue;
-    if (!live.has(n.id)) { out.push(`[${FTYPE[n.type].tag}] 노드가 -f 출력에 이어지지 않았다`); continue; }
-    if (n.type === 'stream' && !n.sel) out.push('스트림 노드에 셀렉터가 비어 있다');
-    if (FOP_TYPES.includes(n.type) && operands(n.id, g).length < 2)
-      out.push(`[${FTYPE[n.type].tag}] 노드에 이어진 입력이 ${operands(n.id, g).length}개뿐이다 — 그냥 통과된다`);
-  }
-  return [...new Set(out)];
-}
+// 트리 ↔ 그래프 변환과 문제 진단은 core/format-graph.js 에 있다.
+const opsOf = id => operands(state.format, id);
+const fmtIssues = () => formatIssues(state.format, t => FTYPE[t].tag);
+const fmtExpr = () => formatExpr(state.format);
 
 function addFormatNode(type, x, y, extra) {
   const n = Object.assign({ id: nid(), type, x, y }, extra || {});
@@ -877,74 +580,16 @@ function addFormatNode(type, x, y, extra) {
   return n;
 }
 
-/** 표현식 트리 → 서브그래프. 오른쪽 끝이 -f 출력, 왼쪽으로 갈수록 깊어진다. */
-function treeToGraph(tree) {
-  const g = blankFormat();
-  const PX = NODE_W + 90, PY = 200;   // 열 간격은 노드 폭보다 넓어야 한다
-  g._tidy = true;                   // DOM 이 생기면 실측해서 다시 정돈하라는 표시
-  if (!tree) return g;
-
-  const depthOf = n => n.t === 'sel' ? 0 : 1 + Math.max(...n.kids.map(depthOf));
-  const maxDepth = depthOf(tree);
-  let slot = 0;
-
-  const walk = (n, depth) => {
-    if (n.t === 'sel') {
-      const id = nid();
-      g.nodes[id] = { id, type:'stream', sel:n.name, filters:n.filters || [], x:0, y: slot++ * PY, _d: depth };
-      return id;
-    }
-    const kids = n.kids.map(k => walk(k, depth + 1));
-    const id = nid();
-    const y = kids.reduce((a, k) => a + g.nodes[k].y, 0) / kids.length;
-    g.nodes[id] = { id, type:n.t, x:0, y, _d: depth };
-    for (const k of kids) g.edges.push({ from:k, to:id });
-    return id;
-  };
-  const rootId = walk(tree, 0);
-  for (const n of nodeList(g)) {
-    if (n.id === 'fout') continue;
-    n.x = (maxDepth - n._d) * PX;
-    n.y = Math.round(n.y) + 60;
-    delete n._d;
-  }
-  g.nodes.fout.x = (maxDepth + 1) * PX;
-  g.nodes.fout.y = Math.round(g.nodes[rootId].y);
-  g.edges.push({ from: rootId, to: 'fout' });
-  return g;
-}
-
-/** 노드 높이는 필터 개수에 따라 달라진다. 렌더된 뒤 실측해서 열마다 세로로 풀어 준다.
- *  연산자는 피연산자들의 세로 중심으로 끌어오되, 겹치면 아래로 밀어 순서는 보존한다. */
+/** 노드 높이는 필터 개수에 따라 달라진다. 렌더된 뒤 실측해서 열마다 풀어 준다. */
 function tidyFormat(g = state.format) {
-  const H = id => {
-    const el = document.querySelector(`.node[data-id="${id}"]`);
-    return el ? el.offsetHeight : 190;
-  };
-  const cols = [...new Set(nodeList(g).map(n => Math.round(n.x)))].sort((a, b) => a - b);
-  for (const x of cols) {
-    const col = nodeList(g).filter(n => Math.round(n.x) === x);
-    for (const n of col) {
-      const ins = operands(n.id, g);
-      if (ins.length) {
-        const mid = ins.reduce((a, k) => a + k.y + H(k.id) / 2, 0) / ins.length;
-        n.y = Math.round(mid - H(n.id) / 2);
-      }
-    }
-    col.sort((a, b) => a.y - b.y);
-    for (let i = 1; i < col.length; i++) {
-      const min = col[i - 1].y + H(col[i - 1].id) + 26;
-      if (col[i].y < min) col[i].y = Math.round(min);
-    }
-  }
+  tidyColumns(g, measuredHeight, { operandsOf: operands });
 }
 
 /** 파이프라인의 --format 값을 서브그래프가 컴파일한 결과로 덮어쓴다. */
 function syncFormatValue() {
-  const n = stageNode('format');
-  if (n) valuesOf(n).format = formatExpr();
+  const n = stageNode(state, 'format');
+  if (n) valuesOf(n).format = fmtExpr();
 }
-
 /* ── 좌표 변환 ───────────────────────────── */
 const vp = () => $('#viewport').getBoundingClientRect();
 function toWorld(clientX, clientY) {
@@ -956,33 +601,9 @@ const hasInPort = n => !(n.id === 'src' || n.type === 'stream');
 const hasOutPort = n => !(n.id === 'out' || n.type === 'fout');
 
 /* ══ 명령어 조립 ═════════════════════════════ */
-const SAFE = /^[A-Za-z0-9._:,\/=+@%^-]+$/;
-const quote = v => SAFE.test(v) ? v : '"' + v.replace(/([\\"$`])/g, '\\$1') + '"';
-
-/** 살아 있는 경로를 순서대로 훑으며 토큰을 뽑는다. 노드 순서가 곧 플래그 순서다. */
-function buildTokens() {
-  const toks = [];
-  for (const id of livePath()) {
-    const n = state.nodes[id];
-    if (n.type !== 'stage') continue;
-    const vals = valuesOf(n);
-    for (const o of BY_STAGE[n.stage]) {
-      if (!(o.id in vals) || vals[o.id] === '') continue;
-      const v = vals[o.id];
-      if (v === true) toks.push({ node:n.id, opt:o, text: o.short || o.flag });
-      else if (v === false) { if (o.negation) toks.push({ node:n.id, opt:o, text:o.negation }); }
-      else if (o.kind === 'repeatable') {
-        for (const line of String(v).split('\n').map(s => s.trim()).filter(Boolean))
-          toks.push({ node:n.id, opt:o, text: (o.short || o.flag) + ' ' + quote(line) });
-      } else toks.push({ node:n.id, opt:o, text: (o.short || o.flag) + ' ' + quote(String(v)) });
-    }
-  }
-  return toks;
-}
-const urlList = () => (state.nodes.src.urls || '').split('\n').map(s => s.trim()).filter(Boolean);
-const commandString = () => ['yt-dlp', ...buildTokens().map(t => t.text), ...urlList().map(quote)].join(' ');
-const confString = () => buildTokens().map(t => t.text).join('\n') + '\n';
-
+// 조립·해석은 core/pipeline.js 에 있다. 여기서는 현재 상태를 넘기기만 한다.
+const tokensNow = () => buildTokens(state);
+const urlsNow = () => urlList(state);
 /* ══ 렌더 ════════════════════════════════════ */
 function applyView() {
   $('#node-layer').style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
@@ -1009,7 +630,7 @@ function renderWires() {
   if (inFormat()) {
     for (const n of nodeList(g)) {
       if (!FOP_TYPES.includes(n.type)) continue;
-      operands(n.id, g).forEach((k, i) => { ordinal[k.id + '>' + n.id] = i + 1; });
+      operands(g, n.id).forEach((k, i) => { ordinal[k.id + '>' + n.id] = i + 1; });
     }
   }
 
@@ -1268,7 +889,7 @@ function streamBody(n, body) {
 }
 
 function opBody(n, body) {
-  const ins = operands(n.id);
+  const ins = opsOf(n.id);
   const box = document.createElement('div');
   box.className = 'ops';
   box.innerHTML = `<div>${FTYPE[n.type].blurb} · 입력은 <b>세로 위치 순서</b>다.</div>`;
@@ -1278,7 +899,7 @@ function opBody(n, body) {
     const ol = document.createElement('ol');
     for (const k of ins) {
       const li = document.createElement('li');
-      li.textContent = emitTree(graphToTree(k.id)) || '(비어 있음)';
+      li.textContent = emitTree(graphToTree(state.format, k.id)) || '(비어 있음)';
       ol.append(li);
     }
     box.append(ol);
@@ -1297,10 +918,10 @@ function foutBody(n, body) {
   const expr = document.createElement('div');
   expr.className = 'fout-expr';
   expr.id = 'fout-expr';
-  expr.textContent = formatExpr();
+  expr.textContent = fmtExpr();
   body.append(note, expr);
 
-  const issues = formatIssues();
+  const issues = fmtIssues();
   if (issues.length) {
     const bad = document.createElement('div');
     bad.className = 'fout-issue';
@@ -1354,7 +975,7 @@ function nodeEl(n, live) {
     const x = document.createElement('button');
     x.className = 'node-x'; x.type = 'button'; x.textContent = '✕';
     x.title = '노드 지우기';
-    x.onclick = ev => { ev.stopPropagation(); removeNode(n.id); render(); };
+    x.onclick = ev => { ev.stopPropagation(); dropNode(n.id); render(); };
     head.append(x);
   } else {
     head.append(document.createElement('span'));
@@ -1378,7 +999,7 @@ function nodeEl(n, live) {
     note.textContent = '명령어 맨 뒤에 붙는 대상 URL.';
     body.append(ta, note);
   } else if (n.id === 'out') {
-    const toks = buildTokens();
+    const toks = tokensNow();
     const note = document.createElement('div');
     note.className = 'node-note';
     note.textContent = '여기까지 이어진 노드만 아래 명령어에 들어간다.';
@@ -1386,7 +1007,7 @@ function nodeEl(n, live) {
     stat.className = 'sink-stat';
     stat.innerHTML = `<span>토큰 ${toks.length}</span>`
       + `<span>단계 ${new Set(toks.map(t => t.node)).size}</span>`
-      + `<span>URL ${urlList().length}</span>`;
+      + `<span>URL ${urlsNow().length}</span>`;
     body.append(note, stat);
   } else if (n.type === 'stream') {
     streamBody(n, body);
@@ -1490,7 +1111,7 @@ function renderPalette() {
   }
 
   for (const s of STAGES) {
-    const placed = stageNode(s.id);
+    const placed = stageOf(s.id);
     const b = document.createElement('button');
     b.className = 'pal-item' + (placed ? ' placed' : '');
     b.type = 'button';
@@ -1525,7 +1146,7 @@ function renderHits() {
   box.hidden = false;
   box.innerHTML = `<div class="hits-head">${hits.length}개 일치 · 고르면 해당 단계 노드에 들어간다</div>`;
   for (const o of hits.slice(0, 80)) {
-    const holder = stageNode(o.stage);
+    const holder = stageOf(o.stage);
     const on = holder && o.id in valuesOf(holder);
     const b = document.createElement('button');
     b.className = 'hit'; b.type = 'button';
@@ -1535,7 +1156,7 @@ function renderHits() {
       + (on ? `<span class="hit-on">✓ 배치됨</span>`
             : `<span class="hit-stage" style="color:${ACCENT[o.stage]}">${o.stage}</span>`);
     b.onclick = () => {
-      const n = addStageNode(o.stage, ...freeSpot());
+      const n = addStageNode(o.stage, ...centerSpot());
       valuesOf(n)[o.id] = o.kind === 'flag' ? true : '';
       $('#q').value = ''; renderHits();
       render();
@@ -1547,7 +1168,7 @@ function renderHits() {
 
 function renderCmd() {
   const box = $('#cmd');
-  const toks = buildTokens();
+  const toks = tokensNow();
   box.innerHTML = '';
   box.append(Object.assign(document.createElement('span'), { className:'prompt', textContent:'$ ' }));
   box.append(Object.assign(document.createElement('span'), { textContent:'yt-dlp' }));
@@ -1561,7 +1182,7 @@ function renderCmd() {
     el.title = t.opt.flag + ' — [' + t.opt.stage + '] ' + STAGE[t.opt.stage].label + ' 노드';
     box.append(el);
   }
-  for (const u of urlList()) {
+  for (const u of urlsNow()) {
     box.append(document.createTextNode(' '));
     box.append(Object.assign(document.createElement('span'), { className:'tok url', textContent: quote(u) }));
   }
@@ -1572,7 +1193,7 @@ function renderCmd() {
   if (ui.fmtWarn) parts.push('<b>' + escapeHtml(ui.fmtWarn) + '</b>');
 
   if (inFormat()) {
-    const issues = formatIssues();
+    const issues = fmtIssues();
     parts.push(issues.length
       ? '<b>서브그래프:</b> ' + issues.map(escapeHtml).join(' · ')
       : '포맷 서브그래프 편집 중 · -f 값은 그래프가 컴파일한 결과로 계속 덮어쓴다');
@@ -1598,7 +1219,7 @@ function renderCrumb() {
   $('#viewport').classList.toggle('sub', inFormat());
   if (inFormat()) {
     c.style.setProperty('--fmt', ACCENT.format);
-    const e = formatExpr();
+    const e = fmtExpr();
     $('#crumb-expr').textContent = e ? '· ' + e : '';
   }
 }
@@ -1608,7 +1229,7 @@ function paintLit() {
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
   for (const el of document.querySelectorAll('.row'))
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
-  const holder = ui.lit && !inFormat() ? stageNode(BY_ID[ui.lit].stage) : null;
+  const holder = ui.lit && !inFormat() ? stageOf(BY_ID[ui.lit].stage) : null;
   for (const el of document.querySelectorAll('.node'))
     el.classList.toggle('lit', !!holder && el.dataset.id === holder.id);
 }
@@ -1622,8 +1243,8 @@ function renderAfterEdit() {
   if (inFormat()) {
     syncFormatValue();
     const e = $('#fout-expr');
-    if (e) e.textContent = formatExpr();
-    $('#crumb-expr').textContent = formatExpr() ? '· ' + formatExpr() : '';
+    if (e) e.textContent = fmtExpr();
+    $('#crumb-expr').textContent = fmtExpr() ? '· ' + fmtExpr() : '';
   }
   renderCmd(); renderPalette(); renderWires();
   for (const el of document.querySelectorAll('.node')) {
@@ -1651,11 +1272,11 @@ function setMode(m) {
 /** --format 문자열을 서브그래프로 풀어 놓고 들어간다.
  *  이미 같은 값을 만들어 내는 그래프가 있으면 배치를 그대로 재사용한다. */
 function enterFormat() {
-  const holder = stageNode('format');
+  const holder = stageOf('format');
   const raw = holder ? String(valuesOf(holder).format ?? '') : '';
   ui.fmtWarn = '';
 
-  if (formatExpr() !== raw.trim()) {
+  if (fmtExpr() !== raw.trim()) {
     let tree = null, err = null;
     try { tree = parseFormat(raw); } catch (e) { err = e; }
     if (err) {
@@ -1666,7 +1287,7 @@ function enterFormat() {
       state.format = blankFormat();
       ui.fmtWarn = '읽지 못한 -f 문자열을 그래프가 덮어썼다: ' + raw;
     } else {
-      state.format = treeToGraph(tree);
+      state.format = treeToGraph(tree, { nid, nodeW: NODE_W });
     }
   }
   setMode('format');
@@ -1679,29 +1300,26 @@ function enterFormat() {
 }
 
 /* ══ 배치 ════════════════════════════════════ */
-function freeSpot() {
+/** 화면 한가운데에서 겹치지 않는 자리. */
+function centerSpot() {
   const r = vp();
-  let x = (r.width / 2 - view.x) / view.k - NODE_W / 2;
-  let y = (r.height / 2 - view.y) / view.k - 60;
-  const taken = () => nodeList().some(n => Math.abs(n.x - x) < 40 && Math.abs(n.y - y) < 40);
-  let guard = 0;
-  while (taken() && guard++ < 40) { x += 34; y += 30; }
-  return [Math.round(x), Math.round(y)];
+  return freeSpot(graph(),
+    (r.width / 2 - view.x) / view.k - NODE_W / 2,
+    (r.height / 2 - view.y) / view.k - 60);
 }
 function autolayout() {
   const g = graph();
   if (inFormat()) {
     // 표현식은 트리다. 컴파일한 결과를 다시 펼치면 그게 곧 정돈된 배치다.
-    const tree = graphToTree('fout');
-    const fresh = treeToGraph(tree);
+    const fresh = treeToGraph(graphToTree(state.format), { nid, nodeW: NODE_W });
     // 트리에 안 잡힌(끊긴) 노드는 아래쪽에 남겨 둔다.
-    const live = reach('fout', adjacency(g).inn);
-    const orphans = nodeList(g).filter(n => !live.has(n.id));
+    const orphans = orphansOf(g, FOUT);
     const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
     orphans.forEach((n, i) => { n.x = i * (NODE_W + 90); n.y = maxY + 190; fresh.nodes[n.id] = n; });
-    for (const e of g.edges) if (fresh.nodes[e.from] && fresh.nodes[e.to]
-        && !fresh.edges.some(x => x.from === e.from && x.to === e.to)
-        && !live.has(e.from)) fresh.edges.push(e);
+    const dead = new Set(orphans.map(n => n.id));
+    for (const e of g.edges)
+      if (fresh.nodes[e.from] && fresh.nodes[e.to] && dead.has(e.from)
+          && !hasEdge(fresh, e.from, e.to)) fresh.edges.push(e);
     fresh.view = g.view;
     delete fresh._tidy;
     state.format = fresh;
@@ -1712,11 +1330,7 @@ function autolayout() {
     fitView();
     return;
   }
-  const order = livePath();
-  const rest = nodeList(g).map(n => n.id).filter(id => !order.includes(id));
-  const GAP_X = NODE_W + 78, TOP = 90;
-  order.forEach((id, i) => { const n = g.nodes[id]; n.x = 40 + i * GAP_X; n.y = TOP + (i % 2) * 74; });
-  rest.forEach((id, i) => { const n = g.nodes[id]; n.x = 40 + i * GAP_X; n.y = TOP + 430; });
+  chainLayout(g, livePath(state), { nodeW: NODE_W });
   fitView(); render();
 }
 function autowire() {
@@ -1730,22 +1344,11 @@ function autowire() {
   render();
 }
 function fitView() {
-  const ns = nodeList();
-  if (!ns.length) return;
   const r = vp();
-  // 노드 높이는 내용에 따라 다르다. 상수로 때려 맞히지 말고 DOM 에서 실측한다.
-  const heightOf = id => {
-    const el = document.querySelector(`.node[data-id="${id}"]`);
-    return el ? el.offsetHeight : 150;
-  };
-  const xs = ns.map(n => n.x);
-  const minX = Math.min(...xs) - 40, maxX = Math.max(...xs) + NODE_W + 40;
-  const minY = Math.min(...ns.map(n => n.y)) - 40;
-  const maxY = Math.max(...ns.map(n => n.y + heightOf(n.id))) + 40;
-  const k = Math.max(0.3, Math.min(1.1, Math.min(r.width / (maxX - minX), r.height / (maxY - minY))));
-  view.k = k;
-  view.x = (r.width - (maxX - minX) * k) / 2 - minX * k;
-  view.y = (r.height - (maxY - minY) * k) / 2 - minY * k;
+  const box = bounds(graph(), measuredHeight, { nodeW: NODE_W });
+  const v = fitTo(box, r.width, r.height);
+  if (!v) return;
+  Object.assign(view, v);
   applyView();
 }
 function focusNode(id) {
@@ -1763,11 +1366,11 @@ const viewport = $('#viewport');
 viewport.addEventListener('pointerdown', e => {
   const port = e.target.closest('.port');
   const head = e.target.closest('.node-head');
-  const wire = e.target.closest('.wire-g');
+  const wireEl = e.target.closest('.wire-g');
 
-  if (wire && !port && !head) {
+  if (wireEl && !port && !head) {
     e.preventDefault();
-    const { from, to } = wire.dataset;
+    const { from, to } = wireEl.dataset;
     graph().edges = graph().edges.filter(x => !(x.from === from && x.to === to));
     render();
     return;
@@ -1843,8 +1446,8 @@ function endPointer(e) {
     if (port && port.dataset.side !== ui.wire.side) {
       const other = port.dataset.node;
       const ok = ui.wire.side === 'out'
-        ? connect(ui.wire.from, other)
-        : connect(other, ui.wire.from);
+        ? wire(ui.wire.from, other)
+        : wire(other, ui.wire.from);
       if (!ok) flashNote('이을 수 없다 — 이미 이어져 있거나 순환이 된다.');
     }
     for (const p of document.querySelectorAll('.port')) p.classList.remove('hot');
@@ -1862,21 +1465,14 @@ viewport.addEventListener('pointercancel', endPointer);
 viewport.addEventListener('wheel', e => {
   e.preventDefault();
   const r = vp();
-  const mx = e.clientX - r.left, my = e.clientY - r.top;
-  const k2 = Math.max(0.3, Math.min(2, view.k * Math.exp(-e.deltaY * 0.0016)));
-  view.x = mx - (mx - view.x) * (k2 / view.k);
-  view.y = my - (my - view.y) * (k2 / view.k);
-  view.k = k2;
+  Object.assign(view, zoomAt(view, e.clientX - r.left, e.clientY - r.top,
+                             Math.exp(-e.deltaY * 0.0016)));
   applyView(); save();
 }, { passive: false });
 
 function zoomBy(f) {
   const r = vp();
-  const mx = r.width / 2, my = r.height / 2;
-  const k2 = Math.max(0.3, Math.min(2, view.k * f));
-  view.x = mx - (mx - view.x) * (k2 / view.k);
-  view.y = my - (my - view.y) * (k2 / view.k);
-  view.k = k2;
+  Object.assign(view, zoomAt(view, r.width / 2, r.height / 2, f));
   applyView(); save();
 }
 $('#zoom-in').onclick = () => zoomBy(1.2);
@@ -1891,7 +1487,7 @@ $('#crumb-back').onclick = () => setMode('pipeline');
 $('#pal-list').addEventListener('pointerdown', e => {
   const item = e.target.closest('.pal-item');
   if (!item) return;
-  if (item.classList.contains('placed')) { focusNode(stageNode(item.dataset.stage).id); return; }
+  if (item.classList.contains('placed')) { focusNode(stageOf(item.dataset.stage).id); return; }
 
   const sid = item.dataset.stage, ftype = item.dataset.fnode;
   const start = { x: e.clientX, y: e.clientY };
@@ -1921,7 +1517,7 @@ $('#pal-list').addEventListener('pointerdown', e => {
     } else if (ghost) {
       return;                                    // 캔버스 밖에 떨어뜨렸다 — 없던 일로
     } else {
-      pos = freeSpot();                          // 그냥 클릭 → 화면 가운데
+      pos = centerSpot();                          // 그냥 클릭 → 화면 가운데
     }
     const n = ftype ? addFormatNode(ftype, pos[0], pos[1]) : addStageNode(sid, pos[0], pos[1]);
     ui.sel = n.id;
@@ -1940,45 +1536,8 @@ $('#cmd').addEventListener('mouseover', e => {
 $('#cmd').addEventListener('mouseout', () => { ui.lit = null; paintLit(); });
 
 /* ══ 역방향: 명령어 → 그래프 ═════════════════ */
-function tokenize(s) {
-  const out = []; let cur = '', q = null;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (q) {
-      if (c === '\\' && q === '"') { cur += s[++i] ?? ''; }
-      else if (c === q) q = null;
-      else cur += c;
-    } else if (c === '"' || c === "'") q = c;
-    else if (/\s/.test(c)) { if (cur) { out.push(cur); cur = ''; } }
-    else cur += c;
-  }
-  if (cur) out.push(cur);
-  return out;
-}
-
 function importCommand(text) {
-  const toks = tokenize(text.replace(/\\\n/g, ' '));
-  if (toks[0] && /yt-dlp|youtube-dl/.test(toks[0])) toks.shift();
-
-  const urls = [];
-  const picked = {};            // stage → { optId: value }
-  const unknown = [];
-
-  for (let i = 0; i < toks.length; i++) {
-    let t = toks[i];
-    if (!t.startsWith('-')) { urls.push(t); continue; }
-    let inline = null;
-    if (t.includes('=') && t.startsWith('--')) { const k = t.indexOf('='); inline = t.slice(k + 1); t = t.slice(0, k); }
-    const hit = BY_FLAG[t];
-    if (!hit) { unknown.push(t); continue; }
-    const { opt, negated } = hit;
-    const bag = (picked[opt.stage] ||= {});
-    if (opt.kind === 'flag') { bag[opt.id] = !negated; continue; }
-    const v = inline ?? toks[++i];
-    if (v === undefined) { unknown.push(t); continue; }
-    if (opt.kind === 'repeatable' && bag[opt.id]) bag[opt.id] += '\n' + v;
-    else bag[opt.id] = v;
-  }
+  const { urls, picked, unknown } = parseCommand(text);
 
   const keep = state.nodes.src.urls;
   resetState();
@@ -1994,59 +1553,33 @@ function importCommand(text) {
   // -f 값도 서브그래프로 풀어 둔다. 못 읽으면 문자열 그대로 두고 알린다.
   const fmt = picked.format && picked.format.format;
   if (fmt) {
-    try { state.format = treeToGraph(parseFormat(fmt)); }
+    try { state.format = treeToGraph(parseFormat(fmt), { nid, nodeW: NODE_W }); }
     catch (e) { ui.fmtWarn = `-f "${fmt}" 는 서브그래프로 못 읽었다 (${e.message}) — 문자열 그대로 둔다`; }
   }
 
   autowire();
   autolayout();
 }
-
 /* ══ 저장 ════════════════════════════════════ */
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); } catch {}
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot(state, seq, ui.mode))); } catch {}
   }, 250);
 }
-function snapshot() { return { v:3, seq, mode: ui.mode, state }; }
+const snap = () => snapshot(state, seq, ui.mode);
 
-function restore(data) {
-  if (!data) return false;
-  // v2 스냅샷(포맷 서브그래프 이전)도 받아 준다.
-  let s = data.state;
-  if (!s && data.nodes) s = { nodes: data.nodes, edges: data.edges || [], view: data.view, format: null };
-  if (!s || !s.nodes || !s.nodes.src || !s.nodes.out) return false;
-
-  s.edges = (s.edges || []).slice();
-  for (const n of Object.values(s.nodes)) if (n.type === 'stage' && !STAGE[n.stage]) delete s.nodes[n.id];
-  s.edges = s.edges.filter(e => s.nodes[e.from] && s.nodes[e.to]);
-  s.view = Object.assign({ x:0, y:0, k:1 }, s.view);
-
-  const f = s.format;
-  if (!f || !f.nodes || !f.nodes.fout) s.format = blankFormat();
-  else {
-    s.format.edges = (f.edges || []).filter(e => f.nodes[e.from] && f.nodes[e.to]);
-    s.format.view = Object.assign({ x:0, y:0, k:1 }, f.view);
-  }
-
-  state = s;
-  seq = data.seq || (Object.keys(s.nodes).length + Object.keys(s.format.nodes).length + 1);
-  ui.mode = data.mode === 'format' ? 'format' : 'pipeline';
+/** core 의 restore 결과를 앱 전역에 앉힌다. */
+function adoptSnapshot(data) {
+  const r = restore(data, { blankFormat, isValidStage: s => !!STAGE[s] });
+  if (!r) return false;
+  state = r.state; seq = r.seq; ui.mode = r.mode;
   view = ui.mode === 'format' ? state.format.view : state.view;
   ui.unknown = []; ui.sel = null; ui.picker = null; ui.fmtWarn = '';
   return true;
 }
-function load() {
-  try {
-    const v3 = localStorage.getItem(STORE_KEY);
-    if (v3) return restore(JSON.parse(v3));
-    const v2 = localStorage.getItem('ytstudio.graph.v2');
-    return v2 ? restore(JSON.parse(v2)) : false;
-  } catch { return false; }
-}
-
+const load = () => adoptSnapshot(loadRaw(localStorage));
 /* ══ 배선 ════════════════════════════════════ */
 $('#ver').textContent = 'yt-dlp ' + SCHEMA.ytdlp_version + ' 스키마 · ' + OPTS.length + '개 옵션 · ' + STAGES.length + '개 단계';
 $('#q').oninput = renderHits;
@@ -2063,12 +1596,12 @@ $('#reset').onclick = () => {
 $('#import').onclick = () => $('#dlg-import').showModal();
 $('#do-import').onclick = () => { importCommand($('#paste').value); $('#dlg-import').close(); };
 $('#graph-io').onclick = () => {
-  $('#graph-text').value = JSON.stringify(snapshot(), null, 1);
+  $('#graph-text').value = JSON.stringify(snap(), null, 1);
   $('#dlg-graph').showModal();
 };
 $('#graph-load').onclick = () => {
   try {
-    if (restore(JSON.parse($('#graph-text').value))) { render(); fitView(); $('#dlg-graph').close(); }
+    if (adoptSnapshot(JSON.parse($('#graph-text').value))) { render(); fitView(); $('#dlg-graph').close(); }
     else alert('그래프 형식이 아니다.');
   } catch (err) { alert('JSON을 읽지 못했다: ' + err.message); }
 };
@@ -2084,7 +1617,7 @@ document.addEventListener('keydown', e => {
     else if (inFormat()) setMode('pipeline');
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && ui.sel) {
-    e.preventDefault(); removeNode(ui.sel); render();
+    e.preventDefault(); dropNode(ui.sel); render();
   }
 });
 
@@ -2105,8 +1638,8 @@ async function copy(text, btn) {
   const old = btn.textContent; btn.textContent = '복사됨';
   setTimeout(() => btn.textContent = old, 1200);
 }
-$('#copy-cmd').onclick = e => copy(commandString(), e.target);
-$('#copy-conf').onclick = e => copy(confString(), e.target);
+$('#copy-cmd').onclick = e => copy(commandString(state), e.target);
+$('#copy-conf').onclick = e => copy(confString(state), e.target);
 
 addEventListener('resize', () => { applyView(); renderWires(); });
 
@@ -2118,12 +1651,12 @@ window.__yt = {
   get ui() { return ui; },
   get view() { return view; },
   render,
-  connect: (from, to, g) => connect(from, to, g || graph()),
-  removeNode: (id, g) => removeNode(id, g || graph()),
+  connect: (from, to, g) => wire(from, to, g || graph()),
+  removeNode: (id, g) => dropNode(id, g || graph()),
   addFormatNode,
-  formatExpr,
-  commandString,
-  confString,
+  formatExpr: () => fmtExpr(),
+  commandString: () => commandString(state),
+  confString: () => confString(state),
   parseFormat,
   emitTree,
 };
