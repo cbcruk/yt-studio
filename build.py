@@ -37,6 +37,7 @@ MODULES = [
     "src/core/pipeline.js",
     "src/core/layout.js",
     "src/core/persist.js",
+    "src/ui/tpl.js",              # 빌드가 vendor/lit-html.iife.js 로 갈아 끼운다
     "src/ui/node-kinds.js",
     "src/ui/graph-kinds.js",
     "src/app.js",
@@ -94,6 +95,12 @@ def main() -> None:
         if rel.endswith("schema-data.js"):
             # 개발용 JSON import 를 통째로 값 하나로 바꾼다.
             body = f"const SCHEMA = {blob};"
+        elif rel.endswith("ui/tpl.js"):
+            # 개발용 lit-html import 를 미리 구워 둔 번들 + 별칭으로 바꾼다.
+            lit = (ROOT / "vendor" / "lit-html.iife.js").read_text(encoding="utf-8").strip()
+            # 앱에도 render 가 있으므로 이름을 갈라 둔다.
+            body = (lit + "\nconst html = __lit.html, renderTpl = __lit.render,"
+                          "\n      nothing = __lit.nothing, repeat = __lit.repeat;")
         else:
             body = strip_module(path)
         for name in DECL_RE.findall(path.read_text(encoding="utf-8")):

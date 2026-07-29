@@ -159,6 +159,8 @@ src/ui/
   graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
 src/app.js           캔버스 · 렌더 · 포인터 · 배선
 src/app.css          스타일 전부
+src/ui/tpl.js        lit-html 어댑터 — 배포는 vendor 번들로 갈아 끼운다
+vendor/              lit-html 을 미리 구워 둔 것 (vendor/README.md)
 index.html           개발 진입점이자 배포 템플릿 — 하나만 둔다
 vite.config.js       개발 서버만. 배포는 build.py 가 만든다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
@@ -183,6 +185,12 @@ tests/e2e/           실제로 조작해 보는 72종
 `build.py` 가 의존 순서대로 이어 붙이며 `import`/`export` 만 걷어낸다. 이름이
 겹치면 빌드가 막는다. 덕분에 소스는 진짜 ES 모듈로 남아 `node --test` 로 돌고,
 산출물은 의존성 0 의 HTML 한 장으로 남는다.
+
+**템플릿 엔진은 lit-html 을 한 곳에서만 쓰고 있다** (스파이크). `fieldBody` 하나만
+태그드 템플릿으로 옮겨 봤다 — 91줄 → 66줄, 산출물 +9KB(gzip +4KB). 나머지 본문은
+아직 손으로 DOM 을 만든다. 개발은 `lit-html` 을 그대로 import 하고, 배포는
+`build.py` 가 `src/ui/tpl.js` 자리에 미리 구워 둔 `vendor/lit-html.iife.js` 를
+끼워 넣는다(그래서 배포 빌드는 여전히 파이썬만으로 돈다).
 
 **노드 종류를 추가하려면** `src/ui/node-kinds.js` 에 `defineKind` 한 줄,
 본문을 그린다면 `defineBody` 한 줄이면 된다. 색·표기·포트 유무·배지·팔레트

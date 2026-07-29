@@ -5,6 +5,7 @@
  * core/ 에, 노드와 그래프 종류의 선언은 ui/ 의 레지스트리에 있다.
  */
 import { SCHEMA } from './core/schema-data.js';
+import { html, renderTpl } from './ui/tpl.js';
 import {
   BY_ID,
   BY_STAGE,
@@ -613,98 +614,72 @@ function textBody(n, body) {
   body.append(wrap);
 }
 
-/** 필드 조각: %(name>strf|fallback)fmt conv */
-function fieldBody(n, body) {
-  const wrap = document.createElement('div');
-  wrap.className = 'fsel';
+/** 필드 조각: %(name>strf|fallback)fmt conv
+ *
+ *  lit-html 스파이크 — 다른 본문은 아직 손으로 DOM 을 만든다.
+ *  옵션 목록에 selected 를 직접 박지 않고 .value 로 넘기는 게 핵심이다. */
+const optionsOf = (pairs, cur) => pairs.map(([v, ko]) =>
+  html`<option value=${v}>${ko}</option>`);
 
+/** 목록에 없는 값이 들어와 있으면 그 값도 항목으로 끼워 준다. */
+const withCurrent = (pairs, cur) =>
+  cur && !pairs.some(([v]) => v === cur) ? [...pairs, [cur, cur]] : pairs;
+
+const tweakRow = (label, control) => html`
+  <label class="ofield-row"><span>${label}</span>${control}</label>`;
+
+function fieldTemplate(n) {
   const custom = !FIELD_SET.has(n.name);
-  const sel = document.createElement('select');
-  sel.dataset.ctl = 'field';
-  sel.innerHTML = FIELDS.map(([g, items]) =>
-    `<optgroup label="${g}">` + items.map(([v, ko]) =>
-      `<option value="${v}"${v === n.name ? ' selected' : ''}>${v} — ${ko}</option>`).join('')
-    + '</optgroup>').join('')
-    + `<option value="__custom"${custom ? ' selected' : ''}>(직접 입력)</option>`;
-  sel.title = '어떤 값을 꺼낼지';
-  sel.onchange = () => { n.name = sel.value === '__custom' ? '' : sel.value; render(); };
-  wrap.append(sel);
+  const set = (k, v) => { n[k] = v; render(); };
 
-  if (custom) {
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.spellcheck = false;
-    inp.dataset.ctl = 'field-custom';
-    inp.value = n.name || '';
-    inp.placeholder = 'tags.0 · release_date,upload_date …';
-    inp.oninput = () => { n.name = inp.value.trim(); render(); };
-    wrap.append(inp);
-  } else {
-    const why = document.createElement('div');
-    why.className = 'why';
-    why.textContent = FIELD_HELP[n.name] || '';
-    wrap.append(why);
-  }
-  body.append(wrap);
+  return html`
+    <div class="fsel">
+      <select data-ctl="field" title="어떤 값을 꺼낼지"
+              .value=${custom ? '__custom' : n.name}
+              @change=${e => set('name', e.target.value === '__custom' ? '' : e.target.value)}>
+        ${FIELDS.map(([group, items]) => html`
+          <optgroup label=${group}>
+            ${items.map(([v, ko]) => html`<option value=${v}>${v} — ${ko}</option>`)}
+          </optgroup>`)}
+        <option value="__custom">(직접 입력)</option>
+      </select>
+      ${custom
+        ? html`<input type="text" spellcheck="false" data-ctl="field-custom"
+                      .value=${n.name || ''} placeholder="tags.0 · release_date,upload_date …"
+                      @input=${e => set('name', e.target.value.trim())}>`
+        : html`<div class="why">${FIELD_HELP[n.name] || ''}</div>`}
+    </div>
 
-  const box = document.createElement('div');
-  box.className = 'filt';
-  box.innerHTML = '<div class="filt-head"><span>다듬기</span></div>';
+    <div class="filt">
+      <div class="filt-head"><span>다듬기</span></div>
+      ${tweakRow('날짜 서식', html`
+        <select data-ctl="strf" .value=${n.strf || ''}
+                @change=${e => set('strf', e.target.value)}>
+          ${optionsOf(withCurrent(STRF_PRESETS, n.strf))}
+        </select>`)}
+      ${tweakRow('없을 때', html`
+        <input type="text" spellcheck="false" data-ctl="fallback"
+               .value=${n.fallback ?? ''} placeholder="(그대로 두면 NA)"
+               @input=${e => set('fallback', e.target.value === '' ? null : e.target.value)}>`)}
+      ${tweakRow('자릿수·자르기', html`
+        <input type="text" spellcheck="false" data-ctl="fmt"
+               .value=${n.fmt || ''} placeholder="03 · .40"
+               title="자릿수 채우기(03) 또는 길이 자르기(.40)"
+               @input=${e => set('fmt', e.target.value)}>`)}
+      ${tweakRow('변환', html`
+        <select data-ctl="conv" .value=${n.conv || 's'}
+                @change=${e => set('conv', e.target.value)}>
+          ${optionsOf(withCurrent(CONVERSIONS, n.conv))}
+        </select>`)}
+    </div>
 
-  const row = (label, el) => {
-    const r = document.createElement('label');
-    r.className = 'ofield-row';
-    r.innerHTML = `<span>${label}</span>`;
-    r.append(el);
-    box.append(r);
-  };
-
-  // 날짜 서식 — 날짜 필드에서만 쓸모가 있으므로 프리셋으로 준다.
-  const strf = document.createElement('select');
-  strf.dataset.ctl = 'strf';
-  const presets = STRF_PRESETS.slice();
-  if (n.strf && !presets.some(([v]) => v === n.strf)) presets.push([n.strf, n.strf]);
-  strf.innerHTML = presets.map(([v, ko]) =>
-    `<option value="${escapeHtml(v)}"${v === (n.strf || '') ? ' selected' : ''}>${escapeHtml(ko)}</option>`).join('');
-  strf.onchange = () => { n.strf = strf.value; render(); };
-  row('날짜 서식', strf);
-
-  // 값이 없을 때
-  const fb = document.createElement('input');
-  fb.type = 'text'; fb.spellcheck = false;
-  fb.dataset.ctl = 'fallback';
-  fb.value = n.fallback ?? '';
-  fb.placeholder = '(그대로 두면 NA)';
-  fb.oninput = () => { n.fallback = fb.value === '' ? null : fb.value; render(); };
-  row('없을 때', fb);
-
-  // 자릿수·자르기 — %(playlist_index)03d · %(title).40s
-  const fmt = document.createElement('input');
-  fmt.type = 'text'; fmt.spellcheck = false;
-  fmt.dataset.ctl = 'fmt';
-  fmt.value = n.fmt || '';
-  fmt.placeholder = '03 · .40';
-  fmt.title = '자릿수 채우기(03) 또는 길이 자르기(.40)';
-  fmt.oninput = () => { n.fmt = fmt.value; render(); };
-  row('자릿수·자르기', fmt);
-
-  const conv = document.createElement('select');
-  conv.dataset.ctl = 'conv';
-  const convs = CONVERSIONS.slice();
-  if (n.conv && !convs.some(([v]) => v === n.conv)) convs.push([n.conv, n.conv]);
-  conv.innerHTML = convs.map(([v, ko]) =>
-    `<option value="${v}"${v === (n.conv || 's') ? ' selected' : ''}>${ko}</option>`).join('');
-  conv.onchange = () => { n.conv = conv.value; render(); };
-  row('변환', conv);
-
-  body.append(box);
-
-  const out = document.createElement('div');
-  out.className = 'why';
-  out.style.marginTop = '6px';
-  out.textContent = emitPiece({ t: 'field', name: n.name, strf: n.strf,
-                                fallback: n.fallback, fmt: n.fmt, conv: n.conv });
-  body.append(out);
+    <div class="why" style="margin-top:6px">
+      ${emitPiece({ t: 'field', name: n.name, strf: n.strf,
+                    fallback: n.fallback, fmt: n.fmt, conv: n.conv })}
+    </div>`;
 }
+
+const fieldBody = (n, body) => renderTpl(fieldTemplate(n), body);
 
 /** -o 출력: TYPES 선택 + 완성된 문자열 + 미리보기. */
 function ooutBody(n, body) {
