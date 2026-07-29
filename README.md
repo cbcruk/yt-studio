@@ -128,7 +128,7 @@ tests/e2e/           실제로 조작해 보는 47종
 **그래프 종류를 추가하려면**(예: `-o` 출력 템플릿을 서브그래프로) `graph-kinds.js`
 에 `defineGraph` 한 항목이면 된다. "무엇이 살아 있는가"(`live`), 순서(`order`),
 팔레트 문구, 하단 노트, 어느 옵션 행에서 열리는가(`opensFrom`)를 선언하고,
-캔버스를 실제로 만지는 일(`sync`·`onEdit`·`relayout`)만 `defineGraphBehavior`
+캔버스를 실제로 만지는 일(`sync`·`relayout`)만 `defineGraphBehavior`
 로 얹는다. 렌더 쪽은 손댈 것이 없다 — 전부 `KIND().…` 를 탄다.
 
 스키마는 help 텍스트를 긁는 게 아니라 옵션 객체를 직접 읽는다. yt-dlp를 올리면
