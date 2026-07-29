@@ -144,6 +144,7 @@ uploader   /      title              .       ext        chapter: …
 ```
 src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   schema.js          색인 · 검색 · KO 사전
+  schema-data.js     개발은 JSON import, 배포는 빌드가 값으로 갈아 끼운다
   graph.js           adjacency · reach · connect · removeNode · topoOrder
   format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
   format-graph.js    트리 ↔ 그래프 · 문제 진단
@@ -156,10 +157,10 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
 src/ui/
   node-kinds.js      노드 종류 레지스트리
   graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
-  app.js             캔버스 · 렌더 · 포인터 · 배선
-  app.css            전부
-  core/schema-data.js  개발은 JSON import, 배포는 빌드가 값으로 갈아 끼운다
+src/app.js           캔버스 · 렌더 · 포인터 · 배선
+src/app.css          스타일 전부
 index.html           개발 진입점이자 배포 템플릿 — 하나만 둔다
+vite.config.js       개발 서버만. 배포는 build.py 가 만든다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
 tests/unit/          브라우저 없이 도는 88종
