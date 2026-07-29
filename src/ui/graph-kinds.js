@@ -22,6 +22,10 @@ import {
   outputLive, outputExpr, outputIssues, outputPreview, pieceNodes,
   outputToGraph, blankOutput, OOUT,
 } from '../core/output-graph.js';
+import {
+  pathsLive, pathsExpr, pathsIssues, pathsPreview, entryNodes,
+  pathsToGraph, blankPaths, POUT,
+} from '../core/paths-graph.js';
 import { tagOfType } from './node-kinds.js';
 
 const GRAPHS = {};
@@ -210,4 +214,55 @@ defineGraph('output', {
   fromString: (raw, opts) => outputToGraph(raw, opts),
   blank: blankOutput,
   adopt: (s, g) => { s.output = g; },
+});
+
+defineGraph('paths', {
+  label: '[store] 저장 경로',
+  graphOf: s => s.paths,
+  viewOf: s => s.paths.view,
+
+  live: pathsLive,
+  // 수열도 트리도 아닌 집합이다. TYPES 가 키라 순서에 뜻은 없지만,
+  // 결과가 흔들리지 않게 세로 위치로 안정된 순서를 준다.
+  order: g => entryNodes(g).map(n => n.id),
+  endpoints: { end: POUT },
+  exclusiveIn: [],
+  wireOrdinals: true,
+  operandsOf: entryNodes,
+
+  search: false,
+  canAutowire: false,
+  parent: 'pipeline',
+  chrome: { crumb: true, sub: true },
+  crumbDetail: s => pathsPreview(s.paths),
+  opensFrom: {
+    option: 'paths',
+    label: '그래프 ↗',
+    title: '저장 경로를 노드 서브그래프로 편집한다',
+  },
+
+  palette: {
+    head: '경로 항목',
+    hint: '<b>-P 출력</b>에 이어진 항목마다 <code>-P</code> 가 하나씩 붙는다. '
+        + '같은 종류를 두 번 주면 아래쪽 것만 쓰인다.',
+  },
+
+  isEmpty: g => Object.keys(g.nodes).length <= 1,
+  emptyHint: '저장 경로 서브그래프가 비어 있다.<br>'
+           + '왼쪽에서 <b>경로</b>를 놓고 <b>-P 출력</b>에 이어라.<br>'
+           + '<b>home</b> 은 최종 파일, <b>temp</b> 는 받는 동안 쓰는 폴더다.',
+
+  statusNotes(g) {
+    const issues = pathsIssues(g, tagOfType);
+    return issues.length
+      ? [{ label: '서브그래프', body: issues.join(' · ') }]
+      : [{ body: '저장 경로 편집 중 · ' + (pathsPreview(g) || '(비어 있음)') }];
+  },
+
+  holderOf: () => null,
+
+  compile: s => pathsExpr(s.paths),
+  fromString: (raw, opts) => pathsToGraph(raw, opts),
+  blank: blankPaths,
+  adopt: (s, g) => { s.paths = g; },
 });

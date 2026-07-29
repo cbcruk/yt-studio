@@ -27,6 +27,7 @@ MODULES = [
     "src/core/layout.js",
     "src/core/output-template.js",
     "src/core/output-graph.js",
+    "src/core/paths-graph.js",
     "src/core/persist.js",
     "src/ui/node-kinds.js",
     "src/ui/graph-kinds.js",

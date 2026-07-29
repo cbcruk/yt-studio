@@ -49,6 +49,15 @@ STAGE_OVERRIDE = {
     "--cookies-from-browser": "connect",
 }
 
+# yt-dlp 가 TYPES 로 값을 모으는 옵션은 실제로 여러 번 준다.
+#     -P home:/a -P temp:/b
+# optparse 쪽은 callback 액션에 dict 기본값일 뿐이라 append 로 안 보인다.
+# --output·--progress-template 도 같은 성질이지만, 지금 UI 가 값 하나를
+# 전제하므로 건드리지 않는다. 그쪽을 열 때 여기 같이 추가할 것.
+KIND_OVERRIDE = {
+    "--paths": "repeatable",
+}
+
 
 def clean_help(text, default):
     """optparse의 %default 치환과 공백 정규화."""
@@ -118,7 +127,7 @@ def main():
                 "stage": STAGE_OVERRIDE.get(long_opt, stage),
                 "group": group.title,
                 "dest": opt.dest,
-                "kind": control_kind(opt),
+                "kind": KIND_OVERRIDE.get(long_opt, control_kind(opt)),
                 "metavar": opt.metavar,
                 "choices": list(opt.choices) if opt.choices else None,
                 "default": jsonable(opt.default),

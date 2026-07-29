@@ -15,6 +15,7 @@ import { parseFormat } from '../../src/core/format-grammar.js';
 import { tidyColumns, bounds, fitTo, zoomAt, freeSpot } from '../../src/core/layout.js';
 import { snapshot, restore } from '../../src/core/persist.js';
 import { blankOutput, OOUT } from '../../src/core/output-graph.js';
+import { blankPaths, POUT } from '../../src/core/paths-graph.js';
 
 /** a→b→c 사슬. */
 const chain = () => ({
@@ -200,6 +201,7 @@ test('freeSpot 은 겹치는 자리를 피한다', () => {
 const SUBS = { subgraphs: [
   { key: 'format', root: FOUT, blank: blankFormat },
   { key: 'output', root: OOUT, blank: blankOutput },
+  { key: 'paths',  root: POUT, blank: blankPaths },
 ] };
 
 const stateFixture = () => ({
@@ -208,6 +210,7 @@ const stateFixture = () => ({
   view: { x: 1, y: 2, k: 0.5 },
   format: blankFormat(),
   output: blankOutput(),
+  paths: blankPaths(),
 });
 
 test('스냅샷 왕복', () => {
@@ -271,12 +274,12 @@ test('노드 레지스트리가 모든 종류를 안다', async () => {
   const K = await import('../../src/ui/node-kinds.js');
 
   for (const type of ['source', 'sink', 'stage', 'stream', 'merge', 'fallback', 'multi', 'fout',
-                      'text', 'field', 'oout']) {
+                      'text', 'field', 'oout', 'path', 'pout']) {
     assert.ok(K.kindByType(type), `${type} 이 등록되지 않았다`);
   }
 
   // 끝점은 지울 수 없다
-  assert.deepEqual([...K.protectedIds()].sort(), ['fout', 'oout', 'out', 'src']);
+  assert.deepEqual([...K.protectedIds()].sort(), ['fout', 'oout', 'out', 'pout', 'src']);
 
   // 포트는 그래프의 끝을 막는다
   assert.equal(K.hasIn({ type: 'source' }), false, '소스에 입력이 있다');
@@ -286,6 +289,8 @@ test('노드 레지스트리가 모든 종류를 안다', async () => {
   assert.equal(K.hasIn({ type: 'text' }), false, '글자 조각에 입력이 있다');
   assert.equal(K.hasIn({ type: 'field' }), false, '필드 조각에 입력이 있다');
   assert.equal(K.hasOut({ type: 'oout' }), false, '-o 출력에 출력이 있다');
+  assert.equal(K.hasIn({ type: 'path' }), false, '경로 항목에 입력이 있다');
+  assert.equal(K.hasOut({ type: 'pout' }), false, '-P 출력에 출력이 있다');
 
   // 단계 노드는 자기 stage 에서 표기·색을 끌어온다
   const n = { type: 'stage', stage: 'format' };
@@ -320,4 +325,5 @@ test('팔레트 항목이 레지스트리에서 나온다', async () => {
   // 끝점은 팔레트에 안 나온다 — 캔버스에 이미 하나씩 있다
   assert.ok(!fmt.some(i => i.key === 'fout'));
   assert.ok(!out.some(i => i.key === 'oout'));
+  assert.deepEqual(K.paletteItems('paths').map(i => i.key), ['path']);
 });

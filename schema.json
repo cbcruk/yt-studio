@@ -2538,7 +2538,7 @@
    "stage": "store",
    "group": "Filesystem Options",
    "dest": "paths",
-   "kind": "value",
+   "kind": "repeatable",
    "metavar": "[TYPES:]PATH",
    "choices": null,
    "default": {},

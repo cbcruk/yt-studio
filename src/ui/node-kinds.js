@@ -174,3 +174,21 @@ defineKind('oout', {
   width: 280,
   ports: { in: true, out: false },
 });
+
+/* ── 경로 항목 ───────────────────────────── */
+
+defineKind('path', {
+  graph: 'paths', palette: 0,
+  tag: 'path', label: '경로', accent: '#A6265E',
+  blurb: '어떤 종류의 파일을 어디에 둘지',
+  width: 300,
+  ports: { in: false, out: true },
+});
+
+defineKind('pout', {
+  graph: 'paths', fixedId: 'pout', protected: true, io: true,
+  tag: 'paths', label: '-P 출력', accent: '#141C19',
+  blurb: '여기 이어진 항목이 --paths 값이 된다',
+  width: 300,
+  ports: { in: true, out: false },
+});

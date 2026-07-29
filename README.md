@@ -95,12 +95,34 @@ uploader   /      title              .       ext        chapter: …
   접두어로 오인하지 않는다.
 - 확장자(`ext`) 필드가 빠지면 알려 준다 — 흔한 실수다.
 
+## 저장 경로 서브그래프
+
+`-P` 는 값 안에 템플릿이 없는 평범한 경로다. 값 하나만 보면 그래프로 만들 게
+없지만, 실제로는 **여러 번 준다**.
+
+```
+-P home:/mnt/media/videos   -P temp:/var/tmp/yt-dlp   -P subtitle:/mnt/media/subs
+```
+
+그래서 이 서브그래프는 수열도 트리도 아닌 **집합**이다. 항목마다 `-P` 가
+하나씩 붙는다. `TYPES` 가 키라 순서에 뜻이 없지만, 결과가 흔들리지 않게 세로
+위치로 안정된 순서를 준다. 같은 종류를 두 번 주면 아래쪽 것만 쓰인다고 알려 준다.
+
+`home` 은 최종 파일이 놓일 곳, `temp` 는 받는 동안 쓰는 폴더다. 나머지 `TYPES`
+는 `-o` 와 같다. 여기서도 아는 `TYPES:` 만 잘라 내므로 `C:/dl/videos` 를
+오인하지 않는다.
+
+> `-P` 가 여러 번 주어진다는 사실은 optparse 쪽에서 안 보인다(콜백 액션에 dict
+> 기본값일 뿐이라 `append` 로 잡히지 않는다). `gen_schema.py` 의 `KIND_OVERRIDE`
+> 에 손으로 적어 두었다. `--output`·`--progress-template` 도 같은 성질이지만
+> 지금 UI 가 값 하나를 전제하므로 건드리지 않았다.
+
 ## 조작
 
 | 하는 일 | 방법 |
 |---|---|
 | 단계 노드 만들기 | 왼쪽 팔레트에서 캔버스로 드래그, 또는 클릭 |
-| 서브그래프 | `--format` · `--output` 행의 `그래프 ↗` · 나올 때는 `← 파이프라인` 또는 `Esc` |
+| 서브그래프 | `--format` · `--output` · `--paths` 행의 `그래프 ↗` · 나올 때는 `← 파이프라인` 또는 `Esc` |
 | 옵션 넣기 | 노드 안 `+ 옵션` → 검색 → 선택 |
 | 옵션 찾기 | 상단 검색(`/` 키). 고르면 해당 단계 노드에 자동으로 들어간다 |
 | 잇기 | 노드 오른쪽 포트에서 다른 노드 왼쪽 포트로 드래그 |
@@ -126,17 +148,18 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   format-graph.js    트리 ↔ 그래프 · 문제 진단
   output-template.js -o 파서 · 컴파일러 · 필드/변환 어휘
   output-graph.js    수열 ↔ 그래프 · 미리보기 · 문제 진단
+  paths-graph.js     -P 항목 집합 ↔ 그래프
   pipeline.js        livePath · buildTokens · 명령어 조립/해석
   layout.js          정돈 · 화면 맞춤 · 줌 계산 (높이는 인자로 받는다)
   persist.js         스냅샷 · 복원 · 마이그레이션
 src/ui/
   node-kinds.js      노드 종류 레지스트리
-  graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력)
+  graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
 app.template.html    캔버스 · 렌더 · 포인터 · 배선
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
-tests/unit/          브라우저 없이 도는 75종
-tests/e2e/           실제로 조작해 보는 62종
+tests/unit/          브라우저 없이 도는 88종
+tests/e2e/           실제로 조작해 보는 72종
 ```
 
 **번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
@@ -168,8 +191,9 @@ python gen_schema.py > schema.json
 python build.py
 ```
 
-손으로 정한 건 두 군데뿐이다. `gen_schema.py`의 **optparse 그룹 → 생애주기 단계**
-매핑(16 → 9)과, `src/core/schema.js`의 **한국어 의도 → yt-dlp 어휘** 사전(`KO`).
+손으로 정한 건 세 군데뿐이다. `gen_schema.py`의 **optparse 그룹 → 생애주기 단계**
+매핑(16 → 9)과 **`KIND_OVERRIDE`**(introspection 이 못 보는 누적 옵션), 그리고
+`src/core/schema.js`의 **한국어 의도 → yt-dlp 어휘** 사전(`KO`).
 후자가 이 도구의 실제 부가가치다. "자막", "403", "이어받기" 같은 말로 검색이
 걸리게 하는 층은 introspection이 절대 못 준다. 안 걸리는 말이 나오면 계속 채울 것.
 

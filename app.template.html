@@ -496,7 +496,7 @@ const ui = {
 };
 
 const blankState = () => Object.assign(blankPipeline(),
-  { format: blankFormat(), output: blankOutput() });
+  { format: blankFormat(), output: blankOutput(), paths: blankPaths() });
 
 function resetState() {
   state = blankState();
@@ -558,6 +558,19 @@ const opsOf = id => operands(state.format, id);
 const fmtIssues = () => formatIssues(state.format, tagOfType);
 const fmtExpr = () => formatExpr(state.format);
 const outExpr = () => outputExpr(state.output);
+const pathExpr = () => pathsExpr(state.paths);
+
+function addPathNode(type, x, y, extra) {
+  const n = Object.assign({ id: nid(), type, x, y }, extra || {});
+  if (type === 'path') { n.pathType = n.pathType ?? 'home'; n.path = n.path ?? ''; }
+  state.paths.nodes[n.id] = n;
+  return n;
+}
+/** 파이프라인의 --paths 값을 서브그래프가 컴파일한 결과로 덮어쓴다. 한 줄에 -P 하나. */
+function syncPathsValue() {
+  const n = stageOf('store');
+  if (n) valuesOf(n).paths = pathExpr();
+}
 
 function addOutputNode(type, x, y, extra) {
   const n = Object.assign({ id: nid(), type, x, y }, extra || {});
@@ -1083,6 +1096,53 @@ function ooutBody(n, body) {
   }
 }
 
+/** 경로 항목: TYPES 선택 + 경로. */
+function pathBody(n, body) {
+  const wrap = document.createElement('div');
+  wrap.className = 'fsel';
+  const sel = document.createElement('select');
+  sel.dataset.ctl = 'pathtype';
+  sel.innerHTML = '<option value="">(지정 안 함 = home)</option>'
+    + PATH_TYPES.map(([v, ko]) =>
+        `<option value="${v}"${v === (n.pathType || '') ? ' selected' : ''}>${ko}</option>`).join('');
+  sel.title = '어떤 종류의 파일을 어디에 둘지';
+  sel.onchange = () => { n.pathType = sel.value; render(); };
+
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.spellcheck = false;
+  inp.dataset.ctl = 'path';
+  inp.value = n.path || '';
+  inp.placeholder = '/downloads  ·  D:/videos';
+  inp.oninput = () => { n.path = inp.value; render(); };
+
+  const why = document.createElement('div');
+  why.className = 'why';
+  why.textContent = joinEntry({ type: n.pathType, path: n.path }) || '(비어 있음)';
+  wrap.append(sel, inp, why);
+  body.append(wrap);
+}
+
+/** -P 출력: 붙게 될 플래그들을 그대로 보여 준다. */
+function poutBody(n, body) {
+  const note = document.createElement('div');
+  note.className = 'node-note';
+  note.textContent = '이어진 항목마다 -P 가 하나씩 붙는다.';
+  const expr = document.createElement('div');
+  expr.className = 'fout-expr';
+  expr.style.whiteSpace = 'pre-line';
+  expr.textContent = pathExpr().split('\n').filter(Boolean).map(l => '-P ' + l).join('\n');
+  body.append(note, expr);
+
+  const issues = pathsIssues(state.paths, tagOfType);
+  if (issues.length) {
+    const bad = document.createElement('div');
+    bad.className = 'fout-issue';
+    bad.style.whiteSpace = 'pre-line';
+    bad.textContent = '· ' + issues.join('\n· ');
+    body.append(bad);
+  }
+}
+
 /* ── 노드 본문 등록 ──────────────────────── */
 // 노드 종류를 추가하려면 defineKind 한 줄과 defineBody 한 줄이면 된다.
 
@@ -1151,6 +1211,8 @@ defineBody('fout', (n, body) => foutBody(n, body));
 defineBody('text', (n, body) => textBody(n, body));
 defineBody('field', (n, body) => fieldBody(n, body));
 defineBody('oout', (n, body) => ooutBody(n, body));
+defineBody('path', (n, body) => pathBody(n, body));
+defineBody('pout', (n, body) => poutBody(n, body));
 
 /* ── 노드 ────────────────────────────────── */
 function headLabel(n) {
@@ -1474,6 +1536,25 @@ defineGraphBehavior('format', {
   },
 });
 
+defineGraphBehavior('paths', {
+  addNode: (key, x, y) => addPathNode(key, x, y),
+  sync() { syncPathsValue(); },
+  tidy() { tidyColumns(state.paths, measuredHeight, {}); },
+  relayout() {
+    const g = graph();
+    const fresh = pathsToGraph(pathExpr(), { nid, nodeW: NODE_W });
+    const orphans = orphansOf(g, POUT);
+    const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
+    orphans.forEach((n, i) => { n.x = 0; n.y = maxY + 190 + i * 150; fresh.nodes[n.id] = n; });
+    fresh.view = g.view;
+    delete fresh._tidy;
+    state.paths = fresh;
+    view = state.paths.view;
+    render(); KIND().tidy(); render();
+    fitView();
+  },
+});
+
 defineGraphBehavior('output', {
   // 조각을 고칠 때마다 이어 붙여 --output 문자열로 돌려놓는다.
   addNode: (key, x, y) => addOutputNode(key, x, y),
@@ -1527,7 +1608,8 @@ function enterSubgraph(kindId) {
         `빈 서브그래프에서 새로 시작할까? (취소하면 문자열을 그대로 두고 돌아간다)`);
       if (!keep) return;
       built = k.blank();
-      ui.fmtWarn = `읽지 못한 ${k.opensFrom.option === 'format' ? '-f' : '-o'} 문자열을 그래프가 덮어썼다: ` + raw;
+      const opt = BY_ID[k.opensFrom.option];
+      ui.fmtWarn = `읽지 못한 ${opt.short || opt.flag} 문자열을 그래프가 덮어썼다: ` + raw;
     }
     k.adopt(state, built);
   }
@@ -1767,12 +1849,20 @@ function importCommand(text) {
     Object.assign(valuesOf(n), picked[sid]);
   }
 
-  // -f 값도 서브그래프로 풀어 둔다. 못 읽으면 문자열 그대로 두고 알린다.
-  const fmt = picked.format && picked.format.format;
-  if (fmt) {
-    try { state.format = treeToGraph(parseFormat(fmt), { nid, nodeW: NODE_W }); }
-    catch (e) { ui.fmtWarn = `-f "${fmt}" 는 서브그래프로 못 읽었다 (${e.message}) — 문자열 그대로 둔다`; }
+  // 값이 그 자체로 문법인 옵션들은 서브그래프로도 풀어 둔다.
+  // 못 읽으면 문자열은 그대로 두고 알린다.
+  const warns = [];
+  for (const k of allGraphKinds()) {
+    if (!k.opensFrom) continue;
+    const opt = BY_ID[k.opensFrom.option];
+    const raw = picked[opt.stage] && picked[opt.stage][opt.id];
+    if (!raw) continue;
+    try { k.adopt(state, k.fromString(raw, { nid, nodeW: NODE_W, widthOf: widthOfType })); }
+    catch (e) {
+      warns.push(`${opt.short || opt.flag} "${raw}" 는 서브그래프로 못 읽었다 (${e.message})`);
+    }
   }
+  if (warns.length) ui.fmtWarn = warns.join(' · ') + ' — 문자열 그대로 둔다';
 
   autowire();
   autolayout();
@@ -1791,7 +1881,8 @@ const snap = () => snapshot(state, seq, ui.mode);
 function adoptSnapshot(data) {
   const r = restore(data, {
     subgraphs: [{ key: 'format', root: FOUT, blank: blankFormat },
-                { key: 'output', root: OOUT, blank: blankOutput }],
+                { key: 'output', root: OOUT, blank: blankOutput },
+                { key: 'paths',  root: POUT, blank: blankPaths }],
     isValidStage: s => !!STAGE[s],
   });
   if (!r) return false;
@@ -1877,6 +1968,7 @@ window.__yt = {
   addFormatNode,
   formatExpr: () => fmtExpr(),
   outExpr: () => outExpr(),
+  pathExpr: () => pathExpr(),
   commandString: () => commandString(state),
   confString: () => confString(state),
   parseFormat,
