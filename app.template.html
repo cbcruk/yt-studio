@@ -497,9 +497,9 @@ function resetState() {
 }
 resetState();
 
-/** 지금 편집 중인 그래프. 파이프라인이거나 포맷 서브그래프거나. */
-const graph = () => ui.mode === 'format' ? state.format : state;
-const inFormat = () => ui.mode === 'format';
+/** 지금 편집 중인 그래프와 그 종류. 차이는 전부 ui/graph-kinds.js 가 안다. */
+const KIND = () => graphKind(ui.mode);
+const graph = () => KIND().graphOf(state);
 
 const nid = () => 'n' + (seq++);
 const nodeList = (g = graph()) => Object.values(g.nodes);
@@ -518,16 +518,16 @@ const setCount = n => badgeOf(n);
 // 원시 연산은 core/graph.js, 의미론은 core/pipeline.js · core/format-graph.js.
 // 여기 남는 건 "지금 어느 모드냐"를 아는 얇은 층뿐이다.
 
-/** 현재 모드에서 살아 있는 노드. 파이프라인은 src→out, 포맷은 fout 도달성. */
-const liveIds = () => inFormat() ? formatLive(state.format) : pipelineLive(state);
+/** 살아 있는 노드 — "결과에 기여하는가"의 정의는 그래프 종류가 갖는다. */
+const liveIds = () => KIND().live(graph());
 
-/** -f 출력은 표현식 하나만 받는다. */
-const EXCLUSIVE_IN = new Set([FOUT]);
-const wire = (from, to, g = graph()) => connect(g, from, to, { exclusiveIn: EXCLUSIVE_IN });
+/** 입력을 하나만 받는 노드도 종류마다 다르다 (-f 출력은 표현식 하나). */
+const exclusiveIn = () => new Set(KIND().exclusiveIn);
+const wire = (from, to, g = graph()) => connect(g, from, to, { exclusiveIn: exclusiveIn() });
 const unwire = (from, to, g = graph()) => disconnect(g, from, to);
 
 function dropNode(id, g = graph()) {
-  const ok = removeNode(g, id, { protectedIds: PROTECTED, exclusiveIn: EXCLUSIVE_IN });
+  const ok = removeNode(g, id, { protectedIds: PROTECTED, exclusiveIn: exclusiveIn() });
   if (!ok) return false;
   if (ui.sel === id) ui.sel = null;
   if (ui.picker && ui.picker.node === id) ui.picker = null;
@@ -600,11 +600,12 @@ function renderWires() {
   layer.innerHTML = '';
 
   // 연산자 노드는 입력 순서가 의미를 가지므로 와이어에 번호를 붙인다.
+  // 피연산자 순서가 의미를 갖는 그래프에서만 와이어에 번호를 붙인다.
   const ordinal = {};
-  if (inFormat()) {
+  if (KIND().wireOrdinals) {
     for (const n of nodeList(g)) {
       if (!FOP_TYPES.includes(n.type)) continue;
-      operands(g, n.id).forEach((k, i) => { ordinal[k.id + '>' + n.id] = i + 1; });
+      KIND().operandsOf(g, n.id).forEach((k, i) => { ordinal[k.id + '>' + n.id] = i + 1; });
     }
   }
 
@@ -678,13 +679,15 @@ function optRow(n, o) {
   top.innerHTML = `<span class="row-flag">${o.flag}`
     + (o.short ? ` <span class="short">${o.short}</span>` : '') + `</span>`;
 
-  // -f 는 그 자체가 표현식이다. 서브그래프로 들어가는 문을 여기 단다.
-  if (o.id === 'format') {
-    const sub = document.createElement('button');
-    sub.className = 'row-sub'; sub.type = 'button'; sub.textContent = '그래프 ↗';
-    sub.title = '포맷 셀렉터를 노드 서브그래프로 편집한다';
-    sub.onclick = ev => { ev.stopPropagation(); enterFormat(); };
-    top.append(sub);
+  // 값이 그 자체로 표현식인 옵션에는 서브그래프로 들어가는 문이 달린다.
+  const sub = subgraphFor(o.id);
+  if (sub) {
+    const b = document.createElement('button');
+    b.className = 'row-sub'; b.type = 'button';
+    b.textContent = sub.opensFrom.label;
+    b.title = sub.opensFrom.title;
+    b.onclick = ev => { ev.stopPropagation(); enterSubgraph(sub.id); };
+    top.append(b);
   }
 
   const x = document.createElement('button');
@@ -1048,27 +1051,17 @@ function renderNodes() {
   for (const n of nodeList()) layer.append(nodeEl(n, live));
 
   const hint = $('#hint');
-  if (inFormat()) {
-    const bare = nodeList().length <= 1;
-    hint.hidden = !bare;
-    hint.innerHTML = '<div>포맷 셀렉터 서브그래프가 비어 있다.<br>왼쪽에서 <b>스트림</b>을 놓고 <b>-f 출력</b>에 이어라.<br>'
-      + '<b>병합 +</b> 로 영상·음성을 합치고, <b>폴백 /</b> 로 대안을 준다.</div>';
-  } else {
-    hint.hidden = nodeList().some(n => n.type === 'stage');
-    hint.innerHTML = '<div>캔버스가 비어 있다.<br>왼쪽 <b>실행 단계</b>를 끌어다 놓고 <b>소스 → 명령어</b> 사이에 이어라.<br>'
-      + '또는 위의 <b>명령어 읽기</b>로 기존 명령어를 그래프로 되돌려라.</div>';
-  }
+  hint.hidden = !KIND().isEmpty(graph());
+  hint.innerHTML = `<div>${KIND().emptyHint}</div>`;
 }
 
 function renderPalette() {
   const list = $('#pal-list');
   const mode = ui.mode;
   list.innerHTML = '';
-  $('#pal-head').textContent = inFormat() ? '포맷 노드' : '실행 단계';
-  $('#pal-hint').innerHTML = inFormat()
-    ? '<b>-f 출력</b>에 이어진 것만 표현식이 된다. 연산자 노드의 입력 순서는 <b>세로 위치</b>를 따른다.'
-    : '캔버스로 끌어다 놓거나 클릭해서 노드를 만든다. 소스에서 명령어까지 <b>이어진 노드만</b> 결과에 들어간다.';
-  $('#autowire').hidden = inFormat();
+  $('#pal-head').textContent = KIND().palette.head;
+  $('#pal-hint').innerHTML = KIND().palette.hint;
+  $('#autowire').hidden = !KIND().canAutowire;
 
   // 항목도, 표기도, 색도 전부 레지스트리에서 나온다.
   for (const item of paletteItems(mode, STAGES)) {
@@ -1103,7 +1096,7 @@ function highlight(text, terms) {
 function renderHits() {
   const box = $('#hits');
   const q = $('#q').value;
-  const hits = inFormat() ? null : search(q);
+  const hits = KIND().search ? search(q) : null;
   if (!hits) { box.hidden = true; box.innerHTML = ''; return; }
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean).flatMap(expand);
   box.hidden = false;
@@ -1155,36 +1148,24 @@ function renderCmd() {
   if (ui.unknown.length) parts.push('<b>읽지 못한 토큰:</b> ' + ui.unknown.map(escapeHtml).join(' · '));
   if (ui.fmtWarn) parts.push('<b>' + escapeHtml(ui.fmtWarn) + '</b>');
 
-  if (inFormat()) {
-    const issues = fmtIssues();
-    parts.push(issues.length
-      ? '<b>서브그래프:</b> ' + issues.map(escapeHtml).join(' · ')
-      : '포맷 서브그래프 편집 중 · -f 값은 그래프가 컴파일한 결과로 계속 덮어쓴다');
-  } else {
-    const live = liveIds();
-    const bypassed = nodeList(state).filter(x => x.type === 'stage' && !live.has(x.id));
-    if (toks.length) {
-      parts.push(toks.length + '개 옵션 · ' + new Set(toks.map(t => t.node)).size + '개 노드 · 플래그 순서는 그래프 순서를 따른다');
-    } else if (!ui.unknown.length) {
-      parts.push('아직 잡힌 옵션이 없다. 왼쪽 단계를 캔버스에 놓고 소스 → 명령어로 이어라.');
-    }
-    if (bypassed.length) {
-      parts.push('<b>우회 중:</b> ' + bypassed.map(x => '[' + x.stage + ']').join(' ') + ' — 경로에서 끊겨 있어 반영되지 않는다');
-    }
+  // 무엇을 보고할지는 그래프 종류가 안다. 본문은 사용자 문자열일 수 있으니 이스케이프한다.
+  for (const note of KIND().statusNotes(graph(), { tokens: toks, unknown: ui.unknown })) {
+    parts.push((note.label ? `<b>${escapeHtml(note.label)}:</b> ` : '') + escapeHtml(note.body));
   }
   n.innerHTML = parts.join(' · ');
 }
 
 function renderCrumb() {
+  const k = KIND();
   const c = $('#crumb');
-  c.hidden = !inFormat();
-  $('#field-q').hidden = inFormat();
-  $('#viewport').classList.toggle('sub', inFormat());
-  if (inFormat()) {
-    c.style.setProperty('--fmt', ACCENT.format);
-    const e = fmtExpr();
-    $('#crumb-expr').textContent = e ? '· ' + e : '';
-  }
+  c.hidden = !k.chrome.crumb;
+  $('#field-q').hidden = !k.search;
+  $('#viewport').classList.toggle('sub', !!k.chrome.sub);
+  if (!k.chrome.crumb) return;
+  c.style.setProperty('--fmt', ACCENT.format);
+  c.querySelector('.here').firstChild.textContent = k.label + ' ';
+  const detail = k.crumbDetail ? k.crumbDetail(state) : '';
+  $('#crumb-expr').textContent = detail ? '· ' + detail : '';
 }
 
 function paintLit() {
@@ -1192,7 +1173,7 @@ function paintLit() {
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
   for (const el of document.querySelectorAll('.row'))
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
-  const holder = ui.lit && !inFormat() ? stageOf(BY_ID[ui.lit].stage) : null;
+  const holder = ui.lit ? KIND().holderOf(state, ui.lit) : null;
   for (const el of document.querySelectorAll('.node'))
     el.classList.toggle('lit', !!holder && el.dataset.id === holder.id);
 }
@@ -1203,12 +1184,7 @@ function paintSel() {
 
 /** 텍스트 입력 중에는 노드를 다시 그리지 않는다 — 포커스가 날아간다. */
 function renderAfterEdit() {
-  if (inFormat()) {
-    syncFormatValue();
-    const e = $('#fout-expr');
-    if (e) e.textContent = fmtExpr();
-    $('#crumb-expr').textContent = fmtExpr() ? '· ' + fmtExpr() : '';
-  }
+  KIND().onEdit();
   renderCmd(); renderPalette(); renderWires();
   for (const el of document.querySelectorAll('.node')) {
     const n = graph().nodes[el.dataset.id];
@@ -1218,15 +1194,60 @@ function renderAfterEdit() {
   save();
 }
 function render() {
-  if (inFormat()) syncFormatValue();
+  KIND().sync();
   renderCrumb(); renderNodes(); renderWires(); renderCmd(); renderPalette(); applyView(); save();
 }
+
+/* ══ 그래프 종류의 DOM 쪽 동작 ═══════════════
+   선언은 ui/graph-kinds.js 에 있고, 캔버스를 실제로 만지는 일만 여기서 얹는다. */
+
+defineGraphBehavior('pipeline', {
+  sync() {},                       // 파이프라인은 자기가 원본이라 되돌릴 곳이 없다
+  onEdit() {},
+  relayout() {
+    chainLayout(state, livePath(state), { nodeW: NODE_W });
+    fitView(); render();
+  },
+});
+
+defineGraphBehavior('format', {
+  // 그래프를 고칠 때마다 컴파일해 --format 문자열로 돌려놓는다.
+  sync() { syncFormatValue(); },
+  onEdit() {
+    syncFormatValue();
+    const e = $('#fout-expr');
+    if (e) e.textContent = fmtExpr();
+    const detail = fmtExpr();
+    $('#crumb-expr').textContent = detail ? '· ' + detail : '';
+  },
+  relayout() {
+    const g = graph();
+    // 표현식은 트리다. 컴파일한 결과를 다시 펼치면 그게 곧 정돈된 배치다.
+    const fresh = treeToGraph(graphToTree(g), { nid, nodeW: NODE_W });
+    // 트리에 안 잡힌(끊긴) 노드는 아래쪽에 남겨 둔다.
+    const orphans = orphansOf(g, FOUT);
+    const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
+    orphans.forEach((n, i) => { n.x = i * (NODE_W + 90); n.y = maxY + 190; fresh.nodes[n.id] = n; });
+    const dead = new Set(orphans.map(n => n.id));
+    for (const e of g.edges)
+      if (fresh.nodes[e.from] && fresh.nodes[e.to] && dead.has(e.from)
+          && !hasEdge(fresh, e.from, e.to)) fresh.edges.push(e);
+    fresh.view = g.view;
+    delete fresh._tidy;
+    state.format = fresh;
+    view = state.format.view;
+    render();            // 실측하려면 일단 그려야 한다
+    tidyFormat();
+    render();
+    fitView();
+  },
+});
 
 /* ══ 모드 전환 ═══════════════════════════════ */
 function setMode(m) {
   if (m === ui.mode) return;
   ui.mode = m;
-  view = (m === 'format' ? state.format.view : state.view);
+  view = KIND().viewOf(state);
   ui.sel = null; ui.picker = null; ui.lit = null;
   $('#hits').hidden = true;
   render();
@@ -1234,7 +1255,8 @@ function setMode(m) {
 
 /** --format 문자열을 서브그래프로 풀어 놓고 들어간다.
  *  이미 같은 값을 만들어 내는 그래프가 있으면 배치를 그대로 재사용한다. */
-function enterFormat() {
+function enterSubgraph(kind) {
+  if (kind !== 'format') return;   // 지금은 포맷만 서브그래프를 갖는다
   const holder = stageOf('format');
   const raw = holder ? String(valuesOf(holder).format ?? '') : '';
   ui.fmtWarn = '';
@@ -1271,33 +1293,11 @@ function centerSpot() {
     (r.height / 2 - view.y) / view.k - 60);
 }
 function autolayout() {
-  const g = graph();
-  if (inFormat()) {
-    // 표현식은 트리다. 컴파일한 결과를 다시 펼치면 그게 곧 정돈된 배치다.
-    const fresh = treeToGraph(graphToTree(state.format), { nid, nodeW: NODE_W });
-    // 트리에 안 잡힌(끊긴) 노드는 아래쪽에 남겨 둔다.
-    const orphans = orphansOf(g, FOUT);
-    const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
-    orphans.forEach((n, i) => { n.x = i * (NODE_W + 90); n.y = maxY + 190; fresh.nodes[n.id] = n; });
-    const dead = new Set(orphans.map(n => n.id));
-    for (const e of g.edges)
-      if (fresh.nodes[e.from] && fresh.nodes[e.to] && dead.has(e.from)
-          && !hasEdge(fresh, e.from, e.to)) fresh.edges.push(e);
-    fresh.view = g.view;
-    delete fresh._tidy;
-    state.format = fresh;
-    view = state.format.view;
-    render();            // 실측하려면 일단 그려야 한다
-    tidyFormat();
-    render();
-    fitView();
-    return;
-  }
-  chainLayout(g, livePath(state), { nodeW: NODE_W });
-  fitView(); render();
+  KIND().relayout();
 }
+
 function autowire() {
-  if (inFormat()) return;
+  if (!KIND().canAutowire) return;
   const chain = ['src',
     ...nodeList(state).filter(n => n.type === 'stage')
       .sort((a, b) => stageIdx(a.stage) - stageIdx(b.stage)).map(n => n.id),
@@ -1539,7 +1539,7 @@ function adoptSnapshot(data) {
   const r = restore(data, { blankFormat, isValidStage: s => !!STAGE[s] });
   if (!r) return false;
   state = r.state; seq = r.seq; ui.mode = r.mode;
-  view = ui.mode === 'format' ? state.format.view : state.view;
+  view = KIND().viewOf(state);
   ui.unknown = []; ui.sel = null; ui.picker = null; ui.fmtWarn = '';
   return true;
 }
@@ -1574,11 +1574,11 @@ $('#pal-toggle').onclick = () => $('#palette').classList.toggle('open');
 
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-  if (e.key === '/' && !typing && !inFormat()) { e.preventDefault(); $('#q').focus(); }
+  if (e.key === '/' && !typing && KIND().search) { e.preventDefault(); $('#q').focus(); }
   if (e.key === 'Escape') {
     if (ui.picker) { ui.picker = null; render(); }
     else if (ui.sel) { ui.sel = null; paintSel(); }
-    else if (inFormat()) setMode('pipeline');
+    else if (KIND().parent) setMode(KIND().parent);
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && ui.sel) {
     e.preventDefault(); dropNode(ui.sel); render();

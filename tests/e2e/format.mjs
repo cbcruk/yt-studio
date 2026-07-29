@@ -37,6 +37,15 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     return kinds + ' → ' + await expr();
   });
 
+  await step('브레드크럼 문구가 서술자에서 나온다', async () => {
+    const here = (await p.textContent('#crumb .here')).replace(/\s+/g, ' ').trim();
+    assert(here.startsWith('[format] 포맷 셀렉터'), '브레드크럼: ' + here);
+    assert(here.includes('bv*[height<=720]+ba'), '표현식이 안 붙었다: ' + here);
+    assert(await p.locator('#field-q').isHidden(), '서브그래프에서 검색이 살아 있다');
+    assert(await p.locator('#autowire').isHidden(), '서브그래프에서 전부 잇기가 살아 있다');
+    return here;
+  });
+
   await step('스트림 노드에 셀렉터·필터 UI가 붙는다', async () => {
     const streams = p.locator('.node').filter({ hasText: '[stream]' });
     assert(await streams.count() === 2, `스트림 노드 ${await streams.count()}개`);
