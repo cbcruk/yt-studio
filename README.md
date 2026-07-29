@@ -108,7 +108,7 @@ app.template.html    캔버스 · 렌더 · 포인터 · 배선
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
 tests/unit/          브라우저 없이 도는 56종
-tests/e2e/           실제로 조작해 보는 42종
+tests/e2e/           실제로 조작해 보는 47종
 ```
 
 **번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
@@ -119,6 +119,11 @@ tests/e2e/           실제로 조작해 보는 42종
 **노드 종류를 추가하려면** `src/ui/node-kinds.js` 에 `defineKind` 한 줄,
 본문을 그린다면 `defineBody` 한 줄이면 된다. 색·표기·포트 유무·배지·팔레트
 노출은 전부 그 표에서 나온다.
+
+**렌더는 경로가 하나다.** `render()` 가 노드를 id 로 짝지어 제자리에서 교체하고,
+컨트롤의 `data-ctl` 로 포커스와 캐럿을 되돌려 놓는다. 예외는 하나, IME 가 음절을
+만드는 동안(`compositionstart`~`compositionend`)에는 그 노드를 비켜 간다 — 조합
+중에 DOM 을 갈아엎으면 한글이 깨지기 때문이다.
 
 **그래프 종류를 추가하려면**(예: `-o` 출력 템플릿을 서브그래프로) `graph-kinds.js`
 에 `defineGraph` 한 항목이면 된다. "무엇이 살아 있는가"(`live`), 순서(`order`),
