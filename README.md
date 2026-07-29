@@ -103,11 +103,12 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   persist.js         스냅샷 · 복원 · 마이그레이션
 src/ui/
   node-kinds.js      노드 종류 레지스트리
+  graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷)
 app.template.html    캔버스 · 렌더 · 포인터 · 배선
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
-tests/unit/          브라우저 없이 도는 43종
-tests/e2e/           실제로 조작해 보는 41종
+tests/unit/          브라우저 없이 도는 56종
+tests/e2e/           실제로 조작해 보는 42종
 ```
 
 **번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
@@ -118,6 +119,12 @@ tests/e2e/           실제로 조작해 보는 41종
 **노드 종류를 추가하려면** `src/ui/node-kinds.js` 에 `defineKind` 한 줄,
 본문을 그린다면 `defineBody` 한 줄이면 된다. 색·표기·포트 유무·배지·팔레트
 노출은 전부 그 표에서 나온다.
+
+**그래프 종류를 추가하려면**(예: `-o` 출력 템플릿을 서브그래프로) `graph-kinds.js`
+에 `defineGraph` 한 항목이면 된다. "무엇이 살아 있는가"(`live`), 순서(`order`),
+팔레트 문구, 하단 노트, 어느 옵션 행에서 열리는가(`opensFrom`)를 선언하고,
+캔버스를 실제로 만지는 일(`sync`·`onEdit`·`relayout`)만 `defineGraphBehavior`
+로 얹는다. 렌더 쪽은 손댈 것이 없다 — 전부 `KIND().…` 를 탄다.
 
 스키마는 help 텍스트를 긁는 게 아니라 옵션 객체를 직접 읽는다. yt-dlp를 올리면
 스키마도 따라 올라간다. 릴리스마다 재실행할 것:
