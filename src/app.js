@@ -801,7 +801,7 @@ document.addEventListener('pointerdown', e => {
 }, true);
 
 $('#reset').onclick = () => {
-  if (!confirm('파이프라인과 포맷 서브그래프를 전부 지운다. 계속할까?')) return;
+  if (!confirm('파이프라인과 서브그래프 셋을 전부 지운다. 계속할까?')) return;
   resetState(); render(); fitView();
 };
 $('#import').onclick = () => $('#dlg-import').showModal();

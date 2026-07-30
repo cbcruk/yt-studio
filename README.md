@@ -105,9 +105,14 @@ uploader   /      title              .       ext        chapter: …
 -P home:/mnt/media/videos   -P temp:/var/tmp/yt-dlp   -P subtitle:/mnt/media/subs
 ```
 
-그래서 이 서브그래프는 수열도 트리도 아닌 **집합**이다. 항목마다 `-P` 가
-하나씩 붙는다. `TYPES` 가 키라 순서에 뜻이 없지만, 결과가 흔들리지 않게 세로
-위치로 안정된 순서를 준다. 같은 종류를 두 번 주면 아래쪽 것만 쓰인다고 알려 준다.
+| 노드 | 하는 일 |
+|---|---|
+| `[path]` | 종류(`home`, `temp`, `subtitle` …) + 경로 하나 |
+| `[paths]` | `-P` 출력. 여기 이어진 항목마다 `-P` 가 하나씩 붙는다 |
+
+그래서 이 서브그래프는 수열도 트리도 아닌 **집합**이다. `TYPES` 가 키라 순서에
+뜻이 없지만, 결과가 흔들리지 않게 세로 위치로 안정된 순서를 준다. 같은 종류를
+두 번 주면 아래쪽 것만 쓰인다고 알려 준다.
 
 `home` 은 최종 파일이 놓일 곳, `temp` 는 받는 동안 쓰는 폴더다. 나머지 `TYPES`
 는 `-o` 와 같다. 여기서도 아는 `TYPES:` 만 잘라 내므로 `C:/dl/videos` 를
@@ -145,7 +150,7 @@ uploader   /      title              .       ext        chapter: …
 src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   schema.js          색인 · 검색 · KO 사전
   schema-data.js     개발은 JSON import, 배포는 빌드가 값으로 갈아 끼운다
-  graph.js           adjacency · reach · connect · removeNode · topoOrder
+  graph.js           adjacency · reach · connect · removeNode · topoOrder · 노드 밭 접근자
   format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
   format-graph.js    트리 ↔ 그래프 · 문제 진단
   output-template.js -o 파서 · 컴파일러 · 필드/변환 어휘
@@ -161,7 +166,7 @@ src/ui/
   chrome.js          캔버스 밖 화면 (팔레트 · 검색 · 명령어 · 브레드크럼)
   tpl.js             lit-html 어댑터 — 배포는 vendor 번들로 갈아 끼운다
   dom.js             $ 하나. 두 곳에서 선언하면 빌드가 막으므로 파일로 둔다
-src/app.js           캔버스 · 렌더 · 포인터 · 배선
+src/app.js           캔버스(노드 · 와이어) · 포인터 · 배선 · 상태
 src/app.css          스타일 전부
 vendor/              lit-html 을 미리 구워 둔 것 (vendor/README.md)
 index.html           개발 진입점이자 배포 템플릿 — 하나만 둔다
@@ -171,6 +176,8 @@ build.py             모듈을 이어 붙이고 스키마를 인라인해 단일
 tests/unit/          브라우저 없이 도는 102종
 tests/dev-smoke.mjs  개발 서버가 뜨고 조용한지 9종
 tests/e2e/           실제로 조작해 보는 75종
+tests/run.mjs        굽고(build.py) 그 산출물로 e2e 를 돌린다
+tests/harness.mjs    브라우저 띄우기 · 콘솔 에러 수집 · dialog 응답
 ```
 
 **같은 `index.html` 이 두 가지로 쓰인다.**
@@ -181,13 +188,18 @@ tests/e2e/           실제로 조작해 보는 75종
 | 배포 (`npm run build`) | `build.py` 가 인라인 | 빌드가 값으로 갈아 끼운다 |
 
 경로가 둘이면 **서로 다르게 깨진다.** 새 모듈을 `build.py` 의 `MODULES` 에 안 적으면
-배포만 깨지고, `app.js` 가 `import` 없이 심볼을 쓰면 개발만 깨진다(배포는 한 스코프로
-합쳐서 돌아가므로 안 걸린다). 앞은 빌드가, 뒤는 `npm run test:dev` 가 잡는다.
+배포만 깨지고, 어느 모듈이든 `import` 없이 심볼을 쓰면 개발만 깨진다(배포는 한
+스코프로 합쳐서 돌아가므로 안 걸린다). 앞은 빌드가, 뒤는 `npm run test:dev` 가 잡는다.
 
 **번들러는 쓰지 않는다.** 모듈끼리 순환이 없고 최상위 이름이 겹치지 않으므로,
 `build.py` 가 의존 순서대로 이어 붙이며 `import`/`export` 만 걷어낸다. 이름이
 겹치면 빌드가 막는다. 덕분에 소스는 진짜 ES 모듈로 남아 `node --test` 로 돌고,
 산출물은 의존성 0 의 HTML 한 장으로 남는다.
+
+이 규칙이 소스 모양을 정하는 자리가 셋 있다. `$` 가 `ui/dom.js` 라는 한 줄짜리
+파일로 있는 것, `bodies.js` 와 `chrome.js` 가 앱에서 받은 것을 `UI`·`uiState`
+처럼 서로 다른 이름에 담는 것(`app.js` 에 `ui` 가 있다), 그리고 재수출
+(`export { … }`)을 안 쓰는 것. 셋 다 어기면 빌드가 막는다.
 
 **템플릿 엔진은 lit-html 이다.** 노드 하나가 통째로 태그드 템플릿이고, 본문과 틀은
 DOM 을 만들지 않고 템플릿을 돌려준다. 개발은 `lit-html` 을 그대로 import 하고, 배포는
@@ -237,7 +249,11 @@ UI 가 브라우저 없이 단위 테스트되기 시작했다. 산출물을 줄
 에 `defineGraph` 한 항목이면 된다. "무엇이 살아 있는가"(`live`), 순서(`order`),
 팔레트 문구, 하단 노트, 어느 옵션 행에서 열리는가(`opensFrom`)를 선언하고,
 캔버스를 실제로 만지는 일(`sync`·`relayout`)만 `defineGraphBehavior`
-로 얹는다. 렌더 쪽은 손댈 것이 없다 — 전부 `KIND().…` 를 탄다.
+로 얹는다. 렌더 쪽은 손댈 것이 없다 — 전부 "지금 그래프 종류"를 물어서 탄다.
+
+**e2e 는 `window.__yt` 하나만 잡는다.** 상태·렌더·연결·컴파일 결과를 그 객체로
+내보내고, 테스트는 내부 함수 이름을 모른다. 렌더를 통째로 갈거나 모듈을 쪼개도
+테스트가 리팩터링의 브레이크로 남는다 — 시그니처가 바뀌면 손잡이 안에서 흡수한다.
 
 스키마는 help 텍스트를 긁는 게 아니라 옵션 객체를 직접 읽는다. yt-dlp를 올리면
 스키마도 따라 올라간다. 릴리스마다 재실행할 것:
@@ -251,7 +267,7 @@ python build.py
 손으로 정한 건 세 군데뿐이다. `gen_schema.py`의 **optparse 그룹 → 생애주기 단계**
 매핑(16 → 9)과 **`KIND_OVERRIDE`**(introspection 이 못 보는 누적 옵션), 그리고
 `src/core/schema.js`의 **한국어 의도 → yt-dlp 어휘** 사전(`KO`).
-후자가 이 도구의 실제 부가가치다. "자막", "403", "이어받기" 같은 말로 검색이
+마지막 것이 이 도구의 실제 부가가치다. "자막", "403", "이어받기" 같은 말로 검색이
 걸리게 하는 층은 introspection이 절대 못 준다. 안 걸리는 말이 나오면 계속 채울 것.
 
 ## 알려진 제약

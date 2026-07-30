@@ -78,7 +78,7 @@
 <dialog id="dlg-import">
   <form method="dialog" class="dlg">
     <h3>명령어 읽기</h3>
-    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. <code>-f</code> 값은 포맷 서브그래프로도 풀어 놓는다. 모르는 플래그는 아래 노트에 남는다.</p>
+    <p>어디선가 주운 yt-dlp 명령어를 붙여넣으면 플래그가 속한 단계 노드를 만들고 소스 → 명령어로 이어 붙인다. <code>-f</code> · <code>-o</code> · <code>-P</code> 값은 서브그래프로도 풀어 놓는다. 모르는 플래그는 아래 노트에 남는다.</p>
     <textarea id="paste" spellcheck="false" placeholder='yt-dlp -f "bv*[height&lt;=1080]+ba/b" --embed-subs --sub-langs ko,en -o "%(title)s.%(ext)s" https://...'></textarea>
     <div class="dlg-act">
       <button class="btn" value="cancel">취소</button>
@@ -90,7 +90,7 @@
 <dialog id="dlg-graph">
   <form method="dialog" class="dlg">
     <h3>그래프 JSON</h3>
-    <p>파이프라인과 포맷 서브그래프를 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
+    <p>파이프라인과 서브그래프 셋(포맷 · 출력 템플릿 · 저장 경로)을 통째로 주고받는다. 붙여넣고 <b>불러오기</b>를 누르면 현재 그래프를 덮어쓴다.</p>
     <textarea id="graph-text" spellcheck="false"></textarea>
     <div class="dlg-act">
       <button class="btn" value="cancel">닫기</button>
