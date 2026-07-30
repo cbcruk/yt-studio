@@ -157,15 +157,16 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
 src/ui/
   node-kinds.js      노드 종류 레지스트리
   graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
+  bodies.js          노드 본문 템플릿 13종 — 앱에서 다섯 가지만 받아 온다
+  tpl.js             lit-html 어댑터 — 배포는 vendor 번들로 갈아 끼운다
 src/app.js           캔버스 · 렌더 · 포인터 · 배선
 src/app.css          스타일 전부
-src/ui/tpl.js        lit-html 어댑터 — 배포는 vendor 번들로 갈아 끼운다
 vendor/              lit-html 을 미리 구워 둔 것 (vendor/README.md)
 index.html           개발 진입점이자 배포 템플릿 — 하나만 둔다
 vite.config.js       개발 서버만. 배포는 build.py 가 만든다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
-tests/unit/          브라우저 없이 도는 88종
+tests/unit/          브라우저 없이 도는 93종
 tests/dev-smoke.mjs  개발 서버가 뜨고 조용한지 9종
 tests/e2e/           실제로 조작해 보는 75종
 ```
@@ -188,8 +189,8 @@ tests/e2e/           실제로 조작해 보는 75종
 
 **템플릿 엔진은 lit-html 이다.** 노드 하나가 통째로 태그드 템플릿이고, 본문은
 DOM 을 만들지 않고 템플릿을 돌려준다. 손으로 `createElement` 를 부르던 시절보다
-`app.js` 가 230줄 짧고 산출물도 6KB 작다(lit 을 넣고도 — 손으로 짓던 코드가 그만큼
-더 컸다). 개발은 `lit-html` 을 그대로 import 하고, 배포는 `build.py` 가
+코드가 230줄 짧고 산출물도 6KB 작다(lit 을 넣고도 — 손으로 짓던 코드가 그만큼 더
+컸다). 개발은 `lit-html` 을 그대로 import 하고, 배포는 `build.py` 가
 `src/ui/tpl.js` 자리에 미리 구워 둔 `vendor/lit-html.iife.js` 를 끼워 넣는다(그래서
 배포 빌드는 여전히 파이썬만으로 돈다).
 
@@ -199,8 +200,14 @@ DOM 을 만들지 않고 템플릿을 돌려준다. 손으로 `createElement` �
 결과만 보는 검사로는 안 걸려서, e2e 가 **보이는 값**을 직접 읽는다.
 
 **노드 종류를 추가하려면** `src/ui/node-kinds.js` 에 `defineKind` 한 줄,
-본문을 그린다면 `defineBody` 한 줄이면 된다. 색·표기·포트 유무·배지·팔레트
-노출은 전부 그 표에서 나온다.
+본문을 그린다면 `src/ui/bodies.js` 에 `defineBody` 한 줄이면 된다. 색·표기·포트
+유무·배지·팔레트 노출은 전부 그 표에서 나온다.
+
+**본문은 앱을 거의 모른다.** `bodies.js` 는 노드를 받아 템플릿을 돌려주는 함수들이고,
+어휘·문법·컴파일러는 `core/` 에서 직접 가져다 쓴다. 앱에서 받아 오는 것은
+`installBodies` 로 넘기는 다섯 가지뿐이다 — 지금 상태(게터, 앱이 다시 대입하므로),
+편집 중인 UI 상태, `render`, 서브그래프 문, 옵션 강조. 그래서 `app.js` 에는 캔버스와
+포인터와 배선만 남았다.
 
 **렌더는 경로가 하나고, 예외가 없다.** `render()` 는 노드 전체를 id 로 키를 잡아
 (`repeat`) 다시 그린다. lit 이 같은 DOM 을 재사용하므로 포커스도, 캐럿도, IME 가

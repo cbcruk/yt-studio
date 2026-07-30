@@ -40,6 +40,7 @@ MODULES = [
     "src/ui/tpl.js",              # 빌드가 vendor/lit-html.iife.js 로 갈아 끼운다
     "src/ui/node-kinds.js",
     "src/ui/graph-kinds.js",
+    "src/ui/bodies.js",
     "src/app.js",
 ]
 
@@ -51,8 +52,43 @@ EXPORT_RE = re.compile(r"^export\s+(?=(?:const|let|var|function|async|class)\b)"
 # `export { a, b }` 같은 재수출은 쓰지 않는다. 남아 있으면 잡아낸다.
 BAD_EXPORT_RE = re.compile(r"^export\s*[{*]", re.M)
 
-# 한 스코프로 합치므로 최상위 이름이 겹치면 조용히 덮어쓴다. 미리 막는다.
-DECL_RE = re.compile(r"^(?:export\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)", re.M)
+# 한 스코프로 합치므로 최상위 이름이 겹치면 깨진다. 미리 막는다.
+DECL_RE = re.compile(r"^(?:export\s+)?(const|let|var|function|class)\s+", re.M)
+IDENT_RE = re.compile(r"\*?\s*([A-Za-z_$][\w$]*)")
+
+
+def top_level_names(src: str) -> list[str]:
+    """들여쓰기 없는 선언의 이름들.
+
+    `const a = 1, b = 2;` 처럼 한 줄에 여럿 선언하는 경우까지 본다. 예전에는
+    `let` 뒤 첫 이름만 봤는데, 그 뒤에 숨은 이름이 다른 모듈과 겹쳐도 통과했다.
+    """
+    names = []
+    for m in DECL_RE.finditer(src):
+        rest = src[m.end():]
+        if m.group(1) in ("function", "class"):
+            hit = IDENT_RE.match(rest)
+            if hit:
+                names.append(hit.group(1))
+            continue
+        # 선언문 끝까지 잘라 깊이 0 의 쉼표로 나눈다 — 그게 선언자 경계다.
+        depth, buf, parts = 0, "", []
+        for ch in rest.split(";")[0]:
+            if ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                depth -= 1
+            if ch == "," and depth == 0:
+                parts.append(buf)
+                buf = ""
+            else:
+                buf += ch
+        parts.append(buf)
+        for part in parts:
+            hit = IDENT_RE.match(part)
+            if hit:
+                names.append(hit.group(1))
+    return names
 
 
 def strip_module(path: pathlib.Path) -> str:
@@ -103,7 +139,7 @@ def main() -> None:
                           "\n      nothing = __lit.nothing, repeat = __lit.repeat;")
         else:
             body = strip_module(path)
-        for name in DECL_RE.findall(path.read_text(encoding="utf-8")):
+        for name in top_level_names(path.read_text(encoding="utf-8")):
             if name in seen:
                 raise SystemExit(f"최상위 이름 충돌: {name} ({seen[name]} ↔ {rel})")
             seen[name] = rel

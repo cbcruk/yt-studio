@@ -5,6 +5,14 @@
  * "무엇이 살아 있는가 / 어떤 순서인가" 같은 의미론은 도메인이 얹는다.
  */
 
+/* ── 노드가 늦게 들고 오는 밭 ────────────────
+   저장물에는 빈 표가 안 들어 있다. 처음 읽을 때 만들어 준다. */
+
+/** 단계 노드가 고른 옵션 값 표. */
+export const valuesOf = n => (n.values ||= {});
+/** 스트림 노드에 달린 포맷 필터 목록. */
+export const filtersOf = n => (n.filters ||= []);
+
 export function adjacency(g) {
   const out = {}, inn = {};
   for (const id in g.nodes) { out[id] = []; inn[id] = []; }
