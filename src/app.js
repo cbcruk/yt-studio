@@ -13,9 +13,7 @@ import {
   STAGE,
   STAGES,
   STAGE_ORDER,
-  expand,
   initSchema,
-  search,
   stageIdx,
 } from './core/schema.js';
 import { connect, disconnect, hasEdge, removeNode, valuesOf } from './core/graph.js';
@@ -43,7 +41,6 @@ import {
   confString,
   livePath,
   parseCommand,
-  quote,
   spliceIntoChain,
   stageNode,
   urlList,
@@ -59,7 +56,6 @@ import {
 } from './core/layout.js';
 import { STORE_KEY, loadRaw, restore, snapshot } from './core/persist.js';
 import {
-  STAGE_ACCENT,
   accentOf,
   badgeOf,
   blurbOf,
@@ -76,15 +72,20 @@ import {
   widthOfType,
 } from './ui/node-kinds.js';
 import { installBodies } from './ui/bodies.js';
+import {
+  flashNote,
+  installChrome,
+  renderCmd,
+  renderCrumb,
+  renderHits,
+  renderPalette,
+} from './ui/chrome.js';
+import { $ } from './ui/dom.js';
 import { allGraphKinds, defineGraphBehavior, graphKind } from './ui/graph-kinds.js';
 
 /* ══ 스키마 파생 ═════════════════════════════ */
 // 색인·검색·KO 사전은 core/schema.js 에 있다.
 initSchema(SCHEMA);
-
-const $ = s => document.querySelector(s);
-
-const ACCENT = STAGE_ACCENT;   // 단계 색은 레지스트리가 갖는다
 
 /* ══ 그래프 상태 ═════════════════════════════ */
 const NODE_W = 300, HEAD_H = 34;
@@ -281,15 +282,24 @@ function renderWires() {
   }
 }
 
-/* ── 노드 본문 ───────────────────────────── */
-// 노드 안쪽은 ui/bodies.js 가 전부 그린다. 앱은 그쪽이 필요한 다섯 가지만
-// 넘긴다 — state 는 다시 대입되므로 값이 아니라 게터로 넘긴다.
+/* ── UI 모듈에 앱을 넘긴다 ───────────────── */
+// 노드 안쪽은 ui/bodies.js, 캔버스 밖 틀은 ui/chrome.js 가 그린다. 앱은 그쪽이
+// 필요한 것만 넘긴다 — state 는 다시 대입되므로 값이 아니라 게터로 넘긴다.
 installBodies({
   state: () => state,
   ui,
   render: () => render(),
   enterSubgraph: id => enterSubgraph(id),
   paintLit: () => paintLit(),
+});
+
+installChrome({
+  state: () => state,
+  ui,
+  render: () => render(),
+  addStage: (sid, x, y) => addStageNode(sid, x, y),
+  centerSpot: () => centerSpot(),
+  focusNode: id => focusNode(id),
 });
 
 /* ── 노드 ────────────────────────────────── */
@@ -362,120 +372,6 @@ function renderNodes() {
   const hint = $('#hint');
   hint.hidden = !KIND().isEmpty(g);
   hint.innerHTML = `<div>${KIND().emptyHint}</div>`;
-}
-
-function renderPalette() {
-  const list = $('#pal-list');
-  const mode = ui.mode;
-  list.innerHTML = '';
-  $('#pal-head').textContent = KIND().palette.head;
-  $('#pal-hint').innerHTML = KIND().palette.hint;
-  $('#autowire').hidden = !KIND().canAutowire;
-
-  // 항목도, 표기도, 색도 전부 레지스트리에서 나온다.
-  for (const item of paletteItems(mode, STAGES)) {
-    const placed = item.kind === 'stage' ? stageOf(item.key) : null;
-    const n = placed ? setCount(placed) : 0;
-    const b = document.createElement('button');
-    b.className = 'pal-item' + (placed ? ' placed' : '');
-    b.type = 'button';
-    b.dataset.key = item.key;
-    if (item.kind === 'stage') b.dataset.stage = item.key;
-    else b.dataset.fnode = item.key;
-    b.style.setProperty('--a', item.accent);
-    b.title = item.blurb + (placed ? ' · 이미 캔버스에 있다' : '');
-    b.innerHTML = `<span class="dot"></span>`
-      + `<span class="tag">[<b>${item.tag}</b>]<span class="ko">${item.label}</span></span>`
-      + (n ? `<span class="n">${n}</span>` : '<span></span>');
-    list.append(b);
-  }
-}
-
-function escapeHtml(t) {
-  return String(t).replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
-}
-function highlight(text, terms) {
-  let html = escapeHtml(text);
-  for (const t of terms) {
-    if (!t) continue;
-    html = html.replace(new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>');
-  }
-  return html;
-}
-
-function renderHits() {
-  const box = $('#hits');
-  const q = $('#q').value;
-  const hits = KIND().search ? search(q) : null;
-  if (!hits) { box.hidden = true; box.innerHTML = ''; return; }
-  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean).flatMap(expand);
-  box.hidden = false;
-  box.innerHTML = `<div class="hits-head">${hits.length}개 일치 · 고르면 해당 단계 노드에 들어간다</div>`;
-  for (const o of hits.slice(0, 80)) {
-    const holder = stageOf(o.stage);
-    const on = holder && o.id in valuesOf(holder);
-    const b = document.createElement('button');
-    b.className = 'hit'; b.type = 'button';
-    b.innerHTML = `<span><span class="hit-flag">${highlight(o.flag, terms)}`
-      + (o.short ? ` <span class="short">${o.short}</span>` : '') + `</span>`
-      + `<span class="hit-help">${highlight(o.help, terms)}</span></span>`
-      + (on ? `<span class="hit-on">✓ 배치됨</span>`
-            : `<span class="hit-stage" style="color:${ACCENT[o.stage]}">${o.stage}</span>`);
-    b.onclick = () => {
-      const n = addStageNode(o.stage, ...centerSpot());
-      valuesOf(n)[o.id] = o.kind === 'flag' ? true : '';
-      $('#q').value = ''; renderHits();
-      render();
-      focusNode(n.id);
-    };
-    box.append(b);
-  }
-}
-
-function renderCmd() {
-  const box = $('#cmd');
-  const toks = tokensNow();
-  box.innerHTML = '';
-  box.append(Object.assign(document.createElement('span'), { className:'prompt', textContent:'$ ' }));
-  box.append(Object.assign(document.createElement('span'), { textContent:'yt-dlp' }));
-  for (const t of toks) {
-    box.append(document.createTextNode(' '));
-    const el = document.createElement('span');
-    el.className = 'tok' + (ui.lit === t.opt.id ? ' lit' : '');
-    el.dataset.opt = t.opt.id;
-    el.dataset.node = t.node;
-    el.textContent = t.text;
-    el.title = t.opt.flag + ' — [' + t.opt.stage + '] ' + STAGE[t.opt.stage].label + ' 노드';
-    box.append(el);
-  }
-  for (const u of urlsNow()) {
-    box.append(document.createTextNode(' '));
-    box.append(Object.assign(document.createElement('span'), { className:'tok url', textContent: quote(u) }));
-  }
-
-  const n = $('#notes');
-  const parts = [];
-  if (ui.unknown.length) parts.push('<b>읽지 못한 토큰:</b> ' + ui.unknown.map(escapeHtml).join(' · '));
-  if (ui.fmtWarn) parts.push('<b>' + escapeHtml(ui.fmtWarn) + '</b>');
-
-  // 무엇을 보고할지는 그래프 종류가 안다. 본문은 사용자 문자열일 수 있으니 이스케이프한다.
-  for (const note of KIND().statusNotes(graph(), { tokens: toks, unknown: ui.unknown })) {
-    parts.push((note.label ? `<b>${escapeHtml(note.label)}:</b> ` : '') + escapeHtml(note.body));
-  }
-  n.innerHTML = parts.join(' · ');
-}
-
-function renderCrumb() {
-  const k = KIND();
-  const c = $('#crumb');
-  c.hidden = !k.chrome.crumb;
-  $('#field-q').hidden = !k.search;
-  $('#viewport').classList.toggle('sub', !!k.chrome.sub);
-  if (!k.chrome.crumb) return;
-  c.style.setProperty('--fmt', ACCENT.format);
-  c.querySelector('.here').firstChild.textContent = k.label + ' ';
-  const detail = k.crumbDetail ? k.crumbDetail(state) : '';
-  $('#crumb-expr').textContent = detail ? '· ' + detail : '';
 }
 
 function paintLit() {
@@ -935,13 +831,6 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); dropNode(ui.sel); render();
   }
 });
-
-let noteTimer = null;
-function flashNote(msg) {
-  $('#notes').innerHTML = '<b>' + escapeHtml(msg) + '</b>';
-  clearTimeout(noteTimer);
-  noteTimer = setTimeout(renderCmd, 2200);
-}
 
 async function copy(text, btn) {
   try { await navigator.clipboard.writeText(text); }

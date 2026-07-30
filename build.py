@@ -38,9 +38,11 @@ MODULES = [
     "src/core/layout.js",
     "src/core/persist.js",
     "src/ui/tpl.js",              # 빌드가 vendor/lit-html.iife.js 로 갈아 끼운다
+    "src/ui/dom.js",
     "src/ui/node-kinds.js",
     "src/ui/graph-kinds.js",
     "src/ui/bodies.js",
+    "src/ui/chrome.js",
     "src/app.js",
 ]
 
