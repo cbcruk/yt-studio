@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "python3 build.py",
+    "build": "vite build",
     "test": "npm run test:unit && npm run test:dev && npm run test:e2e",
     "test:unit": "node --test \"tests/unit/*.test.mjs\"",
     "test:e2e": "node tests/run.mjs",

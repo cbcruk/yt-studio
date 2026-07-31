@@ -5,7 +5,7 @@
  *   node tests/run.mjs            전부
  *   node tests/run.mjs format     이름에 'format' 이 든 것만
  *
- * 앱을 먼저 굽고(build.py) 그 산출물을 상대로 돌린다.
+ * 앱을 먼저 굽고(vite build) 그 산출물을 상대로 돌린다.
  */
 import { execFileSync } from 'node:child_process';
 import { runSuite, ROOT } from './harness.mjs';
@@ -15,7 +15,8 @@ const wanted = f => !only.length || only.some(o => f.includes(o));
 
 console.log('· 빌드');
 try {
-  const out = execFileSync('python3', ['build.py'], { cwd: ROOT, encoding: 'utf8' });
+  const out = execFileSync('npx', ['vite', 'build', '--logLevel', 'error'],
+    { cwd: ROOT, encoding: 'utf8' });
   console.log('  ' + out.trim());
 } catch (e) {
   console.error('빌드 실패:', e.stderr || e.message);
