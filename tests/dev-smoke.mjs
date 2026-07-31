@@ -66,7 +66,8 @@ const check = (name, cond, note = '') => {
 
 try {
   await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
-  await page.waitForTimeout(700);
+  // 고정 대기는 vite 의 첫 의존성 최적화와 경합한다. 앱이 그려질 때까지 기다린다.
+  await page.locator('.node').first().waitFor({ timeout: 20000 }).catch(() => {});
 
   check('앱이 뜬다', (await page.locator('.node').count()) === 2);
   check('CSS 가 붙었다',
