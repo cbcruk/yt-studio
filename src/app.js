@@ -7,7 +7,6 @@
 import { SCHEMA } from './core/schema-data.js';
 import {
   BY_ID,
-  KO,
   OPTS,
   STAGE,
   STAGES,
@@ -15,48 +14,32 @@ import {
   initSchema,
   stageIdx,
 } from './core/schema.js';
-import { connect, disconnect, hasEdge, removeNode, valuesOf } from './core/graph.js';
+import { connect, disconnect, removeNode, valuesOf } from './core/graph.js';
 import { emitTree, parseFormat } from './core/format-grammar.js';
-import {
-  FOUT,
-  blankFormat,
-  formatExpr,
-  graphToTree,
-  operands,
-  treeToGraph,
-} from './core/format-graph.js';
-import {
-  OOUT,
-  blankOutput,
-  outputExpr,
-  outputPieces,
-  piecesToGraph,
-} from './core/output-graph.js';
-import { POUT, blankPaths, pathsExpr, pathsToGraph } from './core/paths-graph.js';
+import { FOUT, blankFormat } from './core/format-graph.js';
+import { OOUT, blankOutput } from './core/output-graph.js';
+import { POUT, blankPaths } from './core/paths-graph.js';
 import {
   blankPipeline,
-  buildTokens,
   commandString,
   confString,
-  livePath,
   parseCommand,
   spliceIntoChain,
   stageNode,
-  urlList,
 } from './core/pipeline.js';
-import { chainLayout, freeSpot, orphansOf, tidyColumns } from './core/layout.js';
+import { freeSpot } from './core/layout.js';
 import { STORE_KEY, loadRaw, restore, snapshot } from './core/persist.js';
-import {
-  badgeOf, paletteItems, protectedIds, widthOf, widthOfType,
-} from './ui/node-kinds.js';
+import { protectedIds, widthOfType } from './ui/node-kinds.js';
 import { installBodies } from './ui/bodies.js';
+import {
+  addFormatNode, fmtExpr, installGraphBehavior, outExpr, pathExpr,
+} from './ui/graph-behavior.js';
 import {
   applyCanvasView,
   canvasRect,
   fitCanvas,
   focusCanvasOn,
   installCanvas,
-  measuredHeight,
   mountCanvas,
   syncCanvas,
   toWorld,
@@ -68,20 +51,21 @@ import {
   renderCmd,
   renderCrumb,
   renderHits,
+  mountChrome,
   renderPalette,
 } from './ui/chrome.js';
 import { $ } from './ui/dom.js';
-import { allGraphKinds, defineGraphBehavior, graphKind } from './ui/graph-kinds.js';
+import { allGraphKinds, graphKind } from './ui/graph-kinds.js';
 
 /* ══ 스키마 파생 ═════════════════════════════ */
 // 색인·검색·KO 사전은 core/schema.js 에 있다.
 initSchema(SCHEMA);
 
 /* ══ 그래프 상태 ═════════════════════════════ */
-const NODE_W = 300, HEAD_H = 34;
+const NODE_W = 300;
 const PROTECTED = protectedIds();   // 각 그래프의 고정 끝점
 
-let state, view, seq;
+let state, seq;
 const ui = {
   mode: 'pipeline', lit: null, sel: null, picker: null,
   unknown: [], drag: null, wire: null, pan: null, fmtWarn: '',
@@ -94,7 +78,6 @@ function resetState() {
   state = blankState();
   seq = 1;
   ui.mode = 'pipeline';
-  view = state.view;
   ui.unknown = []; ui.sel = null; ui.picker = null; ui.fmtWarn = '';
 }
 resetState();
@@ -106,7 +89,6 @@ const graph = () => KIND().graphOf(state);
 const nid = () => 'n' + (seq++);
 const nodeList = (g = graph()) => Object.values(g.nodes);
 const stageOf = sid => stageNode(state, sid);
-const setCount = n => badgeOf(n);
 
 /* ── 그래프 질의 (모드 공용) ─────────────── */
 // 원시 연산은 core/graph.js, 의미론은 core/pipeline.js · core/format-graph.js.
@@ -136,54 +118,8 @@ function addStageNode(sid, x, y) {
   spliceIntoChain(state, n);
   return n;
 }
-/* ── 서브그래프 전용 ─────────────────────── */
-// 서브그래프가 컴파일한 값. 문법·트리 변환은 core/ 의 해당 모듈에 있다.
-const fmtExpr = () => formatExpr(state.format);
-const outExpr = () => outputExpr(state.output);
-const pathExpr = () => pathsExpr(state.paths);
-
-function addPathNode(type, x, y, extra) {
-  const n = Object.assign({ id: nid(), type, x, y }, extra || {});
-  if (type === 'path') { n.pathType = n.pathType ?? 'home'; n.path = n.path ?? ''; }
-  state.paths.nodes[n.id] = n;
-  return n;
-}
-/** 파이프라인의 --paths 값을 서브그래프가 컴파일한 결과로 덮어쓴다. 한 줄에 -P 하나. */
-function syncPathsValue() {
-  const n = stageOf('store');
-  if (n) valuesOf(n).paths = pathExpr();
-}
-
-function addOutputNode(type, x, y, extra) {
-  const n = Object.assign({ id: nid(), type, x, y }, extra || {});
-  if (type === 'text') n.text = n.text ?? ' - ';
-  if (type === 'field') { n.name = n.name || 'title'; n.conv = n.conv || 's'; n.fmt = n.fmt || ''; }
-  state.output.nodes[n.id] = n;
-  return n;
-}
-
-/** 파이프라인의 --output 값을 서브그래프가 컴파일한 결과로 덮어쓴다. */
-function syncOutputValue() {
-  const n = stageOf('store');
-  if (n) valuesOf(n).output = outExpr();
-}
-
-function addFormatNode(type, x, y, extra) {
-  const n = Object.assign({ id: nid(), type, x, y }, extra || {});
-  if (type === 'stream') { n.sel = n.sel || 'bv'; n.filters = n.filters || []; }
-  state.format.nodes[n.id] = n;
-  return n;
-}
-
-/** 파이프라인의 --format 값을 서브그래프가 컴파일한 결과로 덮어쓴다. */
-function syncFormatValue() {
-  const n = stageNode(state, 'format');
-  if (n) valuesOf(n).format = fmtExpr();
-}
 /* ══ 명령어 조립 ═════════════════════════════ */
 // 조립·해석은 core/pipeline.js 에 있다. 여기서는 현재 상태를 넘기기만 한다.
-const tokensNow = () => buildTokens(state);
-const urlsNow = () => urlList(state);
 
 /* ── UI 모듈에 앱을 넘긴다 ───────────────── */
 // 노드 안쪽은 ui/bodies.js, 캔버스 밖 틀은 ui/chrome.js 가 그린다. 앱은 그쪽이
@@ -196,12 +132,21 @@ installBodies({
   paintLit: () => paintLit(),
 });
 
+installGraphBehavior({
+  state: () => state,
+  graph: () => graph(),
+  kind: () => KIND(),
+  nid,
+  render: () => render(),
+  addStage: (sid, x, y) => addStageNode(sid, x, y),
+});
+
 installCanvas({
   graph: () => graph(),
   kind: () => KIND(),
   live: () => liveIds(),
   ui,
-  view: () => view,
+  view: () => KIND().viewOf(state),   // 그래프마다 따로다
   wire: (from, to) => wire(from, to),
   unwire: (from, to) => unwire(from, to),
   dropNode: id => dropNode(id),
@@ -214,6 +159,7 @@ installChrome({
   ui,
   render: () => render(),
   addStage: (sid, x, y) => addStageNode(sid, x, y),
+  addNode: (key, x, y) => KIND().addNode(key, x, y),
   centerSpot: () => centerSpot(),
   focusNode: id => focusNode(id),
 });
@@ -255,95 +201,10 @@ function render() {
   renderHint(); renderCmd(); renderPalette(); save();
 }
 
-/* ══ 그래프 종류의 DOM 쪽 동작 ═══════════════
-   선언은 ui/graph-kinds.js 에 있고, 캔버스를 실제로 만지는 일만 여기서 얹는다. */
-
-defineGraphBehavior('pipeline', {
-  addNode: (key, x, y) => addStageNode(key, x, y),
-  sync() {},                       // 파이프라인은 자기가 원본이라 되돌릴 곳이 없다
-  tidy() {},
-  relayout() {
-    chainLayout(state, livePath(state), { nodeW: NODE_W });
-    fitView(); render();
-  },
-});
-
-defineGraphBehavior('format', {
-  // 그래프를 고칠 때마다 컴파일해 --format 문자열로 돌려놓는다.
-  // -f 출력 노드와 브레드크럼은 render 가 알아서 따라온다.
-  addNode: (key, x, y) => addFormatNode(key, x, y),
-  sync() { syncFormatValue(); },
-  tidy() { tidyColumns(state.format, measuredHeight, { operandsOf: operands }); },
-  relayout() {
-    const g = graph();
-    // 표현식은 트리다. 컴파일한 결과를 다시 펼치면 그게 곧 정돈된 배치다.
-    const fresh = treeToGraph(graphToTree(g), { nid, nodeW: NODE_W });
-    // 트리에 안 잡힌(끊긴) 노드는 아래쪽에 남겨 둔다.
-    const orphans = orphansOf(g, FOUT);
-    const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
-    orphans.forEach((n, i) => { n.x = i * (NODE_W + 90); n.y = maxY + 190; fresh.nodes[n.id] = n; });
-    const dead = new Set(orphans.map(n => n.id));
-    for (const e of g.edges)
-      if (fresh.nodes[e.from] && fresh.nodes[e.to] && dead.has(e.from)
-          && !hasEdge(fresh, e.from, e.to)) fresh.edges.push(e);
-    fresh.view = g.view;
-    delete fresh._tidy;
-    state.format = fresh;
-    view = state.format.view;
-    render();            // 실측하려면 일단 그려야 한다
-    KIND().tidy();
-    render();
-    fitView();
-  },
-});
-
-defineGraphBehavior('paths', {
-  addNode: (key, x, y) => addPathNode(key, x, y),
-  sync() { syncPathsValue(); },
-  tidy() { tidyColumns(state.paths, measuredHeight, {}); },
-  relayout() {
-    const g = graph();
-    const fresh = pathsToGraph(pathExpr(), { nid, nodeW: NODE_W });
-    const orphans = orphansOf(g, POUT);
-    const maxY = Math.max(0, ...nodeList(fresh).map(n => n.y));
-    orphans.forEach((n, i) => { n.x = 0; n.y = maxY + 190 + i * 150; fresh.nodes[n.id] = n; });
-    fresh.view = g.view;
-    delete fresh._tidy;
-    state.paths = fresh;
-    view = state.paths.view;
-    render(); KIND().tidy(); render();
-    fitView();
-  },
-});
-
-defineGraphBehavior('output', {
-  // 조각을 고칠 때마다 이어 붙여 --output 문자열로 돌려놓는다.
-  addNode: (key, x, y) => addOutputNode(key, x, y),
-  sync() { syncOutputValue(); },
-  // 조각은 한 줄로 늘어서므로 같은 열에 겹칠 일이 없다. 세로만 맞춰 준다.
-  tidy() { tidyColumns(state.output, measuredHeight, {}); },
-  relayout() {
-    const g = graph();
-    // 수열이다. 지금 순서 그대로 다시 늘어놓으면 그게 정돈된 배치다.
-    const fresh = piecesToGraph(outputPieces(g), g.nodes[OOUT].outType, { nid, widthOf: widthOfType });
-    // 이어지지 않은 조각은 아래쪽에 남겨 둔다.
-    const orphans = orphansOf(g, OOUT);
-    const maxX = Math.max(0, ...nodeList(fresh).map(n => n.x));
-    orphans.forEach((n, i) => { n.x = i * (NODE_W + 40); n.y = 380; fresh.nodes[n.id] = n; });
-    fresh.view = g.view;
-    delete fresh._tidy;
-    state.output = fresh;
-    view = state.output.view;
-    render(); KIND().tidy(); render();
-    fitView();
-  },
-});
-
 /* ══ 모드 전환 ═══════════════════════════════ */
 function setMode(m) {
   if (m === ui.mode) return;
   ui.mode = m;
-  view = KIND().viewOf(state);
   ui.sel = null; ui.picker = null; ui.lit = null;
   $('#hits').hidden = true;
   render();
@@ -414,52 +275,6 @@ $('#autolayout').onclick = autolayout;
 $('#autowire').onclick = autowire;
 $('#crumb-back').onclick = () => setMode('pipeline');
 
-/* ── 팔레트에서 캔버스로 끌어다 놓기 ─────── */
-$('#pal-list').addEventListener('pointerdown', e => {
-  const item = e.target.closest('.pal-item');
-  if (!item) return;
-  if (item.classList.contains('placed')) { focusNode(stageOf(item.dataset.stage).id); return; }
-
-  const key = item.dataset.key;
-  const start = { x: e.clientX, y: e.clientY };
-  let ghost = null;
-  item.setPointerCapture(e.pointerId);
-
-  const move = ev => {
-    if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
-      ghost = document.createElement('div');
-      ghost.className = 'pal-ghost';
-      const meta = paletteItems(ui.mode, STAGES).find(x => x.key === key);
-      ghost.style.setProperty('--a', meta.accent);
-      ghost.textContent = `[${meta.tag}] ${meta.label}`;
-      document.body.append(ghost);
-    }
-    if (ghost) { ghost.style.left = (ev.clientX + 12) + 'px'; ghost.style.top = (ev.clientY + 12) + 'px'; }
-  };
-  const up = ev => {
-    item.removeEventListener('pointermove', move);
-    item.removeEventListener('pointerup', up);
-    if (ghost) ghost.remove();
-    const r = canvasRect();
-    const inside = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
-    let pos;
-    if (ghost && inside) {
-      const w = toWorld(ev.clientX, ev.clientY);
-      pos = [Math.round(w.x - NODE_W / 2), Math.round(w.y - HEAD_H / 2)];
-    } else if (ghost) {
-      return;                                    // 캔버스 밖에 떨어뜨렸다 — 없던 일로
-    } else {
-      pos = centerSpot();                          // 그냥 클릭 → 화면 가운데
-    }
-    const n = KIND().addNode(key, pos[0], pos[1]);   // 무엇을 만드는지는 그래프 종류가 안다
-    ui.sel = n.id;
-    render();
-    $('#palette').classList.remove('open');
-  };
-  item.addEventListener('pointermove', move);
-  item.addEventListener('pointerup', up);
-});
-
 /* ── 명령어 ↔ 그래프 상호 강조 ───────────── */
 $('#cmd').addEventListener('mouseover', e => {
   const t = e.target.closest('.tok[data-opt]');
@@ -520,7 +335,6 @@ function adoptSnapshot(data) {
   });
   if (!r) return false;
   state = r.state; seq = r.seq; ui.mode = r.mode;
-  view = KIND().viewOf(state);
   ui.unknown = []; ui.sel = null; ui.picker = null; ui.fmtWarn = '';
   return true;
 }
@@ -587,7 +401,7 @@ $('#copy-conf').onclick = e => copy(confString(state), e.target);
 window.__yt = {
   get state() { return state; },
   get ui() { return ui; },
-  get view() { return view; },
+  get view() { return KIND().viewOf(state); },
   render,
   connect: (from, to, g) => wire(from, to, g || graph()),
   removeNode: (id, g) => dropNode(id, g || graph()),
@@ -603,6 +417,7 @@ window.__yt = {
 
 /* ── 시작 ────────────────────────────────── */
 mountCanvas($('#viewport'));
+mountChrome();
 const fresh = !load();
 if (fresh) resetState();
 render();

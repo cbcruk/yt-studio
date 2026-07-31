@@ -186,7 +186,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
   });
 
   await step('배선: merge → fallback → fout, 스트림 추가로 (…)+ba/b 구성', async () => {
-    const ids = await p.evaluate(() => {
+    await p.evaluate(() => {
       const g = __yt.state.format;
       const N = Object.values(g.nodes);
       const merge = N.find(n => n.type === 'merge');

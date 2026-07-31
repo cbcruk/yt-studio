@@ -11,6 +11,7 @@
  *   ui → uiState         편집 중인 UI 상태 (강조 중인 옵션, 읽지 못한 토큰)
  *   render → repaint()   전체 렌더
  *   addStage → addStage()   단계 노드를 만든다 (검색 결과에서 고를 때)
+ *   addNode → addAt()       팔레트에서 끌어다 놓은 것을 만든다 (종류는 그래프가 안다)
  *   centerSpot → spot()     화면 가운데의 빈 자리
  *   focusNode → focusOn()   그 노드로 화면을 옮긴다
  *
@@ -26,6 +27,7 @@ import { buildTokens, quote, stageNode, urlList } from '../core/pipeline.js';
 import { html, nothing, renderTpl } from './tpl.js';
 import { STAGE_ACCENT, badgeOf, paletteItems } from './node-kinds.js';
 import { graphKind } from './graph-kinds.js';
+import { canvasRect, toWorld } from './canvas.js';
 import { $ } from './dom.js';
 
 /* ══ 앱에서 받아 오는 것 ══════════════════════ */
@@ -34,6 +36,7 @@ let stateOf = () => null;
 let uiState = {};
 let repaint = () => {};
 let addStage = () => null;
+let addAt = () => null;
 let spot = () => [0, 0];
 let focusOn = () => {};
 
@@ -43,11 +46,17 @@ export function installChrome(host) {
   uiState = host.ui;
   repaint = host.render;
   addStage = host.addStage;
+  addAt = host.addNode;
   spot = host.centerSpot;
   focusOn = host.focusNode;
 }
 
+/** DOM 에 붙는 일은 따로 둔다 — installChrome 은 브라우저 없이도 불릴 수 있어야
+ *  단위 테스트가 템플릿을 들여다볼 수 있다. */
+export function mountChrome() { bindPaletteDrag(); }
+
 // app.js 에도 같은 파생이 있지만 이름을 갈라 둔다 — 한 스코프로 합쳐지므로.
+const NODE_W = 300, HEAD_H = 34;      // 새 노드 폭은 만들어 봐야 안다 — 기본값으로 잡는다
 const kind = () => graphKind(uiState.mode);
 const stageAt = sid => stageNode(stateOf(), sid);
 
@@ -80,6 +89,61 @@ function paletteItem(item) {
       <span class="tag">[<b>${item.tag}</b>]<span class="ko">${item.label}</span></span>
       ${n ? html`<span class="n">${n}</span>` : html`<span></span>`}
     </button>`;
+}
+
+/**
+ * 팔레트에서 캔버스로 끌어다 놓기.
+ *
+ * 라이브러리가 주지 않는 몇 안 되는 조작이다. 팔레트를 그리는 쪽이 끌어 놓는
+ * 것도 갖는다 — 목록과 드래그가 다른 파일에 있으면 항목 모양을 바꿀 때마다
+ * 두 곳을 봐야 한다.
+ */
+function bindPaletteDrag() {
+  $('#pal-list').addEventListener('pointerdown', e => {
+    const item = e.target.closest('.pal-item');
+    if (!item) return;
+    if (item.classList.contains('placed')) { focusOn(stageAt(item.dataset.stage).id); return; }
+
+    const key = item.dataset.key;
+    const start = { x: e.clientX, y: e.clientY };
+    let ghost = null;
+    item.setPointerCapture(e.pointerId);
+
+    const move = ev => {
+      if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
+        ghost = document.createElement('div');
+        ghost.className = 'pal-ghost';
+        const meta = paletteItems(uiState.mode, STAGES).find(x => x.key === key);
+        ghost.style.setProperty('--a', meta.accent);
+        ghost.textContent = `[${meta.tag}] ${meta.label}`;
+        document.body.append(ghost);
+      }
+      if (ghost) { ghost.style.left = (ev.clientX + 12) + 'px'; ghost.style.top = (ev.clientY + 12) + 'px'; }
+    };
+    const up = ev => {
+      item.removeEventListener('pointermove', move);
+      item.removeEventListener('pointerup', up);
+      if (ghost) ghost.remove();
+      const r = canvasRect();
+      const inside = ev.clientX >= r.left && ev.clientX <= r.right
+                  && ev.clientY >= r.top && ev.clientY <= r.bottom;
+      let pos;
+      if (ghost && inside) {
+        const w = toWorld(ev.clientX, ev.clientY);
+        pos = [Math.round(w.x - NODE_W / 2), Math.round(w.y - HEAD_H / 2)];
+      } else if (ghost) {
+        return;                                  // 캔버스 밖에 떨어뜨렸다 — 없던 일로
+      } else {
+        pos = spot();                            // 그냥 클릭 → 화면 가운데
+      }
+      const n = addAt(key, pos[0], pos[1]);      // 무엇을 만드는지는 그래프 종류가 안다
+      uiState.sel = n.id;
+      repaint();
+      $('#palette').classList.remove('open');
+    };
+    item.addEventListener('pointermove', move);
+    item.addEventListener('pointerup', up);
+  });
 }
 
 /* ══ 검색 결과 ═══════════════════════════════ */

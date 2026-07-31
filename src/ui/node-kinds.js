@@ -11,7 +11,6 @@
  */
 import { STAGE } from '../core/schema.js';
 import { FORMAT_OPS } from '../core/format-grammar.js';
-import { FIELD_HELP } from '../core/output-template.js';
 
 const call = (v, n) => (typeof v === 'function' ? v(n) : v);
 

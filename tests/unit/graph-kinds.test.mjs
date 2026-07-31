@@ -10,8 +10,8 @@ import { readFile } from 'node:fs/promises';
 import { initSchema } from '../../src/core/schema.js';
 import { blankPipeline } from '../../src/core/pipeline.js';
 import { blankFormat, treeToGraph, FOUT } from '../../src/core/format-graph.js';
-import { blankOutput, outputToGraph, OOUT } from '../../src/core/output-graph.js';
-import { blankPaths, pathsToGraph, POUT } from '../../src/core/paths-graph.js';
+import { blankOutput, outputToGraph } from '../../src/core/output-graph.js';
+import { blankPaths, pathsToGraph } from '../../src/core/paths-graph.js';
 import { parseFormat } from '../../src/core/format-grammar.js';
 
 initSchema(JSON.parse(await readFile(new URL('../../schema.json', import.meta.url), 'utf8')));

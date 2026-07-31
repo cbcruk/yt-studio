@@ -5,7 +5,7 @@ yt-dlp 옵션을 **노드 그래프**로 조립한다. 의존성 없는 단일 H
 ```
 npm run dev       # vite 개발 서버 (HMR)
 npm run build     # → dist/ytdlp-studio.html
-npm test          # 단위(node) + 개발 서버 스모크 + e2e(playwright)
+npm test          # 린트 + 단위(node) + 개발 서버 스모크 + e2e(playwright)
 ```
 
 배포물은 브라우저로 그 파일을 열면 끝이다. 서버도, 네트워크도 필요 없다.
@@ -138,6 +138,7 @@ src/ui/
   bodies.js          노드 본문 템플릿 13종
   chrome.js          캔버스 밖 화면 (팔레트 · 검색 · 명령어 · 브레드크럼)
   canvas.js          캔버스 — Rete.js 어댑터 (노드 · 와이어 · 팬 · 줌)
+  graph-behavior.js  그래프 종류마다 다른 정렬 · 되돌려쓰기 · 새 노드
   tpl.js · dom.js    lit 어댑터 · DOM 손잡이
 src/app.js           상태 · 모드 전환 · 명령어 읽기 · 저장 · 배선
 src/app.css          스타일 전부
@@ -155,6 +156,10 @@ tests/               단위 102 · 개발 서버 스모크 9 · e2e 75
 
 **배포물은 여전히 HTML 한 장이다.** `vite build` 가 묶고, `vite.config.js` 의
 플러그인이 CSS·JS 를 `index.html` 안으로 접는다. 외부 참조가 남으면 빌드가 막는다.
+
+**린트는 `no-undef` 하나를 위해 있다.** 번들러는 선언 안 된 이름을 "전역이겠지"
+하고 넘어가므로, 임포트 한 줄을 지워도 그 코드가 실제로 불릴 때까지 조용하다.
+스타일 규칙은 켜지 않는다.
 
 노드 종류를 늘리려면 `node-kinds.js` 에 `defineKind` 한 줄과 `bodies.js` 에
 `defineBody` 한 줄, 그래프 종류를 늘리려면 `graph-kinds.js` 에 `defineGraph`

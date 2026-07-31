@@ -9,7 +9,7 @@ import {
 } from '../../src/core/output-template.js';
 import {
   blankOutput, outputToGraph, outputExpr, outputPieces, outputIssues,
-  outputLive, outputPreview, pieceNodes, OOUT,
+  outputLive, outputPreview, OOUT,
 } from '../../src/core/output-graph.js';
 
 let seq = 0;

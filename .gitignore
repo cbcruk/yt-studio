@@ -2,8 +2,3 @@ __pycache__/
 *.pyc
 node_modules/
 .vite-build/
-
-# 스파이크 산출물
-spike/*/dist/
-spike/*/shot.png
-spike/*/diag*.mjs
