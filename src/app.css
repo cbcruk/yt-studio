@@ -137,19 +137,17 @@
   .viewport.wiring{cursor:crosshair}
   /* 서브그래프 안이라는 걸 캔버스 자체가 말해 준다 */
   .viewport.sub{background-color:#F1F0E6}
-  .wires{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  .wire-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
-  .wire{fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
-  .wire.dead{stroke:var(--rule);stroke-dasharray:5 5}
-  .wire-g:hover .wire{stroke:var(--warn);stroke-width:3}
-  .wire-temp{fill:none;stroke:var(--signal);stroke-width:2;stroke-dasharray:5 4}
-  .wire-ord{font:500 10px var(--mono);fill:var(--dim);pointer-events:none}
+  /* 와이어는 Rete 의 그림자 DOM 안에서 그려진다 — 스타일은 ui/canvas.js 의
+     YtWire.styles 에 있다. 여기서는 겹치는 순서만 잡는다. Rete 가 노드와 연결을
+     형제로 놓고 연결이 DOM 뒤라, 그대로 두면 와이어의 두꺼운 클릭 영역이 노드
+     위를 덮어 입력을 못 누른다. */
+  .viewport > div > div:has(yt-node){z-index:1}
+  .viewport > div > div:has(rete-connection-wrapper){z-index:0}
 
-  /* 레이어 자체는 클릭을 통과시킨다 — 아래 깔린 와이어를 집을 수 있어야 한다. */
-  .nodes{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
   .node{
     pointer-events:auto;
-    position:absolute;width:var(--node-w);background:var(--panel);
+    /* 자리는 Rete 의 래퍼가 transform 으로 잡는다. */
+    position:relative;width:var(--node-w);background:var(--panel);
     border:1px solid var(--rule);border-radius:5px;
     box-shadow:0 2px 0 #141c190a, 0 10px 24px #141c1910;
   }
@@ -185,6 +183,9 @@
     background:var(--panel);border:2px solid var(--a);cursor:crosshair;z-index:3;
     top:calc(var(--head-h)/2);
   }
+  /* 포트 자리는 우리가 잡고, 안쪽 <rete-ref> 가 실제 소켓이 된다. */
+  .port > rete-ref,.port > rete-ref > *{display:block;width:100%;height:100%}
+  .port > rete-ref > *{opacity:0}
   .port.in{left:-7px;transform:translateY(-50%)}
   .port.out{right:-7px;transform:translateY(-50%)}
   .port:hover,.port.hot{background:var(--a);transform:translateY(-50%) scale(1.3)}

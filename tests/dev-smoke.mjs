@@ -70,8 +70,9 @@ try {
   await page.locator('.node').first().waitFor({ timeout: 20000 }).catch(() => {});
 
   check('앱이 뜬다', (await page.locator('.node').count()) === 2);
+  // 노드는 캔버스 라이브러리의 그림자 DOM 밖(light DOM)에 있어야 app.css 가 닿는다.
   check('CSS 가 붙었다',
-    await page.evaluate(() => getComputedStyle(document.querySelector('.node')).position === 'absolute'));
+    await page.evaluate(() => getComputedStyle(document.querySelector('.node')).width === '300px'));
   check('스키마가 JSON import 로 들어온다', (await page.textContent('#ver')).includes('개 옵션'),
     (await page.textContent('#ver')).trim());
 

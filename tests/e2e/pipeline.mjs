@@ -142,21 +142,22 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
   });
 
   await step('와이어 끊기 → 우회 + 명령어에서 빠짐', async () => {
-    const box = await p.locator('.wire-hit').first().boundingBox();
-    // 첫 와이어(src→format)의 중간 지점 클릭
-    const paths = await p.locator('.wire-hit').all();
-    const el = paths[0];
-    const d = await el.evaluate(n => n.getAttribute('d'));
-    const pt = await el.evaluate(n => { const l = n.getTotalLength(); const q = n.getPointAtLength(l / 2); return [q.x, q.y]; });
-    const vpb = await p.locator('#viewport').boundingBox();
-    const svgPt = await p.evaluate(([x, y]) => {
-      const g = document.querySelector('#wire-layer');
-      const m = g.getCTM();
-      const r = document.querySelector('#viewport').getBoundingClientRect();
-      return [r.left + m.a * x + m.c * y + m.e, r.top + m.b * x + m.d * y + m.f];
-    }, pt);
-    await p.mouse.click(svgPt[0], svgPt[1]);
-    await p.waitForTimeout(200);
+    // src → format 와이어에서 노드에 가리지 않은 지점을 찾아 누른다.
+    const pt = await p.locator('yt-wire[data-from=src]').locator('.hit').evaluate(n => {
+      const len = n.getTotalLength(), m = n.getScreenCTM();
+      const at = f => {
+        const q = n.getPointAtLength(len * f);
+        return [m.a * q.x + m.c * q.y + m.e, m.b * q.x + m.d * q.y + m.f];
+      };
+      for (const f of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+        const [x, y] = at(f);
+        const el = document.elementFromPoint(x, y);
+        if (el && el.closest('rete-connection-wrapper')) return [x, y];
+      }
+      return at(0.5);
+    });
+    await p.mouse.click(pt[0], pt[1]);
+    await p.waitForTimeout(250);
     assert(await p.locator('.node.bypass:not(.io)').count() === 1, '우회 단계 노드가 안 생김');
     assert(await p.locator('.node.bypass.io').count() === 2, '소스·명령어도 끊김 표시가 나야 한다');
     const c = await cmd();
@@ -174,20 +175,23 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await p.mouse.up();
     await p.waitForTimeout(200);
     assert(await p.locator('.node.bypass').count() === 0, '아직 우회 상태');
-    assert(await p.locator('.wire.dead').count() === 0, '죽은 와이어가 남음');
+    assert(await p.locator('yt-wire .dead').count() === 0, '죽은 와이어가 남음');
     assert((await cmd()).includes('height<=1080'), '명령어 복구 안 됨: ' + await cmd());
   });
 
   await step('노드 헤더 드래그로 이동', async () => {
-    const node = p.locator('.node').filter({ hasText: '[format]' });
-    const before = await node.evaluate(n => n.style.left);
-    const h = await node.locator('.node-head').boundingBox();
+    // 자리는 캔버스가 갖지만 뜻은 그래프가 갖는다 — 그래프의 x 를 본다.
+    const xOf = () => p.evaluate(() =>
+      Object.values(__yt.state.nodes).find(n => n.stage === 'format').x);
+    const before = await xOf();
+    const h = await p.locator('.node').filter({ hasText: '[format]' })
+      .locator('.node-head').boundingBox();
     await p.mouse.move(h.x + 60, h.y + h.height / 2);
     await p.mouse.down();
     await p.mouse.move(h.x + 200, h.y + 120, { steps: 10 });
     await p.mouse.up();
-    await p.waitForTimeout(150);
-    const after = await node.evaluate(n => n.style.left);
+    await p.waitForTimeout(250);
+    const after = await xOf();
     assert(before !== after, `안 움직임 ${before} → ${after}`);
     return `${before} → ${after}`;
   });

@@ -39,8 +39,9 @@ yt-dlp 명령어는 평평한 플래그 목록이라, 엣지가 ffmpeg 필터그
 
 끊긴 노드는 흐려지고 와이어는 점선이 되며, 하단 노트가 무엇이 빠졌는지 알려 준다.
 
-플래그가 나가는 순서는 그래프 순서를 따른다(위상 정렬, 같은 층이면 x 좌표 순).
-노드를 왼쪽으로 끌면 그 단계 플래그가 앞으로 나온다.
+플래그가 나가는 순서는 그래프 순서를 따른다 — 위상 정렬이 먼저고, 엣지로 순서가
+정해지지 않는 노드끼리는 x 좌표 순이다. 사슬로 이어 놓았다면 끌어도 안 바뀌고,
+갈라진 가지끼리는 왼쪽에 놓은 것이 앞으로 나온다.
 
 ## 서브그래프
 
@@ -136,21 +137,24 @@ src/ui/
   graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
   bodies.js          노드 본문 템플릿 13종
   chrome.js          캔버스 밖 화면 (팔레트 · 검색 · 명령어 · 브레드크럼)
-  tpl.js · dom.js    lit-html 어댑터 · DOM 손잡이
-src/app.js           캔버스(노드 · 와이어) · 포인터 · 배선 · 상태
+  canvas.js          캔버스 — Rete.js 어댑터 (노드 · 와이어 · 팬 · 줌)
+  tpl.js · dom.js    lit 어댑터 · DOM 손잡이
+src/app.js           상태 · 모드 전환 · 명령어 읽기 · 저장 · 배선
 src/app.css          스타일 전부
 index.html           개발 진입점이자 배포 템플릿
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
-build.py             모듈을 이어 붙이고 스키마를 인라인해 단일 HTML 로
-vendor/              lit-html 을 미리 구워 둔 것 (vendor/README.md)
+vite.config.js       개발 서버 + 배포 빌드(CSS·JS 를 HTML 한 장으로 접는다)
 tests/               단위 102 · 개발 서버 스모크 9 · e2e 75
 ```
 
-**같은 `index.html` 이 두 가지로 쓰인다.** 개발에서는 `<link>` 와
-`<script type="module">` 을 그대로 쓰고 스키마를 Vite 의 JSON import 로 받는다.
-배포에서는 `build.py` 가 그 두 줄을 인라인 `<style>`·`<script>` 로 갈아 끼우고
-스키마를 값으로 박는다. 번들러는 쓰지 않는다 — 모듈을 의존 순서대로 이어 붙이며
-`import`/`export` 만 걷어내고, 최상위 이름이 겹치면 빌드가 막는다.
+**캔버스는 [Rete.js](https://retejs.org) 가 그린다.** 팬·줌·노드 드래그·포트
+드래그로 잇기·와이어 경로가 라이브러리 몫이고, `ui/canvas.js` 는 그 위에 우리
+의미론을 얹는다 — **`state` 가 원본이고 Rete 는 뷰다.** "이어도 되는가"(순환 ·
+중복 · 입력 하나만 받는 노드)는 예전처럼 `core/graph.js` 가 정하고, 캔버스는 그
+결정에 맞춰 다시 그려진다.
+
+**배포물은 여전히 HTML 한 장이다.** `vite build` 가 묶고, `vite.config.js` 의
+플러그인이 CSS·JS 를 `index.html` 안으로 접는다. 외부 참조가 남으면 빌드가 막는다.
 
 노드 종류를 늘리려면 `node-kinds.js` 에 `defineKind` 한 줄과 `bodies.js` 에
 `defineBody` 한 줄, 그래프 종류를 늘리려면 `graph-kinds.js` 에 `defineGraph`
@@ -164,7 +168,7 @@ yt-dlp 릴리스마다 재실행할 것:
 ```
 pip install -U yt-dlp
 python gen_schema.py > schema.json
-python build.py
+npm run build
 ```
 
 손으로 정한 건 세 군데다. `gen_schema.py` 의 **optparse 그룹 → 생애주기 단계**

@@ -5,7 +5,6 @@
  * core/ 에, 노드와 그래프 종류의 선언은 ui/ 의 레지스트리에 있다.
  */
 import { SCHEMA } from './core/schema-data.js';
-import { html, nothing, renderTpl, repeat } from './ui/tpl.js';
 import {
   BY_ID,
   KO,
@@ -17,7 +16,7 @@ import {
   stageIdx,
 } from './core/schema.js';
 import { connect, disconnect, hasEdge, removeNode, valuesOf } from './core/graph.js';
-import { FORMAT_OPS, emitTree, parseFormat } from './core/format-grammar.js';
+import { emitTree, parseFormat } from './core/format-grammar.js';
 import {
   FOUT,
   blankFormat,
@@ -45,33 +44,24 @@ import {
   stageNode,
   urlList,
 } from './core/pipeline.js';
-import {
-  bounds,
-  chainLayout,
-  fitTo,
-  freeSpot,
-  orphansOf,
-  tidyColumns,
-  zoomAt,
-} from './core/layout.js';
+import { chainLayout, freeSpot, orphansOf, tidyColumns } from './core/layout.js';
 import { STORE_KEY, loadRaw, restore, snapshot } from './core/persist.js';
 import {
-  accentOf,
-  badgeOf,
-  blurbOf,
-  bodyOf,
-  bypassLabelOf,
-  hasIn,
-  hasOut,
-  isIO,
-  labelOf,
-  paletteItems,
-  protectedIds,
-  tagOf,
-  widthOf,
-  widthOfType,
+  badgeOf, paletteItems, protectedIds, widthOf, widthOfType,
 } from './ui/node-kinds.js';
 import { installBodies } from './ui/bodies.js';
+import {
+  applyCanvasView,
+  canvasRect,
+  fitCanvas,
+  focusCanvasOn,
+  installCanvas,
+  measuredHeight,
+  mountCanvas,
+  syncCanvas,
+  toWorld,
+  zoomCanvasBy,
+} from './ui/canvas.js';
 import {
   flashNote,
   installChrome,
@@ -116,11 +106,6 @@ const graph = () => KIND().graphOf(state);
 const nid = () => 'n' + (seq++);
 const nodeList = (g = graph()) => Object.values(g.nodes);
 const stageOf = sid => stageNode(state, sid);
-/** 렌더된 노드의 실제 높이. 레이아웃 계산에 넘겨 준다. */
-const measuredHeight = id => {
-  const el = document.querySelector(`.node[data-id="${id}"]`);
-  return el ? el.offsetHeight : 190;
-};
 const setCount = n => badgeOf(n);
 
 /* ── 그래프 질의 (모드 공용) ─────────────── */
@@ -195,92 +180,10 @@ function syncFormatValue() {
   const n = stageNode(state, 'format');
   if (n) valuesOf(n).format = fmtExpr();
 }
-/* ── 좌표 변환 ───────────────────────────── */
-const vp = () => $('#viewport').getBoundingClientRect();
-function toWorld(clientX, clientY) {
-  const r = vp();
-  return { x: (clientX - r.left - view.x) / view.k, y: (clientY - r.top - view.y) / view.k };
-}
-const portPos = n => ({ inX: n.x, outX: n.x + widthOf(n), y: n.y + HEAD_H / 2 });
-const hasInPort = hasIn, hasOutPort = hasOut;
-
 /* ══ 명령어 조립 ═════════════════════════════ */
 // 조립·해석은 core/pipeline.js 에 있다. 여기서는 현재 상태를 넘기기만 한다.
 const tokensNow = () => buildTokens(state);
 const urlsNow = () => urlList(state);
-/* ══ 렌더 ════════════════════════════════════ */
-function applyView() {
-  $('#node-layer').style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
-  $('#wire-layer').setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
-  const el = $('#viewport');
-  el.style.backgroundSize = (22 * view.k) + 'px ' + (22 * view.k) + 'px';
-  el.style.backgroundPosition = view.x + 'px ' + view.y + 'px';
-  $('#zoom-label').textContent = Math.round(view.k * 100) + '%';
-}
-function wirePath(x1, y1, x2, y2) {
-  const dx = Math.max(34, Math.min(150, Math.abs(x2 - x1) * 0.5));
-  return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
-}
-const svgEl = t => document.createElementNS('http://www.w3.org/2000/svg', t);
-
-function renderWires() {
-  const g = graph();
-  const layer = $('#wire-layer');
-  const live = liveIds();
-  layer.innerHTML = '';
-
-  // 연산자 노드는 입력 순서가 의미를 가지므로 와이어에 번호를 붙인다.
-  // 피연산자 순서가 의미를 갖는 그래프에서만 와이어에 번호를 붙인다.
-  const ordinal = {};
-  if (KIND().wireOrdinals) {
-    for (const n of nodeList(g)) {
-      if (!FORMAT_OPS.includes(n.type)) continue;
-      KIND().operandsOf(g, n.id).forEach((k, i) => { ordinal[k.id + '>' + n.id] = i + 1; });
-    }
-  }
-
-  for (const e of g.edges) {
-    const a = g.nodes[e.from], b = g.nodes[e.to];
-    if (!a || !b) continue;
-    const pa = portPos(a), pb = portPos(b);
-    const d = wirePath(pa.outX, pa.y, pb.inX, pb.y);
-    const on = live.has(e.from) && live.has(e.to);
-    const grp = svgEl('g');
-    grp.setAttribute('class', 'wire-g');
-    grp.style.pointerEvents = 'auto';
-    // 삭제는 viewport 의 pointerdown 에서 처리한다. 팬이 포인터를 캡처해 버리면
-    // click 이 viewport 로 되돌아가기 때문에 여기에 onclick 을 달면 안 걸린다.
-    grp.dataset.from = e.from;
-    grp.dataset.to = e.to;
-    const hit = svgEl('path');
-    hit.setAttribute('class', 'wire-hit'); hit.setAttribute('d', d);
-    hit.innerHTML = '<title>클릭해서 연결 끊기</title>';
-    const p = svgEl('path');
-    p.setAttribute('class', 'wire' + (on ? '' : ' dead'));
-    p.setAttribute('d', d);
-    if (on) p.style.stroke = accentOf(a);
-    grp.append(hit, p);
-
-    const ord = ordinal[e.from + '>' + e.to];
-    if (ord) {
-      const t = svgEl('text');
-      t.setAttribute('class', 'wire-ord');
-      t.setAttribute('x', pb.inX - 16);
-      t.setAttribute('y', pb.y - 6);
-      t.setAttribute('text-anchor', 'end');
-      t.textContent = ord;
-      grp.append(t);
-    }
-    layer.append(grp);
-  }
-
-  if (ui.wire) {
-    const p = svgEl('path');
-    p.setAttribute('class', 'wire-temp');
-    p.setAttribute('d', wirePath(ui.wire.x1, ui.wire.y1, ui.wire.x2, ui.wire.y2));
-    layer.append(p);
-  }
-}
 
 /* ── UI 모듈에 앱을 넘긴다 ───────────────── */
 // 노드 안쪽은 ui/bodies.js, 캔버스 밖 틀은 ui/chrome.js 가 그린다. 앱은 그쪽이
@@ -293,6 +196,19 @@ installBodies({
   paintLit: () => paintLit(),
 });
 
+installCanvas({
+  graph: () => graph(),
+  kind: () => KIND(),
+  live: () => liveIds(),
+  ui,
+  view: () => view,
+  wire: (from, to) => wire(from, to),
+  unwire: (from, to) => unwire(from, to),
+  dropNode: id => dropNode(id),
+  redraw: () => render(),
+  note: msg => flashNote(msg),
+});
+
 installChrome({
   state: () => state,
   ui,
@@ -302,78 +218,9 @@ installChrome({
   focusNode: id => focusNode(id),
 });
 
-/* ── 노드 ────────────────────────────────── */
-/**
- * 노드 하나. 머리·본문·포트가 전부 한 템플릿이다.
- *
- * 예전에는 렌더마다 노드 엘리먼트를 새로 만들어 갈아 끼웠다. 그래서 입력
- * 중 포커스가 날아갔고, 포커스와 캐럿을 담았다 되돌리는 기구와 조합(IME)
- * 중인 노드를 비켜 가는 예외가 따로 필요했다. 지금은 lit 이 같은 DOM 을
- * 재사용하므로 그 기구가 통째로 없다 — 브라우저가 알아서 지킨다.
- */
-function nodeTemplate(n, live) {
-  const cls = 'node' + (isIO(n) ? ' io' : '')
-    + (live.has(n.id) ? '' : ' bypass') + (ui.sel === n.id ? ' sel' : '')
-    + (n.collapsed ? ' collapsed' : '');
-  const style = `--a:${accentOf(n)};--node-w:${widthOf(n)}px;`
-    + `left:${n.x}px;top:${n.y}px`;
-  const badge = setCount(n);
-  const toggle = () => {
-    n.collapsed = !n.collapsed;
-    if (ui.picker && ui.picker.node === n.id) ui.picker = null;
-    render();
-  };
 
-  return html`
-    <div class=${cls} data-id=${n.id} style=${style}
-         @pointerdown=${() => { ui.sel = n.id; paintSel(); }}>
-      <div class="node-head" title=${blurbOf(n)} @dblclick=${toggle}>
-        <span class="node-tag">[${tagOf(n)}]</span>
-        <span class="node-ko">${labelOf(n)}<span class="node-badge">${bypassLabelOf(n)}</span></span>
-        <span class="node-n" data-n=${badge}>${badge}</span>
-        <button class="node-x" type="button" title=${n.collapsed ? '펴기' : '접기'}
-                @click=${ev => { ev.stopPropagation(); toggle(); }}
-        >${n.collapsed ? '▸' : '▾'}</button>
-        ${PROTECTED.has(n.id) ? html`<span></span>` : html`
-          <button class="node-x" type="button" title="노드 지우기"
-                  @click=${ev => { ev.stopPropagation(); dropNode(n.id); render(); }}>✕</button>`}
-      </div>
-      ${n.collapsed ? nothing : html`
-        <div class="node-body">${bodyOf(n.type)(n)}</div>`}
-      ${hasInPort(n) ? html`
-        <span class="port in" data-node=${n.id} data-side="in" title="입력"></span>` : nothing}
-      ${hasOutPort(n) ? html`
-        <span class="port out" data-node=${n.id} data-side="out"
-              title="출력 — 여기서 끌어다 다른 노드 입력에 놓아라"></span>` : nothing}
-    </div>`;
-}
-
-/** 옵션 검색창은 열린 그 순간에만 포커스를 가져간다. 그 뒤로는 DOM 이
- *  살아 있으므로 다시 건드릴 필요가 없다. */
-let pickerFocused = null;
-function focusPicker(layer) {
-  const at = ui.picker ? ui.picker.node : null;
-  if (at === pickerFocused) return;
-  pickerFocused = at;
-  if (!at) return;
-  const inp = layer.querySelector(`.node[data-id="${at}"] .picker input`);
-  if (inp) inp.focus();
-}
-
-function renderNodes() {
-  const layer = $('#node-layer');
-  const g = graph();
-  const live = liveIds();
-
-  // id 로 키를 잡아 두면 노드가 늘고 줄어도 남는 노드의 DOM 은 그대로다.
-  renderTpl(html`${repeat(nodeList(g), n => n.id, n => nodeTemplate(n, live))}`, layer);
-  focusPicker(layer);
-
-  const hint = $('#hint');
-  hint.hidden = !KIND().isEmpty(g);
-  hint.innerHTML = `<div>${KIND().emptyHint}</div>`;
-}
-
+/* ══ 렌더 ════════════════════════════════════ */
+/** 옵션 ↔ 명령어 토큰 ↔ 노드 상호 강조. 클래스만 건드린다. */
 function paintLit() {
   for (const el of document.querySelectorAll('.tok[data-opt]'))
     el.classList.toggle('lit', el.dataset.opt === ui.lit);
@@ -383,14 +230,29 @@ function paintLit() {
   for (const el of document.querySelectorAll('.node'))
     el.classList.toggle('lit', !!holder && el.dataset.id === holder.id);
 }
-function paintSel() {
-  for (const el of document.querySelectorAll('.node'))
-    el.classList.toggle('sel', el.dataset.id === ui.sel);
+
+/** 캔버스가 빌 때의 안내. */
+function renderHint() {
+  const hint = $('#hint');
+  hint.hidden = !KIND().isEmpty(graph());
+  hint.innerHTML = `<div>${KIND().emptyHint}</div>`;
+}
+
+/** 옵션 검색창은 열린 그 순간에만 포커스를 가져간다. */
+let pickerFocused = null;
+function focusPicker() {
+  const at = ui.picker ? ui.picker.node : null;
+  if (at === pickerFocused) return;
+  pickerFocused = at;
+  const inp = at && document.querySelector(`.node[data-id="${at}"] .picker input`);
+  if (inp) inp.focus();
 }
 
 function render() {
   KIND().sync();
-  renderCrumb(); renderNodes(); renderWires(); renderCmd(); renderPalette(); applyView(); save();
+  renderCrumb();
+  syncCanvas().then(focusPicker);      // 캔버스는 Rete 가 그린다 — 우리는 맞추기만
+  renderHint(); renderCmd(); renderPalette(); save();
 }
 
 /* ══ 그래프 종류의 DOM 쪽 동작 ═══════════════
@@ -485,6 +347,7 @@ function setMode(m) {
   ui.sel = null; ui.picker = null; ui.lit = null;
   $('#hits').hidden = true;
   render();
+  applyCanvasView();          // 화면 변환은 그래프마다 따로다
 }
 
 /** --format 문자열을 서브그래프로 풀어 놓고 들어간다.
@@ -521,10 +384,9 @@ function enterSubgraph(kindId) {
 /* ══ 배치 ════════════════════════════════════ */
 /** 화면 한가운데에서 겹치지 않는 자리. */
 function centerSpot() {
-  const r = vp();
-  return freeSpot(graph(),
-    (r.width / 2 - view.x) / view.k - NODE_W / 2,   // 새 노드 폭은 만들어 봐야 안다
-    (r.height / 2 - view.y) / view.k - 60);
+  const r = canvasRect();
+  const w = toWorld(r.left + r.width / 2, r.top + r.height / 2);
+  return freeSpot(graph(), w.x - NODE_W / 2, w.y - 60);   // 새 노드 폭은 만들어 봐야 안다
 }
 function autolayout() {
   KIND().relayout();
@@ -540,140 +402,12 @@ function autowire() {
   for (let i = 0; i < chain.length - 1; i++) state.edges.push({ from: chain[i], to: chain[i + 1] });
   render();
 }
-function fitView() {
-  const r = vp();
-  const box = bounds(graph(), measuredHeight, { widthOf: id => widthOf(graph().nodes[id]) });
-  const v = fitTo(box, r.width, r.height);
-  if (!v) return;
-  Object.assign(view, v);
-  applyView();
-}
-function focusNode(id) {
-  const n = graph().nodes[id];
-  if (!n) return;
-  const r = vp();
-  view.x = r.width / 2 - (n.x + NODE_W / 2) * view.k;
-  view.y = r.height / 3 - n.y * view.k;
-  applyView(); renderWires();
-}
+const fitView = () => fitCanvas();
+const focusNode = id => focusCanvasOn(id);
 
-/* ══ 포인터: 팬 · 노드 이동 · 배선 ═══════════ */
-const viewport = $('#viewport');
-
-viewport.addEventListener('pointerdown', e => {
-  const port = e.target.closest('.port');
-  const head = e.target.closest('.node-head');
-  const wireEl = e.target.closest('.wire-g');
-
-  if (wireEl && !port && !head) {
-    e.preventDefault();
-    const { from, to } = wireEl.dataset;
-    graph().edges = graph().edges.filter(x => !(x.from === from && x.to === to));
-    render();
-    return;
-  }
-
-  if (port) {
-    e.preventDefault(); e.stopPropagation();
-    const n = graph().nodes[port.dataset.node];
-    const p = portPos(n);
-    const side = port.dataset.side;
-    const x = side === 'out' ? p.outX : p.inX;
-    ui.wire = { from:n.id, side, x1:x, y1:p.y, x2:x, y2:p.y };
-    viewport.classList.add('wiring');
-    viewport.setPointerCapture(e.pointerId);
-    renderWires();
-    return;
-  }
-
-  // 헤더 위의 버튼(접기·삭제)은 자기 onclick 으로 처리한다.
-  // 여기서 드래그를 시작하면 포인터 캡처가 click 을 viewport 로 가로챈다.
-  if (head && e.target.closest('button')) return;
-
-  if (head) {
-    const el = head.closest('.node');
-    const n = graph().nodes[el.dataset.id];
-    const w = toWorld(e.clientX, e.clientY);
-    ui.drag = { id:n.id, dx: w.x - n.x, dy: w.y - n.y, el };
-    ui.sel = n.id; paintSel();
-    viewport.setPointerCapture(e.pointerId);
-    e.preventDefault();
-    return;
-  }
-
-  if (e.target.closest('.node') || e.target.closest('.hud')) return;
-  ui.pan = { x: e.clientX - view.x, y: e.clientY - view.y };
-  ui.sel = null; paintSel();
-  viewport.classList.add('panning');
-  viewport.setPointerCapture(e.pointerId);
-});
-
-viewport.addEventListener('pointermove', e => {
-  if (ui.wire) {
-    const w = toWorld(e.clientX, e.clientY);
-    ui.wire.x2 = w.x; ui.wire.y2 = w.y;
-    for (const p of document.querySelectorAll('.port')) p.classList.remove('hot');
-    const hit = document.elementFromPoint(e.clientX, e.clientY);
-    const port = hit && hit.closest && hit.closest('.port');
-    if (port && port.dataset.side !== ui.wire.side) port.classList.add('hot');
-    renderWires();
-    return;
-  }
-  if (ui.drag) {
-    const w = toWorld(e.clientX, e.clientY);
-    const n = graph().nodes[ui.drag.id];
-    n.x = Math.round(w.x - ui.drag.dx);
-    n.y = Math.round(w.y - ui.drag.dy);
-    ui.drag.el.style.left = n.x + 'px';
-    ui.drag.el.style.top = n.y + 'px';
-    renderWires();
-    return;
-  }
-  if (ui.pan) {
-    view.x = e.clientX - ui.pan.x;
-    view.y = e.clientY - ui.pan.y;
-    applyView();
-  }
-});
-
-function endPointer(e) {
-  if (ui.wire) {
-    const hit = document.elementFromPoint(e.clientX, e.clientY);
-    const port = hit && hit.closest && hit.closest('.port');
-    if (port && port.dataset.side !== ui.wire.side) {
-      const other = port.dataset.node;
-      const ok = ui.wire.side === 'out'
-        ? wire(ui.wire.from, other)
-        : wire(other, ui.wire.from);
-      if (!ok) flashNote('이을 수 없다 — 이미 이어져 있거나 순환이 된다.');
-    }
-    for (const p of document.querySelectorAll('.port')) p.classList.remove('hot');
-    ui.wire = null;
-    viewport.classList.remove('wiring');
-    render();
-  }
-  // 세로 위치가 연산자의 피연산자 순서를 정하므로, 드래그가 끝나면 전부 다시 그린다.
-  if (ui.drag) { ui.drag = null; render(); }
-  if (ui.pan) { ui.pan = null; viewport.classList.remove('panning'); save(); }
-}
-viewport.addEventListener('pointerup', endPointer);
-viewport.addEventListener('pointercancel', endPointer);
-
-viewport.addEventListener('wheel', e => {
-  e.preventDefault();
-  const r = vp();
-  Object.assign(view, zoomAt(view, e.clientX - r.left, e.clientY - r.top,
-                             Math.exp(-e.deltaY * 0.0016)));
-  applyView(); save();
-}, { passive: false });
-
-function zoomBy(f) {
-  const r = vp();
-  Object.assign(view, zoomAt(view, r.width / 2, r.height / 2, f));
-  applyView(); save();
-}
-$('#zoom-in').onclick = () => zoomBy(1.2);
-$('#zoom-out').onclick = () => zoomBy(1 / 1.2);
+/* ══ 화면 조작 ═══════════════════════════════ */
+$('#zoom-in').onclick = () => zoomCanvasBy(1.2);
+$('#zoom-out').onclick = () => zoomCanvasBy(1 / 1.2);
 $('#zoom-reset').onclick = fitView;
 $('#fit').onclick = fitView;
 $('#autolayout').onclick = autolayout;
@@ -706,7 +440,7 @@ $('#pal-list').addEventListener('pointerdown', e => {
     item.removeEventListener('pointermove', move);
     item.removeEventListener('pointerup', up);
     if (ghost) ghost.remove();
-    const r = vp();
+    const r = canvasRect();
     const inside = ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom;
     let pos;
     if (ghost && inside) {
@@ -824,7 +558,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '/' && !typing && KIND().search) { e.preventDefault(); $('#q').focus(); }
   if (e.key === 'Escape') {
     if (ui.picker) { ui.picker = null; render(); }
-    else if (ui.sel) { ui.sel = null; paintSel(); }
+    else if (ui.sel) { ui.sel = null; render(); }
     else if (KIND().parent) setMode(KIND().parent);
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && ui.sel) {
@@ -845,7 +579,7 @@ async function copy(text, btn) {
 $('#copy-cmd').onclick = e => copy(commandString(state), e.target);
 $('#copy-conf').onclick = e => copy(confString(state), e.target);
 
-addEventListener('resize', () => { applyView(); renderWires(); });
+
 
 /* ══ 테스트 손잡이 ═══════════════════════════
    e2e 가 잡는 유일한 표면. 내부 이름·시그니처가 바뀌어도 여기서 흡수해서
@@ -868,6 +602,7 @@ window.__yt = {
 };
 
 /* ── 시작 ────────────────────────────────── */
+mountCanvas($('#viewport'));
 const fresh = !load();
 if (fresh) resetState();
 render();
