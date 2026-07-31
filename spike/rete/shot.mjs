@@ -1,0 +1,26 @@
+import { spawn } from 'node:child_process';
+import { chromium } from 'playwright';
+const vite = spawn('npx', ['vite', '--port', '5214', '--strictPort'], { stdio: ['ignore','pipe','pipe'] });
+let log=''; vite.stdout.on('data',d=>log+=d); vite.stderr.on('data',d=>log+=d);
+process.on('exit', () => { try { vite.kill('SIGTERM'); } catch {} });
+for (let i=0;i<100 && !/ready in|Local:/.test(log);i++) await new Promise(r=>setTimeout(r,200));
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+const p = await b.newPage({ viewport: { width: 1400, height: 900 } });
+await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+await p.goto('http://localhost:5214/', { waitUntil: 'load' });
+await p.waitForTimeout(1200);
+await p.locator('.node').filter({ hasText: '[format]' }).locator('.node-x').first().click();
+await p.waitForTimeout(300);
+await p.click('#add'); await p.waitForTimeout(300);
+await p.evaluate(async () => {
+  const s = __spike.state;
+  const proc = Object.values(s.nodes).find(n => n.stage === 'process');
+  s.edges.push({ from: 'src', to: proc.id }, { from: proc.id, to: 'out' });
+  s.nodes[proc.id].values['embed-subs'] = true;
+  await __spike.area.translate(proc.id, { x: 380, y: 460 });
+  __spike.refresh();
+});
+await p.waitForTimeout(400);
+await p.click('#fit'); await p.waitForTimeout(400);
+await p.screenshot({ path: 'shot.png' });
+await b.close(); vite.kill('SIGTERM');
