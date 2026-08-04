@@ -23,7 +23,7 @@
  */
 import { STAGE, STAGES, expand, search } from '../core/schema.js';
 import { valuesOf } from '../core/graph.js';
-import { buildTokens, quote, stageNode, urlList } from '../core/pipeline.js';
+import { buildTokens, extraList, quote, stageNode, urlList } from '../core/pipeline.js';
 import { html, nothing, renderTpl } from './tpl.js';
 import { STAGE_ACCENT, badgeOf, paletteItems } from './node-kinds.js';
 import { graphKind } from './graph-kinds.js';
@@ -212,14 +212,18 @@ function place(o) {
  *  한다. 그래서 정적 문자열에 줄바꿈을 넣지 않는다(줄바꿈은 `${}` 안쪽에만). */
 const tokenSpan = t => html` <span class="tok${uiState.lit === t.opt.id ? ' lit' : ''}" data-opt=${t.opt.id} data-node=${t.node} title=${`${t.opt.flag} — [${t.opt.stage}] ${STAGE[t.opt.stage].label} 노드`}>${t.text}</span>`;
 
-export const cmdTemplate = (toks, urls) =>
+/** 스키마가 모르는 토큰. 그래프에 실을 자리는 없어도 명령어에는 그대로 남는다. */
+const extraSpan = raw => html` <span class="tok extra" title="이 스키마에 없는 토큰 — 원문 그대로 내보낸다">${raw}</span>`;
+
+export const cmdTemplate = (toks, urls, extras = []) =>
   html`<span class="prompt">$ </span><span>yt-dlp</span>${
     toks.map(tokenSpan)}${
+    extras.map(extraSpan)}${
     urls.map(u => html` <span class="tok url">${quote(u)}</span>`)}`;
 
 export function renderCmd() {
   const toks = buildTokens(stateOf());
-  renderTpl(cmdTemplate(toks, urlList(stateOf())), $('#cmd'));
+  renderTpl(cmdTemplate(toks, urlList(stateOf()), extraList(stateOf())), $('#cmd'));
   renderTpl(notesTemplate(toks), $('#notes'));
 }
 

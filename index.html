@@ -30,6 +30,10 @@
     <div class="hits" id="hits" hidden></div>
   </div>
   <div class="top-spacer"></div>
+  <div class="views" id="views" role="tablist" aria-label="화면">
+    <button class="view" id="view-ask" role="tab">프롬프트</button>
+    <button class="view" id="view-graph" role="tab">그래프</button>
+  </div>
   <div class="topact">
     <button class="btn" id="pal-toggle">노드</button>
     <button class="btn" id="import">명령어 읽기</button>
@@ -37,6 +41,10 @@
     <button class="btn" id="reset">초기화</button>
   </div>
 </header>
+
+<main class="ask" id="ask" hidden>
+  <!-- 프롬프트 · 명령어 · 판독 · 옵션 찾아보기는 ui/ask.js 가 여기 안에 그린다 -->
+</main>
 
 <div class="main">
   <aside class="palette" id="palette" aria-label="노드 팔레트">
@@ -95,6 +103,31 @@
       <button class="btn" value="cancel">닫기</button>
       <button class="btn" id="graph-copy" type="button">복사</button>
       <button class="btn primary" id="graph-load" type="button">불러오기</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-key">
+  <form method="dialog" class="dlg">
+    <h3>Anthropic API 키</h3>
+    <p>서버가 없으므로 브라우저에서 <code>api.anthropic.com</code> 을 바로 부른다. 키는 이 브라우저의 <code>localStorage</code> 에만 있고 우리 쪽 어디로도 가지 않는다 — 다만 이 페이지의 스크립트는 읽을 수 있으니, 쓰고 버릴 키를 권한다. 키 없이 쓰려면 <b>프롬프트 복사</b>로 쓰던 LLM 에 붙여넣으면 된다.</p>
+    <input id="key-input" type="password" spellcheck="false" autocomplete="off" placeholder="sk-ant-…">
+    <div class="dlg-act">
+      <button class="btn" value="cancel">취소</button>
+      <button class="btn" id="key-clear" type="button">지우기</button>
+      <button class="btn primary" id="key-save" type="button">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-pack">
+  <form method="dialog" class="dlg">
+    <h3>프롬프트 복사</h3>
+    <p>설치된 yt-dlp <b id="pack-ver"></b> 를 리플렉션한 옵션 카탈로그가 통째로 들어 있다. 쓰던 LLM 에 붙여넣고, 돌아온 명령어를 명령어 칸에 붙여넣으면 검증은 똑같이 돈다.</p>
+    <textarea id="pack-text" spellcheck="false" readonly></textarea>
+    <div class="dlg-act">
+      <button class="btn" value="cancel">닫기</button>
+      <button class="btn primary" id="pack-copy" type="button">복사</button>
     </div>
   </form>
 </dialog>

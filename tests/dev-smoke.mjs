@@ -67,9 +67,24 @@ const check = (name, cond, note = '') => {
 try {
   await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
   // 고정 대기는 vite 의 첫 의존성 최적화와 경합한다. 앱이 그려질 때까지 기다린다.
-  await page.locator('.node').first().waitFor({ timeout: 20000 }).catch(() => {});
+  await page.locator('.ak-put textarea').first().waitFor({ timeout: 20000 }).catch(() => {});
 
-  check('앱이 뜬다', (await page.locator('.node').count()) === 2);
+  // 화면이 둘이라 import 빠짐도 두 갈래로 난다. 프롬프트 쪽을 먼저 밟는다.
+  check('프롬프트 화면이 뜬다', (await page.locator('.ak-put textarea').count()) === 1);
+  await page.fill('.ak-cmd-box', 'yt-dlp -f "bv+ba/" --write-sub https://youtu.be/x');
+  await page.waitForTimeout(300);
+  check('검증기가 돈다', (await page.textContent('.rp-issues')).includes('-f 값을 읽지 못했다'));
+  check('판독이 그려진다', (await page.locator('.rp-verdict').count()) === 1);
+  await page.click('.br-open');
+  await page.locator('.br-chip').first().click();
+  await page.waitForTimeout(250);
+  check('옵션 찾아보기가 열린다', (await page.locator('.br-row').count()) >= 3,
+    `${await page.locator('.br-row').count()}개`);
+
+  await page.fill('.ak-cmd-box', '');
+  await page.click('#view-graph');
+  await page.locator('.node').first().waitFor({ timeout: 20000 }).catch(() => {});
+  check('그래프 화면이 뜬다', (await page.locator('.node').count()) === 2);
   // 노드는 캔버스 라이브러리의 그림자 DOM 밖(light DOM)에 있어야 app.css 가 닿는다.
   check('CSS 가 붙었다',
     await page.evaluate(() => getComputedStyle(document.querySelector('.node')).width === '300px'));

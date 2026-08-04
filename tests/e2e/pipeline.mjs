@@ -3,6 +3,7 @@
  *
  * 노드 배치·배선·절단·우회 반영, 명령어 왕복, 저장 복원까지.
  */
+export const view = 'graph';
 export const name = '파이프라인 그래프';
 
 export default async function ({ p, step, assert, dialogs, setDialog }) {
