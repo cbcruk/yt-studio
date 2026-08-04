@@ -81,17 +81,22 @@ def jsonable(v):
 
 
 def control_kind(opt):
-    """옵션을 UI 컨트롤 종류로 분류."""
+    """옵션을 UI 컨트롤 종류로 분류.
+
+    action 이름을 열거하면 계속 샌다 — store_const · version · help 처럼
+    인자를 안 받는 action 이 여럿이고, yt-dlp 는 그중 여러 개를 쓴다.
+    (그래서 --version · --write-thumbnail 이 한동안 값을 받는 옵션으로 잡혔다.)
+    optparse 가 이미 답을 갖고 있으니 그걸 묻는다 — takes_value() 는
+    type 이 붙어 있는지를 본다.
+    """
     if opt.choices:
         return "choice"
-    if opt.action in ("store_true", "store_false"):
-        return "flag"
     if opt.action == "count":
         return "count"
+    if not opt.takes_value():
+        return "flag"
     if opt.action == "append":
         return "repeatable"
-    if opt.action == "callback" and not opt.nargs:
-        return "flag"
     return "value"
 
 
