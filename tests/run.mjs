@@ -23,12 +23,12 @@ try {
   process.exit(1);
 }
 
-const SUITES = ['e2e/pipeline.mjs', 'e2e/format.mjs', 'e2e/output.mjs', 'e2e/paths.mjs'].filter(wanted);
+const SUITES = ['e2e/ask.mjs', 'e2e/pipeline.mjs', 'e2e/format.mjs', 'e2e/output.mjs', 'e2e/paths.mjs'].filter(wanted);
 const totals = [];
 
 for (const file of SUITES) {
   const mod = await import('./' + file);
-  totals.push(await runSuite(mod.name || file, mod.default));
+  totals.push(await runSuite(mod.name || file, mod.default, { view: mod.view }));
 }
 
 console.log('\n' + '─'.repeat(52));

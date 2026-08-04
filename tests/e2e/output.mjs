@@ -3,6 +3,7 @@
  *
  * -o 문자열 ↔ 노드 수열 왕복, 조각 편집, 가로 위치 = 파일명 순서.
  */
+export const view = 'graph';
 export const name = '출력 템플릿 서브그래프';
 
 export default async function ({ p, step, assert, dialogs, setDialog }) {

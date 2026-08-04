@@ -3,6 +3,7 @@
  *
  * -f 문자열 ↔ 노드 그래프 왕복, 필터 UI, 피연산자 순서, 괄호 자동 삽입.
  */
+export const view = 'graph';
 export const name = '포맷 셀렉터 서브그래프';
 
 export default async function ({ p, step, assert, dialogs, setDialog }) {

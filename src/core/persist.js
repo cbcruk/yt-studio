@@ -8,6 +8,8 @@ import { pruneEdges } from './graph.js';
 
 export const STORE_KEY = 'ytstudio.graph.v3';
 export const LEGACY_KEYS = ['ytstudio.graph.v2'];
+export const HISTORY_KEY = 'ytstudio.history.v1';
+export const HISTORY_MAX = 30;
 
 /** 직렬화 전에 걷어낼 내부 전용 필드. 저장물로 새면 안 된다. */
 const TRANSIENT = ['_tidy'];
@@ -40,6 +42,8 @@ export function restore(data, { subgraphs = [], isValidStage } = {}) {
   }
   pruneEdges(s);
   s.view = Object.assign({ x: 0, y: 0, k: 1 }, s.view);
+  // extras 는 v3 중간에 생겼다. 옛 스냅샷에는 없다.
+  s.extras = Array.isArray(s.extras) ? s.extras.filter(x => typeof x === 'string') : [];
 
   let extra = 0;
   for (const { key, root, blank } of subgraphs) {
@@ -67,4 +71,59 @@ export function loadRaw(storage) {
     } catch { /* 깨진 저장물은 없는 셈 친다 */ }
   }
   return null;
+}
+
+/* ── 명령어 히스토리 ─────────────────────── */
+/**
+ * 원본이 그래프에서 명령어로 바뀌면서 생긴 저장물.
+ *
+ * 그래프 스냅샷은 "지금 편집 중인 것" 하나뿐이지만, 명령어는 만들고 버리고
+ * 다시 꺼내는 물건이라 여러 개가 쌓인다. 프롬프트를 같이 남긴다 — 나중에
+ * 보면 명령어보다 "무엇을 원했는지"가 먼저 기억나기 때문이다.
+ */
+export function loadHistory(storage) {
+  try {
+    const raw = storage.getItem(HISTORY_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list.filter(e => e && typeof e.command === 'string') : [];
+  } catch { return []; }
+}
+
+/** 같은 명령어는 위로 끌어올린다 — 목록이 같은 줄로 채워지지 않게. */
+export function pushHistory(list, entry) {
+  const cmd = String((entry && entry.command) || '').trim();
+  if (!cmd) return list;
+  const rest = list.filter(e => e.command.trim() !== cmd);
+  return [{ ...entry, command: cmd }, ...rest].slice(0, HISTORY_MAX);
+}
+
+export function saveHistory(storage, list) {
+  try { storage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch { /* 저장 못 해도 계속 쓴다 */ }
+}
+
+/** 마지막으로 보던 화면. 그래프에서 새로고침했는데 프롬프트로 튕기면 안 된다. */
+export const VIEW_KEY = 'ytstudio.view';
+export const loadView = storage => {
+  try { return storage.getItem(VIEW_KEY) === 'graph' ? 'graph' : 'ask'; }
+  catch { return 'ask'; }
+};
+
+/* ── 편집 중인 명령어 ────────────────────── */
+/** 히스토리에 넣기 전, 아직 고치는 중인 것. 새로고침으로 날아가면 안 된다. */
+export const DRAFT_KEY = 'ytstudio.draft.v1';
+
+export function loadDraft(storage) {
+  try {
+    const d = JSON.parse(storage.getItem(DRAFT_KEY) || 'null');
+    if (!d || typeof d !== 'object') return null;
+    return {
+      prompt: String(d.prompt || ''),
+      command: String(d.command || ''),
+      note: String(d.note || ''),
+    };
+  } catch { return null; }
+}
+
+export function saveDraft(storage, d) {
+  try { storage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch { /* 저장 못 해도 계속 쓴다 */ }
 }

@@ -34,12 +34,17 @@ export function assert(cond, msg) {
  * 스위트 하나를 브라우저 하나로 돌린다.
  * body 는 { p, step, dialogs, setDialog } 를 받는다.
  */
-export async function runSuite(name, body) {
+export async function runSuite(name, body, { view = 'ask' } = {}) {
   if (!fs.existsSync(path.join(ROOT, 'dist', 'ytdlp-studio.html')))
     throw new Error('dist/ytdlp-studio.html 이 없다. 먼저 `python3 build.py` 를 돌려라.');
 
   const browser = await chromium.launch(launchOpts());
   const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // 앱은 프롬프트 화면으로 열린다. 캔버스를 보는 스위트는 그 화면을 미리
+  // 골라 둔다 — 스위트 안에서 reload 를 해도 계속 유지되도록 초기 스크립트로.
+  if (view === 'graph') {
+    await p.addInitScript(() => { localStorage.setItem('ytstudio.view', 'graph'); });
+  }
   p.setDefaultTimeout(8000);
   p.setDefaultNavigationTimeout(30000);
   await p.route(FONT_CDN, r => r.abort());

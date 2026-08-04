@@ -7,6 +7,7 @@
 import { SCHEMA } from './core/schema-data.js';
 import {
   BY_ID,
+  BY_STAGE,
   OPTS,
   STAGE,
   STAGES,
@@ -24,11 +25,20 @@ import {
   commandString,
   confString,
   parseCommand,
+  scanCommand,
   spliceIntoChain,
   stageNode,
 } from './core/pipeline.js';
 import { freeSpot } from './core/layout.js';
-import { STORE_KEY, loadRaw, restore, snapshot } from './core/persist.js';
+import {
+  STORE_KEY, VIEW_KEY, loadDraft, loadHistory, loadRaw, loadView, pushHistory,
+  restore, saveDraft, saveHistory, snapshot,
+} from './core/persist.js';
+import { lintCommand } from './core/lint.js';
+import {
+  AskError, DEFAULT_MODEL, KEY_STORE, MODEL_STORE,
+  ask, extractCommand, systemBlocks, userText,
+} from './core/ask.js';
 import { protectedIds, widthOfType } from './ui/node-kinds.js';
 import { installBodies } from './ui/bodies.js';
 import {
@@ -56,6 +66,10 @@ import {
 } from './ui/chrome.js';
 import { $ } from './ui/dom.js';
 import { allGraphKinds, graphKind } from './ui/graph-kinds.js';
+import { askTemplate, installAsk } from './ui/ask.js';
+import { blankBrowse, installBrowse } from './ui/browse.js';
+import { installReport } from './ui/report.js';
+import { renderTpl } from './ui/tpl.js';
 
 /* ══ 스키마 파생 ═════════════════════════════ */
 // 색인·검색·KO 사전은 core/schema.js 에 있다.
@@ -67,8 +81,20 @@ const PROTECTED = protectedIds();   // 각 그래프의 고정 끝점
 
 let state, seq;
 const ui = {
+  view: 'ask',                        // 'ask' 가 첫 화면이다 — 그래프는 고칠 때 연다
   mode: 'pipeline', lit: null, sel: null, picker: null,
   unknown: [], drag: null, wire: null, pan: null, fmtWarn: '',
+};
+
+/**
+ * 프롬프트 화면의 상태.
+ *
+ * command 가 이 앱의 원본이다. 그래프는 이걸 풀어 놓은 편집기이고,
+ * 그래프에서 나올 때 다시 여기로 접힌다.
+ */
+const ak = {
+  prompt: '', command: '', note: '', error: '', busy: false,
+  key: '', model: DEFAULT_MODEL, history: [], browse: blankBrowse(),
 };
 
 const blankState = () => Object.assign(blankPipeline(),
@@ -164,6 +190,111 @@ installChrome({
   focusNode: id => focusNode(id),
 });
 
+/* ══ 프롬프트 화면 ═══════════════════════════
+   원본은 ak.command 다. 그래프는 그걸 풀어 놓는 편집기이고, 검증은
+   core/lint.js 가 스키마와 진짜 파서로 한다 — 모델의 말은 안 믿는다. */
+
+/** 명령어 문자열에 토큰 하나를 끼운다. URL 앞에 둔다 — 뒤로 가면 읽기 나쁘다. */
+function addToken(text) {
+  const t = String(text).trim();
+  if (!t) return;
+  const cur = ak.command.trim();
+  if (!cur) { ak.command = 'yt-dlp ' + t; return; }
+  const { head, items } = scanCommand(cur);
+  ak.command = [
+    head || 'yt-dlp',
+    ...items.filter(i => i.kind !== 'url').map(i => i.raw),
+    t,
+    ...items.filter(i => i.kind === 'url').map(i => i.raw),
+  ].join(' ');
+}
+
+/** 오타 제안을 눌렀을 때. 플래그 자리만 갈아 끼우고 값은 그대로 둔다. */
+function replaceFlag(from, to) {
+  const esc = String(from).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  ak.command = ak.command.replace(new RegExp(`(^|\\s)${esc}(?=[\\s=]|$)`, 'g'), `$1${to}`);
+}
+
+installBrowse({ state: ak.browse, render: () => render(), add: addToken });
+installReport({ render: () => render(), add: addToken, replaceFlag });
+installAsk({
+  state: ak,
+  render: () => render(),
+  run: () => runAsk(),
+  toGraph: () => enterGraph(),
+  copy: (text, btn) => copy(text, btn),
+  lint: text => lintCommand(text),
+  openPack: () => openPack(),
+  openKey: () => openKeyDialog(),
+});
+
+/* ── 모델에게 묻기 ───────────────────────── */
+const systemFor = () => systemBlocks(SCHEMA.ytdlp_version, STAGES, BY_STAGE);
+
+async function runAsk() {
+  const want = ak.prompt.trim();
+  if (!want || ak.busy) return;
+  if (!ak.key) { openPack(); return; }
+
+  ak.busy = true; ak.error = ''; render();
+  try {
+    const { text } = await ask({
+      key: ak.key,
+      model: ak.model,
+      system: systemFor(),
+      user: userText(want, ak.command.trim()),
+    });
+    const { command, note } = extractCommand(text);
+    if (!command) {
+      ak.error = '답에서 명령어를 찾지 못했다 — 프롬프트 복사로 직접 물어볼 것';
+    } else {
+      ak.command = command;
+      ak.note = note;
+      ak.prompt = '';
+      ak.history = pushHistory(ak.history, { command, prompt: want });
+    }
+  } catch (e) {
+    ak.error = e instanceof AskError ? e.message : `실패했다 — ${e.message}`;
+  } finally {
+    ak.busy = false; render();
+  }
+}
+
+/** 키 없이 쓰는 길. 시스템 프롬프트와 요구를 한 덩어리로 만들어 준다. */
+function packText() {
+  const sys = systemFor().map(b => b.text).join('\n\n');
+  const want = ak.prompt.trim() || '(여기에 무엇을 받고 싶은지 쓴다)';
+  return `${sys}\n\n---\n\n${userText(want, ak.command.trim())}`;
+}
+
+function openPack() {
+  $('#pack-ver').textContent = SCHEMA.ytdlp_version;
+  $('#pack-text').value = packText();
+  $('#dlg-pack').showModal();
+}
+
+function openKeyDialog() {
+  $('#key-input').value = ak.key;
+  $('#dlg-key').showModal();
+}
+
+/* ── 명령어 ↔ 그래프 ─────────────────────── */
+/** 명령어를 그래프로 풀어 놓고 캔버스로 간다. */
+function enterGraph() {
+  if (ak.command.trim()) importCommand(ak.command);
+  ui.view = 'graph';
+  render();
+  fitView();
+}
+
+/** 그래프에서 나오면 다시 문자열로 접는다 — 원본은 늘 명령어다. */
+function leaveGraph() {
+  ak.command = commandString(state);
+  ak.note = '';
+  ui.view = 'ask';
+  render();
+}
+
 
 /* ══ 렌더 ════════════════════════════════════ */
 /** 옵션 ↔ 명령어 토큰 ↔ 노드 상호 강조. 클래스만 건드린다. */
@@ -194,7 +325,23 @@ function focusPicker() {
   if (inp) inp.focus();
 }
 
+/** 그래프 화면에만 있는 것들. 프롬프트 화면에서는 통째로 빠진다. */
+function applyView() {
+  const asking = ui.view === 'ask';
+  $('#ask').hidden = !asking;
+  $('.main').hidden = asking;
+  $('.readout').hidden = asking;
+  for (const id of ['pal-toggle', 'import', 'graph-io', 'reset', 'autolayout', 'autowire', 'fit'])
+    $('#' + id).hidden = asking || (id === 'autowire' && !KIND().canAutowire);
+  $('#field-q').hidden = asking || !KIND().search;
+  $('#view-ask').setAttribute('aria-selected', String(asking));
+  $('#view-graph').setAttribute('aria-selected', String(!asking));
+}
+
 function render() {
+  applyView();
+  if (ui.view === 'ask') { renderTpl(askTemplate(), $('#ask')); save(); return; }
+
   KIND().sync();
   renderCrumb();
   syncCanvas().then(focusPicker);      // 캔버스는 Rete 가 그린다 — 우리는 맞추기만
@@ -284,12 +431,15 @@ $('#cmd').addEventListener('mouseout', () => { ui.lit = null; paintLit(); });
 
 /* ══ 역방향: 명령어 → 그래프 ═════════════════ */
 function importCommand(text) {
-  const { urls, picked, unknown } = parseCommand(text);
+  const { urls, picked, unknown, extras } = parseCommand(text);
 
   const keep = state.nodes.src.urls;
   resetState();
   state.nodes.src.urls = urls.length ? urls.join('\n') : keep;
   ui.unknown = unknown;
+  // 그래프에 실을 자리는 없어도 명령어에는 남아야 한다 — 왕복에서 사라지면
+  // "그래프에서 고치기"가 조용히 명령어를 깎는 셈이 된다.
+  state.extras = extras;
 
   for (const sid of STAGE_ORDER) {
     if (!picked[sid]) continue;
@@ -321,6 +471,12 @@ function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot(state, seq, ui.mode))); } catch {}
+    saveDraft(localStorage, { prompt: ak.prompt, command: ak.command, note: ak.note });
+    saveHistory(localStorage, ak.history);
+    try {
+      localStorage.setItem(MODEL_STORE, ak.model);
+      localStorage.setItem(VIEW_KEY, ui.view);
+    } catch { /* 다음에 다시 고르면 된다 */ }
   }, 250);
 }
 const snap = () => snapshot(state, seq, ui.mode);
@@ -348,6 +504,21 @@ document.addEventListener('pointerdown', e => {
   if (!e.target.closest('.field') && !e.target.closest('.hits')) $('#hits').hidden = true;
 }, true);
 
+$('#view-ask').onclick = () => { if (ui.view !== 'ask') leaveGraph(); };
+$('#view-graph').onclick = () => { if (ui.view !== 'graph') enterGraph(); };
+
+$('#key-save').onclick = () => {
+  ak.key = $('#key-input').value.trim();
+  try { localStorage.setItem(KEY_STORE, ak.key); } catch { /* 저장 못 해도 이번 세션은 쓴다 */ }
+  $('#dlg-key').close(); render();
+};
+$('#key-clear').onclick = () => {
+  ak.key = ''; $('#key-input').value = '';
+  try { localStorage.removeItem(KEY_STORE); } catch { /* 없으면 그만 */ }
+  $('#dlg-key').close(); render();
+};
+$('#pack-copy').onclick = e => copy($('#pack-text').value, e.target);
+
 $('#reset').onclick = () => {
   if (!confirm('파이프라인과 서브그래프 셋을 전부 지운다. 계속할까?')) return;
   resetState(); render(); fitView();
@@ -369,11 +540,13 @@ $('#pal-toggle').onclick = () => $('#palette').classList.toggle('open');
 
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if (ui.view === 'ask') return;        // 캔버스 단축키는 캔버스에서만
   if (e.key === '/' && !typing && KIND().search) { e.preventDefault(); $('#q').focus(); }
   if (e.key === 'Escape') {
     if (ui.picker) { ui.picker = null; render(); }
     else if (ui.sel) { ui.sel = null; render(); }
     else if (KIND().parent) setMode(KIND().parent);
+    else leaveGraph();                  // 파이프라인에서 한 번 더 = 프롬프트로
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && !typing && ui.sel) {
     e.preventDefault(); dropNode(ui.sel); render();
@@ -420,5 +593,19 @@ mountCanvas($('#viewport'));
 mountChrome();
 const fresh = !load();
 if (fresh) resetState();
+
+// 프롬프트 화면의 저장물. 키와 모델은 그래프와 수명이 다르므로 따로 둔다.
+try {
+  ak.key = localStorage.getItem(KEY_STORE) || '';
+  ak.model = localStorage.getItem(MODEL_STORE) || DEFAULT_MODEL;
+} catch { /* 저장소가 막혀 있어도 이번 세션은 쓴다 */ }
+ak.history = loadHistory(localStorage);
+ui.view = loadView(localStorage);
+const draft = loadDraft(localStorage);
+if (draft) Object.assign(ak, draft);
+// 저장된 그래프가 있는데 명령어가 비어 있으면 그래프에서 접어 온다 —
+// 원본이 바뀌기 전에 만들어 둔 저장물이 그런 모양이다.
+if (!ak.command.trim() && !fresh) ak.command = commandString(state);
+
 render();
 if (fresh) fitView();

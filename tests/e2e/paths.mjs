@@ -3,6 +3,7 @@
  *
  * 항목마다 -P 가 하나씩 붙는다. 값 안에 템플릿이 없고 TYPES 가 키다.
  */
+export const view = 'graph';
 export const name = '저장 경로 서브그래프';
 
 export default async function ({ p, step, assert, dialogs, setDialog }) {
