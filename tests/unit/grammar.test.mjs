@@ -74,8 +74,33 @@ test('망가진 입력은 이유를 담아 거부한다', () => {
   }
 });
 
-test('그룹에 바로 붙은 필터는 거부한다 — 지원하지 않는다고 말한다', () => {
-  assert.throws(() => parseFormat('(bv+ba)[height<=720]'), /그룹에 바로 붙은 필터/);
+test('그룹에도 필터가 붙는다 — yt-dlp 문서에 나오는 표현이다', () => {
+  const cases = [
+    '(mp4,webm)[height<480]',
+    '(bv+ba)[height<=720]',
+    '(bv[height<=1080]+ba)[filesize<500M]',
+    '(mp4,webm)[height<480]+ba',
+    '(mp4,webm)[height<480]/b',
+  ];
+  for (const s of cases) assert.equal(round(s), s, s);
+});
+
+test('필터가 붙은 그룹은 이미 괄호를 쓰므로 부모가 또 감싸지 않는다', () => {
+  // 필터가 없으면 우선순위대로 괄호가 붙는다
+  assert.equal(round('(bv,ba)+x'), '(bv,ba)+x');
+  // 필터가 있으면 그 괄호가 곧 그룹이다 — ((…))+x 가 되면 안 된다
+  assert.equal(round('(bv,ba)[fps>30]+x'), '(bv,ba)[fps>30]+x');
+});
+
+test('연산자가 하나면 괄호가 풀리고 필터만 남는다', () => {
+  // (bv)[height<480] 과 bv[height<480] 은 같은 뜻이다
+  assert.equal(round('(bv)[height<480]'), 'bv[height<480]');
+  assert.equal(round('((bv+ba)[fps>30])[height<480]'), '(bv+ba)[fps>30][height<480]');
+});
+
+test('그룹 필터에도 닫힘 검사는 그대로 걸린다', () => {
+  assert.throws(() => parseFormat('(bv+ba)[height'), /'\]' 가 닫히지 않았다/);
+  assert.throws(() => parseFormat('()'), /셀렉터를 찾지 못했다/);
 });
 
 test('필터 본문: 비교 · 존재 · 부재 · ? 접미사', () => {

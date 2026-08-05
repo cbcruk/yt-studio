@@ -187,10 +187,32 @@ function filterRow(n, f, idx) {
     </div>`;
 }
 
+/**
+ * 필터 상자. 스트림 노드와 연산자 노드가 같이 쓴다.
+ *
+ * yt-dlp 는 그룹에도 필터를 붙일 수 있다 — `(mp4,webm)[height<480]`. 그래서
+ * `[+]` · `[/]` · `[,]` 노드도 이 상자를 갖는다. 필터가 있으면 컴파일러가
+ * 괄호를 씌워 내보낸다.
+ */
+function filterBox(n) {
+  const loose = filtersOf(n).some(f => !['has', 'hasnot'].includes(f.op));
+  return html`
+    <div class="filt">
+      <div class="filt-head">
+        <span>필터</span>
+        <button class="row-sub" type="button" @click=${() => {
+          filtersOf(n).push({ key: 'height', op: '<=', value: '1080' });
+          redraw();
+        }}>+ 필터</button>
+      </div>
+      ${filtersOf(n).map((f, i) => filterRow(n, f, i))}
+      ${loose ? html`<div class="filt-loose"><b>?</b> = 이 값을 모르는 포맷도 통과</div>` : nothing}
+    </div>`;
+}
+
 function streamBody(n) {
   const custom = !SEL_SET.has(n.sel);
   const cur = custom ? '__custom' : n.sel;
-  const loose = filtersOf(n).some(f => !['has', 'hasnot'].includes(f.op));
   return html`
     <div class="fsel">
       <select data-ctl="sel" title="셀렉터"
@@ -205,31 +227,24 @@ function streamBody(n) {
                       @input=${e => { n.sel = e.target.value.trim(); redraw(); }}>`
         : html`<div class="why">${SEL_HELP[n.sel] || ''}</div>`}
     </div>
-
-    <div class="filt">
-      <div class="filt-head">
-        <span>필터</span>
-        <button class="row-sub" type="button" @click=${() => {
-          filtersOf(n).push({ key: 'height', op: '<=', value: '1080' });
-          redraw();
-        }}>+ 필터</button>
-      </div>
-      ${filtersOf(n).map((f, i) => filterRow(n, f, i))}
-      ${loose ? html`<div class="filt-loose"><b>?</b> = 이 값을 모르는 포맷도 통과</div>` : nothing}
-    </div>`;
+    ${filterBox(n)}`;
 }
 
 function opBody(n) {
   const ins = operands(S().format, n.id);
+  const filtered = filtersOf(n).some(f => f.key);
   return html`
     <div class="ops">
       <div>${blurbOf(n)} · 입력은 <b>세로 위치 순서</b>다.</div>
       ${!ins.length ? html`<div class="warn">이어진 입력이 없다.</div>` : html`
         <ol>${ins.map(k => html`
           <li>${emitTree(graphToTree(S().format, k.id)) || '(비어 있음)'}</li>`)}</ol>
-        ${ins.length === 1 ? html`
+        ${ins.length === 1 && !filtered ? html`
           <div class="warn">입력이 하나뿐이라 <code>${tagOf(n)}</code> 는 그냥 통과된다.</div>` : nothing}`}
-    </div>`;
+      ${filtered ? html`
+        <div class="why">필터가 붙어서 이 묶음은 괄호로 나간다.</div>` : nothing}
+    </div>
+    ${filterBox(n)}`;
 }
 
 /** 여러 줄짜리 진단·미리보기는 모양이 같다. */

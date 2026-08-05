@@ -64,8 +64,17 @@ test('choices 를 벗어난 값을 잡는다', () => {
 
 test('-f 는 진짜 파서로 본다', () => {
   assert.match(msgs('yt-dlp -f "bv*[height<=1080]+ba/" https://x/y'), /-f 값을 읽지 못했다/);
-  assert.match(msgs('yt-dlp -f "(bv+ba)[height<=720]" https://x/y'), /-f 값을 읽지 못했다/);
+  assert.match(msgs('yt-dlp -f "bv[height<=]x" https://x/y'), /-f 값을 읽지 못했다/);
   assert.equal(lintCommand('yt-dlp -f bv+ba/b https://x/y').ok, true);
+});
+
+test('yt-dlp 가 받는 표현식에 거짓 오류를 내지 않는다', () => {
+  // 그룹에 붙은 필터는 yt-dlp 문서에 나오는 표현이다. 파서가 못 읽던 시절엔
+  // 멀쩡한 명령어에 오류가 떴다 — 검증기에서 이게 제일 나쁜 실패다.
+  for (const f of ['(mp4,webm)[height<480]', '(bv+ba)[height<=720]']) {
+    const r = lintCommand(`yt-dlp -f "${f}" --merge-output-format mp4 https://x/y`);
+    assert.equal(r.counts.error, 0, `${f}: ${r.issues.map(i => i.msg).join(' | ')}`);
+  }
 });
 
 test('-o 는 문법과 확장자를 같이 본다', () => {

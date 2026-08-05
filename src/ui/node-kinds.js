@@ -137,7 +137,10 @@ const OP_META = {
   multi:    { tag: ',', label: '동시', accent: '#A6265E', blurb: '여러 포맷을 한꺼번에 받는다' },
 };
 FORMAT_OPS.forEach((type, i) => {
-  defineKind(type, Object.assign({ graph: 'format', palette: i + 1 }, OP_META[type]));
+  defineKind(type, Object.assign({
+    graph: 'format', palette: i + 1,
+    badge: n => (n.filters || []).length,   // 그룹에도 필터가 붙는다
+  }, OP_META[type]));
 });
 
 defineKind('fout', {
