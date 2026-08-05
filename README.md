@@ -49,6 +49,8 @@ yt-dlp 의 optparse 트리를 리플렉션해서 뽑은 것이고, `-f` · `-o` 
 - **키 넣기** — 브라우저에서 `api.anthropic.com` 을 바로 부른다. 서버가 없으므로
   키는 사용자 것이고 `localStorage` 에만 있다. 옵션 카탈로그(≈6천 토큰)를 통째로
   프롬프트에 넣고 — 골라 넣을 만큼 크지 않다 — 그 블록에 프롬프트 캐시를 건다.
+  `max_tokens` 는 생각과 답을 합쳐 재므로 넉넉히 잡는다(답이 한 줄이라고 줄이면
+  생각하다 잘린다). `effort` 는 모델마다 있고 없어서 `MODELS` 표에 같이 적는다.
 - **프롬프트 복사** — 키 없이. 카탈로그가 박힌 프롬프트를 만들어 주면 쓰던 LLM 에
   붙여넣고, 돌아온 명령어를 명령어 칸에 붙여넣는다.
 
@@ -152,7 +154,7 @@ src/app.css          스타일 전부
 index.html           개발 진입점이자 배포 템플릿
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 vite.config.js       개발 서버 + 배포 빌드(CSS·JS 를 HTML 한 장으로 접는다)
-tests/               단위 172 · 개발 서버 스모크 13 · e2e 96
+tests/               단위 175 · 개발 서버 스모크 13 · e2e 96
 ```
 
 **배포물은 여전히 HTML 한 장이다.** `vite build` 가 묶고, `vite.config.js` 의

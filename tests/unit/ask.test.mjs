@@ -132,6 +132,36 @@ test('브라우저에서 직접 부르는 헤더를 붙인다', async () => {
   assert.deepEqual(body.messages, [{ role: 'user', content: '자막' }]);
 });
 
+test('생각도 max_tokens 를 먹는다 — 여유를 두고, effort 는 되는 모델에만 준다', async () => {
+  // 답이 한 줄이라고 1024 로 잡으면 Sonnet 5 · Opus 5 가 생각하다가 잘린다
+  let body = null;
+  const spy = async (url, init) => {
+    body = JSON.parse(init.body);
+    return { ok: true, json: async () => ({ content: [{ type: 'text', text: 'yt-dlp -f b https://x' }] }) };
+  };
+  await ask({ key: 'k', user: 'x', fetchImpl: spy });
+  assert.ok(body.max_tokens >= 4096, `max_tokens ${body.max_tokens}`);
+  assert.deepEqual(body.output_config, { effort: 'medium' });
+
+  // Haiku 4.5 에는 effort 가 없다 — 주면 400 이 온다
+  await ask({ key: 'k', model: 'claude-haiku-4-5', user: 'x', fetchImpl: spy });
+  assert.equal(body.output_config, undefined);
+});
+
+test('200 이어도 거절이면 거절이라고 말한다', async () => {
+  await assert.rejects(
+    () => ask({ key: 'k', user: 'x', fetchImpl: async () => ({
+      ok: true, json: async () => ({ stop_reason: 'refusal', content: [] }) }) }),
+    e => e.kind === 'refusal');
+});
+
+test('잘린 답을 온전한 답으로 넘기지 않는다', async () => {
+  await assert.rejects(
+    () => ask({ key: 'k', user: 'x', fetchImpl: async () => ({
+      ok: true, json: async () => ({ stop_reason: 'max_tokens', content: [{ type: 'text', text: 'yt-dlp -f' }] }) }) }),
+    e => e.kind === 'truncated');
+});
+
 test('상태 코드를 다음에 할 일로 옮긴다', async () => {
   assert.equal(describeStatus(401)[0], 'auth');
   assert.equal(describeStatus(429)[0], 'rate');
