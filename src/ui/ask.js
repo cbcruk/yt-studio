@@ -10,6 +10,7 @@
  * 검증기와 판독 화면은 똑같이 돈다.
  */
 import { MODELS, maskKey } from '../core/ask.js';
+import { MAX_ROUNDS } from '../core/repair.js';
 import { html, nothing } from './tpl.js';
 import { browseTemplate } from './browse.js';
 import { reportTemplate } from './report.js';
@@ -42,6 +43,15 @@ const EXAMPLES = [
   '광고 구간 잘라 내고 챕터는 남겨 줘',
 ];
 
+/**
+ * 두 번째 라운드부터는 무슨 일이 벌어지는지 말한다.
+ *
+ * 한 번 물어서 끝나면 그냥 "묻는 중…" 이다. 검증기가 오류를 잡아 다시 묻고
+ * 있으면 그건 기다림이 길어지는 이유이므로 숨기지 않는다 — 몇 번째인지까지
+ * 보여야 사용자가 "멈춘 건가" 를 안 묻는다.
+ */
+const busyLabel = () => (ak.round > 1 ? `고치는 중… ${ak.round}/${MAX_ROUNDS}` : '묻는 중…');
+
 /* ── 프롬프트 ────────────────────────────── */
 const promptTemplate = () => html`
   <div class="ak-put">
@@ -65,7 +75,7 @@ const promptTemplate = () => html`
       <span class="ak-spacer"></span>
       <button class="btn primary" type="button" ?disabled=${ak.busy || !ak.prompt.trim()}
               @click=${() => run()}>
-        ${ak.busy ? '묻는 중…' : ak.command ? '고치기' : '명령어 만들기'}
+        ${ak.busy ? busyLabel() : ak.command ? '고치기' : '명령어 만들기'}
       </button>
     </div>
 
