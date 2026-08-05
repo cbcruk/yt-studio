@@ -1,13 +1,13 @@
 /**
- * 캔버스 · 렌더 · 포인터 · 배선.
+ * 그래프 상태와 배선.
  *
- * DOM 을 아는 층은 전부 여기 있다. 문법·그래프 대수·레이아웃 계산은
- * core/ 에, 노드와 그래프 종류의 선언은 ui/ 의 레지스트리에 있다.
+ * 그래프를 들고 있고, 그걸 그리는 모듈들에 넘기고, 두 화면을 오간다.
+ * 문법·그래프 대수·레이아웃 계산은 core/ 에, 노드와 그래프 종류의 선언은
+ * ui/ 의 레지스트리에, 프롬프트 화면은 ask-flow.js 에 있다.
  */
 import { SCHEMA } from './core/schema-data.js';
 import {
   BY_ID,
-  BY_STAGE,
   OPTS,
   STAGE,
   STAGES,
@@ -25,20 +25,11 @@ import {
   commandString,
   confString,
   parseCommand,
-  scanCommand,
   spliceIntoChain,
   stageNode,
 } from './core/pipeline.js';
 import { freeSpot } from './core/layout.js';
-import {
-  STORE_KEY, VIEW_KEY, loadDraft, loadHistory, loadRaw, loadView, pushHistory,
-  restore, saveDraft, saveHistory, snapshot,
-} from './core/persist.js';
-import { lintCommand } from './core/lint.js';
-import {
-  AskError, DEFAULT_MODEL, KEY_STORE, MODEL_STORE,
-  ask, extractCommand, systemBlocks, userText,
-} from './core/ask.js';
+import { STORE_KEY, VIEW_KEY, loadRaw, loadView, restore, snapshot } from './core/persist.js';
 import { protectedIds, widthOfType } from './ui/node-kinds.js';
 import { installBodies } from './ui/bodies.js';
 import {
@@ -66,10 +57,9 @@ import {
 } from './ui/chrome.js';
 import { $ } from './ui/dom.js';
 import { allGraphKinds, graphKind } from './ui/graph-kinds.js';
-import { askTemplate, installAsk } from './ui/ask.js';
-import { blankBrowse, installBrowse } from './ui/browse.js';
-import { installReport } from './ui/report.js';
-import { renderTpl } from './ui/tpl.js';
+import {
+  ak, installAskFlow, loadAsk, mountAskFlow, renderAsk, saveAsk,
+} from './ask-flow.js';
 
 /* ══ 스키마 파생 ═════════════════════════════ */
 // 색인·검색·KO 사전은 core/schema.js 에 있다.
@@ -84,17 +74,6 @@ const ui = {
   view: 'ask',                        // 'ask' 가 첫 화면이다 — 그래프는 고칠 때 연다
   mode: 'pipeline', lit: null, sel: null, picker: null,
   unknown: [], drag: null, wire: null, pan: null, fmtWarn: '',
-};
-
-/**
- * 프롬프트 화면의 상태.
- *
- * command 가 이 앱의 원본이다. 그래프는 이걸 풀어 놓은 편집기이고,
- * 그래프에서 나올 때 다시 여기로 접힌다.
- */
-const ak = {
-  prompt: '', command: '', note: '', error: '', busy: false,
-  key: '', model: DEFAULT_MODEL, history: [], browse: blankBrowse(),
 };
 
 const blankState = () => Object.assign(blankPipeline(),
@@ -144,12 +123,10 @@ function addStageNode(sid, x, y) {
   spliceIntoChain(state, n);
   return n;
 }
-/* ══ 명령어 조립 ═════════════════════════════ */
-// 조립·해석은 core/pipeline.js 에 있다. 여기서는 현재 상태를 넘기기만 한다.
-
-/* ── UI 모듈에 앱을 넘긴다 ───────────────── */
-// 노드 안쪽은 ui/bodies.js, 캔버스 밖 틀은 ui/chrome.js 가 그린다. 앱은 그쪽이
-// 필요한 것만 넘긴다 — state 는 다시 대입되므로 값이 아니라 게터로 넘긴다.
+/* ══ 모듈에 앱을 넘긴다 ══════════════════════ */
+// 노드 안쪽은 ui/bodies.js, 캔버스 밖 틀은 ui/chrome.js, 프롬프트 화면은
+// ask-flow.js 가 갖는다. 앱은 그쪽이 못 아는 것만 넘긴다 — state 는 다시
+// 대입되므로 값이 아니라 게터로 넘긴다.
 installBodies({
   state: () => state,
   ui,
@@ -190,95 +167,17 @@ installChrome({
   focusNode: id => focusNode(id),
 });
 
-/* ══ 프롬프트 화면 ═══════════════════════════
-   원본은 ak.command 다. 그래프는 그걸 풀어 놓는 편집기이고, 검증은
-   core/lint.js 가 스키마와 진짜 파서로 한다 — 모델의 말은 안 믿는다. */
-
-/** 명령어 문자열에 토큰 하나를 끼운다. URL 앞에 둔다 — 뒤로 가면 읽기 나쁘다. */
-function addToken(text) {
-  const t = String(text).trim();
-  if (!t) return;
-  const cur = ak.command.trim();
-  if (!cur) { ak.command = 'yt-dlp ' + t; return; }
-  const { head, items } = scanCommand(cur);
-  ak.command = [
-    head || 'yt-dlp',
-    ...items.filter(i => i.kind !== 'url').map(i => i.raw),
-    t,
-    ...items.filter(i => i.kind === 'url').map(i => i.raw),
-  ].join(' ');
-}
-
-/** 오타 제안을 눌렀을 때. 플래그 자리만 갈아 끼우고 값은 그대로 둔다. */
-function replaceFlag(from, to) {
-  const esc = String(from).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  ak.command = ak.command.replace(new RegExp(`(^|\\s)${esc}(?=[\\s=]|$)`, 'g'), `$1${to}`);
-}
-
-installBrowse({ state: ak.browse, render: () => render(), add: addToken });
-installReport({ render: () => render(), add: addToken, replaceFlag });
-installAsk({
-  state: ak,
+installAskFlow({
   render: () => render(),
-  run: () => runAsk(),
   toGraph: () => enterGraph(),
   copy: (text, btn) => copy(text, btn),
-  lint: text => lintCommand(text),
-  openPack: () => openPack(),
-  openKey: () => openKeyDialog(),
 });
 
-/* ── 모델에게 묻기 ───────────────────────── */
-const systemFor = () => systemBlocks(SCHEMA.ytdlp_version, STAGES, BY_STAGE);
+/* ══ 두 화면의 이음매 ════════════════════════
+   프롬프트 화면은 ask-flow.js 가 통째로 갖는다. 여기 남는 것은 명령어를
+   그래프로 풀고 그래프를 명령어로 접는 두 함수뿐이다 — 양쪽을 다 아는
+   유일한 자리라 여기 있다. */
 
-async function runAsk() {
-  const want = ak.prompt.trim();
-  if (!want || ak.busy) return;
-  if (!ak.key) { openPack(); return; }
-
-  ak.busy = true; ak.error = ''; render();
-  try {
-    const { text } = await ask({
-      key: ak.key,
-      model: ak.model,
-      system: systemFor(),
-      user: userText(want, ak.command.trim()),
-    });
-    const { command, note } = extractCommand(text);
-    if (!command) {
-      ak.error = '답에서 명령어를 찾지 못했다 — 프롬프트 복사로 직접 물어볼 것';
-    } else {
-      ak.command = command;
-      ak.note = note;
-      ak.prompt = '';
-      ak.history = pushHistory(ak.history, { command, prompt: want });
-    }
-  } catch (e) {
-    ak.error = e instanceof AskError ? e.message : `실패했다 — ${e.message}`;
-  } finally {
-    ak.busy = false; render();
-  }
-}
-
-/** 키 없이 쓰는 길. 시스템 프롬프트와 요구를 한 덩어리로 만들어 준다. */
-function packText() {
-  const sys = systemFor().map(b => b.text).join('\n\n');
-  const want = ak.prompt.trim() || '(여기에 무엇을 받고 싶은지 쓴다)';
-  return `${sys}\n\n---\n\n${userText(want, ak.command.trim())}`;
-}
-
-function openPack() {
-  $('#pack-ver').textContent = SCHEMA.ytdlp_version;
-  $('#pack-text').value = packText();
-  $('#dlg-pack').showModal();
-}
-
-function openKeyDialog() {
-  $('#key-input').value = ak.key;
-  $('#dlg-key').showModal();
-}
-
-/* ── 명령어 ↔ 그래프 ─────────────────────── */
 /** 명령어를 그래프로 풀어 놓고 캔버스로 간다. */
 function enterGraph() {
   if (ak.command.trim()) importCommand(ak.command);
@@ -294,7 +193,6 @@ function leaveGraph() {
   ui.view = 'ask';
   render();
 }
-
 
 /* ══ 렌더 ════════════════════════════════════ */
 /** 옵션 ↔ 명령어 토큰 ↔ 노드 상호 강조. 클래스만 건드린다. */
@@ -340,7 +238,7 @@ function applyView() {
 
 function render() {
   applyView();
-  if (ui.view === 'ask') { renderTpl(askTemplate(), $('#ask')); save(); return; }
+  if (ui.view === 'ask') { renderAsk(); save(); return; }
 
   KIND().sync();
   renderCrumb();
@@ -471,12 +369,8 @@ function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot(state, seq, ui.mode))); } catch {}
-    saveDraft(localStorage, { prompt: ak.prompt, command: ak.command, note: ak.note });
-    saveHistory(localStorage, ak.history);
-    try {
-      localStorage.setItem(MODEL_STORE, ak.model);
-      localStorage.setItem(VIEW_KEY, ui.view);
-    } catch { /* 다음에 다시 고르면 된다 */ }
+    saveAsk(localStorage);
+    try { localStorage.setItem(VIEW_KEY, ui.view); } catch { /* 화면은 다음에 다시 고르면 된다 */ }
   }, 250);
 }
 const snap = () => snapshot(state, seq, ui.mode);
@@ -506,18 +400,6 @@ document.addEventListener('pointerdown', e => {
 
 $('#view-ask').onclick = () => { if (ui.view !== 'ask') leaveGraph(); };
 $('#view-graph').onclick = () => { if (ui.view !== 'graph') enterGraph(); };
-
-$('#key-save').onclick = () => {
-  ak.key = $('#key-input').value.trim();
-  try { localStorage.setItem(KEY_STORE, ak.key); } catch { /* 저장 못 해도 이번 세션은 쓴다 */ }
-  $('#dlg-key').close(); render();
-};
-$('#key-clear').onclick = () => {
-  ak.key = ''; $('#key-input').value = '';
-  try { localStorage.removeItem(KEY_STORE); } catch { /* 없으면 그만 */ }
-  $('#dlg-key').close(); render();
-};
-$('#pack-copy').onclick = e => copy($('#pack-text').value, e.target);
 
 $('#reset').onclick = () => {
   if (!confirm('파이프라인과 서브그래프 셋을 전부 지운다. 계속할까?')) return;
@@ -591,18 +473,12 @@ window.__yt = {
 /* ── 시작 ────────────────────────────────── */
 mountCanvas($('#viewport'));
 mountChrome();
+mountAskFlow();
 const fresh = !load();
 if (fresh) resetState();
 
-// 프롬프트 화면의 저장물. 키와 모델은 그래프와 수명이 다르므로 따로 둔다.
-try {
-  ak.key = localStorage.getItem(KEY_STORE) || '';
-  ak.model = localStorage.getItem(MODEL_STORE) || DEFAULT_MODEL;
-} catch { /* 저장소가 막혀 있어도 이번 세션은 쓴다 */ }
-ak.history = loadHistory(localStorage);
+loadAsk(localStorage);
 ui.view = loadView(localStorage);
-const draft = loadDraft(localStorage);
-if (draft) Object.assign(ak, draft);
 // 저장된 그래프가 있는데 명령어가 비어 있으면 그래프에서 접어 온다 —
 // 원본이 바뀌기 전에 만들어 둔 저장물이 그런 모양이다.
 if (!ak.command.trim() && !fresh) ak.command = commandString(state);

@@ -194,6 +194,7 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   schema-data.js     개발은 JSON import, 배포는 빌드가 값으로 갈아 끼운다
   lint.js            명령어 진단 — 이 도구의 중심
   explain.js         토큰별 설명 · 파일명 미리보기 · 다음 걸음
+  edit.js            명령어 문자열 편집 (토큰 끼우기 · 플래그 갈아 끼우기)
   catalog.js         의도 축(INTENTS) · LLM 에게 줄 옵션 카탈로그
   ask.js             프롬프트 조립 · 답 파싱 · Anthropic 호출 (fetch 주입 가능)
   graph.js           그래프 원시 연산 (연결 · 삭제 · 위상 정렬)
@@ -216,12 +217,13 @@ src/ui/
   canvas.js          캔버스 — Rete.js 어댑터 (노드 · 와이어 · 팬 · 줌)
   graph-behavior.js  그래프 종류마다 다른 정렬 · 되돌려쓰기 · 새 노드
   tpl.js · dom.js    lit 어댑터 · DOM 손잡이
-src/app.js           상태 · 화면/모드 전환 · 모델 호출 · 저장 · 배선
+src/ask-flow.js      프롬프트 화면의 흐름 (상태 · 모델 호출 · 키 · 저장물)
+src/app.js           그래프 상태 · 화면/모드 전환 · 배선 · 두 화면의 이음매
 src/app.css          스타일 전부
 index.html           개발 진입점이자 배포 템플릿
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 vite.config.js       개발 서버 + 배포 빌드(CSS·JS 를 HTML 한 장으로 접는다)
-tests/               단위 149 · 개발 서버 스모크 13 · e2e 94
+tests/               단위 164 · 개발 서버 스모크 13 · e2e 94
 ```
 
 **캔버스는 [Rete.js](https://retejs.org) 가 그린다.** 팬·줌·노드 드래그·포트
