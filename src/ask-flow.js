@@ -20,8 +20,9 @@ import { addToken, replaceFlag } from './core/edit.js';
 import { lintCommand } from './core/lint.js';
 import {
   AskError, DEFAULT_MODEL, KEY_STORE, MODEL_STORE,
-  ask, extractCommand, systemBlocks, userText,
+  ask, systemBlocks, userText,
 } from './core/ask.js';
+import { repairLoop, repairNote } from './core/repair.js';
 import {
   loadDraft, loadHistory, pushHistory, saveDraft, saveHistory,
 } from './core/persist.js';
@@ -33,7 +34,7 @@ import { $ } from './ui/dom.js';
 
 /** 프롬프트 화면의 상태 전부. app.js 는 `command` 와 `note` 만 들여다본다. */
 export const ak = {
-  prompt: '', command: '', note: '', error: '', busy: false,
+  prompt: '', command: '', note: '', error: '', busy: false, round: 0,
   key: '', model: DEFAULT_MODEL, history: [], browse: blankBrowse(),
 };
 
@@ -89,32 +90,40 @@ export const renderAsk = () => renderTpl(askTemplate(), $('#ask'));
 /* ── 모델에게 묻기 ───────────────────────── */
 const systemFor = () => systemBlocks(VERSION, STAGES, BY_STAGE);
 
+/**
+ * 한 번 묻고 끝이 아니다 — core/repair.js 가 검증기의 오류를 되먹여 다시 묻는다.
+ *
+ * 여기서 하는 일은 그 루프에 "부르는 법"과 "몇 번째인지 화면에 알리기"를
+ * 끼워 넣는 것뿐이다. 몇 번을 돌든 명령어 칸에는 가장 나은 것 하나가 남고,
+ * 히스토리에도 그것만 들어간다 — 중간 과정은 사용자가 볼 물건이 아니다.
+ */
 async function runModel() {
   const want = ak.prompt.trim();
   if (!want || ak.busy) return;
   if (!ak.key) { openPack(); return; }        // 키가 없으면 복붙으로 가는 길을 연다
 
-  ak.busy = true; ak.error = ''; repaint();
+  ak.busy = true; ak.round = 0; ak.error = ''; repaint();
   try {
-    const { text } = await ask({
-      key: ak.key,
-      model: ak.model,
-      system: systemFor(),
-      user: userText(want, ak.command.trim()),
+    const r = await repairLoop({
+      want,
+      command: ak.command.trim(),
+      send: user => {
+        ak.round++; repaint();
+        return ask({ key: ak.key, model: ak.model, system: systemFor(), user });
+      },
     });
-    const { command, note } = extractCommand(text);
-    if (!command) {
+    if (!r.command) {
       ak.error = '답에서 명령어를 찾지 못했다 — 프롬프트 복사로 직접 물어볼 것';
     } else {
-      ak.command = command;
-      ak.note = note;
+      ak.command = r.command;
+      ak.note = repairNote(r);
       ak.prompt = '';
-      ak.history = pushHistory(ak.history, { command, prompt: want });
+      ak.history = pushHistory(ak.history, { command: r.command, prompt: want });
     }
   } catch (e) {
     ak.error = e instanceof AskError ? e.message : `실패했다 — ${e.message}`;
   } finally {
-    ak.busy = false; repaint();
+    ak.busy = false; ak.round = 0; repaint();
   }
 }
 

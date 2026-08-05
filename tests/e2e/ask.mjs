@@ -235,6 +235,63 @@ export default async function ({ p, step, assert }) {
     assert(hist.includes('한국어 자막도 받아 줘'), '프롬프트가 안 남았다');
   });
 
+  await step('오류가 있으면 검증기가 잡은 것을 되먹여 다시 묻는다', async () => {
+    // 첫 답은 없는 플래그, 둘째 답은 제대로 된 것. 사람이 아무것도 안 눌러도
+    // 두 번째 호출이 나가야 하고, 그 호출에는 검증기가 한 말이 실려 있어야 한다.
+    await p.evaluate(() => {
+      window.__calls = [];
+      const replies = [
+        '```\nyt-dlp --write-sub https://youtu.be/abc\n```\n자막을 받는다.',
+        '```\nyt-dlp --write-subs https://youtu.be/abc\n```\n플래그 이름을 고쳤다.',
+      ];
+      window.fetch = async (url, init) => {
+        window.__calls.push(JSON.parse(init.body));
+        return {
+          ok: true,
+          json: async () => ({ content: [{ type: 'text', text: replies[window.__calls.length - 1] }] }),
+        };
+      };
+    });
+
+    await p.fill('#prompt', '자막도 받아 줘');
+    await p.click('.ak-bar .btn.primary');
+    await p.waitForTimeout(700);
+
+    const calls = await p.evaluate(() => window.__calls);
+    assert(calls.length === 2, `호출 ${calls.length}번 — 되먹이지 않았다`);
+    const second = calls[1].messages[0].content;
+    assert(second.includes('--write-sub 는'), '검증기가 한 말이 안 실렸다');
+    assert(second.includes('원래 요구는 그대로'), '요구를 지키라는 말이 없다');
+
+    const cmd = await cmdBox();
+    assert(cmd === 'yt-dlp --write-subs https://youtu.be/abc', `고쳐진 명령어: ${cmd}`);
+    assert((await verdict()).includes('확인됨'), `판정: ${await verdict()}`);
+    assert((await p.textContent('.ak-note')).includes('2번 만에'), await p.textContent('.ak-note'));
+    return '1라운드 오류 → 2라운드 초록';
+  });
+
+  await step('세 번 물어도 안 되면 가장 나은 것을 두고 멈춘다', async () => {
+    await p.evaluate(() => {
+      window.__calls = [];
+      window.fetch = async (url, init) => {
+        window.__calls.push(JSON.parse(init.body));
+        return { ok: true, json: async () => ({ content: [{ type: 'text',
+          text: '```\nyt-dlp --write-sub --embed-subtitle https://youtu.be/abc\n```\n자막.' }] }) };
+      };
+    });
+
+    await p.fill('#prompt', '자막을 넣어 줘');
+    await p.click('.ak-bar .btn.primary');
+    await p.waitForTimeout(700);
+
+    // 같은 답이 두 번 오면 세 번째는 안 묻는다 — 나아지지 않는 데 돈을 쓰지 않는다
+    const calls = await p.evaluate(() => window.__calls.length);
+    assert(calls === 2, `호출 ${calls}번`);
+    assert((await verdict()).includes('오류'), '남은 오류를 숨겼다');
+    assert((await p.textContent('.ak-note')).includes('손으로 고칠 것'), await p.textContent('.ak-note'));
+    return `호출 ${calls}번에서 멈춤`;
+  });
+
   await step('모델이 거부하면 그렇게 말한다', async () => {
     await p.evaluate(() => {
       window.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'bad key' } }) });
