@@ -1,5 +1,7 @@
 # yt-dlp 스튜디오
 
+[![테스트](https://github.com/cbcruk/yt-studio/actions/workflows/test.yml/badge.svg)](https://github.com/cbcruk/yt-studio/actions/workflows/test.yml)
+
 한국어로 쓰면 yt-dlp 명령어가 나온다. 그리고 **그게 맞는지 실물로 검사한다.**
 의존성 없는 단일 HTML 파일 하나로 굽는다.
 
@@ -8,6 +10,10 @@ npm run dev       # vite 개발 서버 (HMR)
 npm run build     # → dist/ytdlp-studio.html
 npm test          # 린트 + 단위(node) + 개발 서버 스모크 + e2e(playwright)
 ```
+
+같은 것을 CI 가 push·PR 마다 돌린다. 다만 단계를 쪼개 두어서 무엇이 깨졌는지가
+잡 요약에 바로 보이고, 마지막에 **커밋된 `dist/` 가 소스와 맞는지**를 한 번 더
+본다 — 배포물을 커밋해 두는 저장소라 소스만 고치고 빌드를 잊으면 늙는다.
 
 ## 왜 만드나
 
@@ -154,6 +160,7 @@ src/app.css          스타일 전부
 index.html           개발 진입점이자 배포 템플릿
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 vite.config.js       개발 서버 + 배포 빌드(CSS·JS 를 HTML 한 장으로 접는다)
+.github/workflows/   CI — npm test 와 같은 것 + dist 최신 여부
 tests/               단위 175 · 개발 서버 스모크 13 · e2e 96
 ```
 
