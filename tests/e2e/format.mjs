@@ -332,6 +332,35 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     return kinds;
   });
 
+  await step('그룹에 붙은 필터가 연산자 노드로 풀린다', async () => {
+    await setup('yt-dlp -f "(mp4,webm)[height<480]" https://youtu.be/xyz');
+    await enter();
+    const multi = p.locator('.node').filter({ hasText: '[,]' });
+    assert(await multi.count() === 1, '동시 노드가 없다');
+    assert(await multi.locator('.filt-row').count() === 1,
+      `연산자에 필터 행이 ${await multi.locator('.filt-row').count()}개`);
+    assert((await multi.textContent()).includes('괄호로 나간다'), '괄호 안내가 없다');
+    assert(await expr() === '(mp4,webm)[height<480]', 'expr: ' + await expr());
+    return await expr();
+  });
+
+  await step('연산자에 필터를 더하면 괄호가 생기고, 빼면 사라진다', async () => {
+    await setup('yt-dlp -f "bv+ba" https://youtu.be/xyz');
+    await enter();
+    const merge = p.locator('.node').filter({ hasText: '[+]' });
+    assert(await expr() === 'bv+ba', '시작: ' + await expr());
+
+    await merge.locator('.filt .row-sub').click();
+    await p.waitForTimeout(250);
+    assert(await expr() === '(bv+ba)[height<=1080]', '필터 뒤: ' + await expr());
+    assert((await p.textContent('#fout-expr')).includes('(bv+ba)'), '-f 출력 미반영');
+
+    await merge.locator('.filt-row .row-x').click();
+    await p.waitForTimeout(250);
+    assert(await expr() === 'bv+ba', '필터를 뺀 뒤: ' + await expr());
+    return '(bv+ba)[height<=1080] ⇄ bv+ba';
+  });
+
   await step('읽을 수 없는 문자열 → 물어보고, 취소하면 그대로 둔다', async () => {
     await p.click('#crumb-back'); await p.waitForTimeout(200);
     await p.locator('.row[data-opt=format] input').fill('bv+((broken');

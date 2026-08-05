@@ -28,6 +28,22 @@ export function operands(g, id) {
 /** -f 출력에 닿는 노드 집합. 나머지는 표현식에 기여하지 않는다. */
 export const formatLive = g => reach(FOUT, adjacency(g).inn);
 
+/** 키가 빈 필터는 아직 고르는 중이다 — 표현식에 넣지 않는다. */
+const usableFilters = n => (n.filters || []).filter(f => f.key);
+
+/**
+ * 노드에 달린 필터를 트리 노드에 얹는다.
+ *
+ * 연산자에도 필터가 붙을 수 있다 — `(mp4,webm)[height<480]`. 연산자가 통과될
+ * 때는(피연산자 하나) 필터가 그 피연산자로 흘러내려 합쳐진다. 괄호가 사라져도
+ * 뜻은 같기 때문이다: `(bv)[height<480]` == `bv[height<480]`.
+ */
+function withFilters(tree, n) {
+  const add = usableFilters(n);
+  if (!tree || !add.length) return tree;
+  return { ...tree, filters: [...(tree.filters || []), ...add] };
+}
+
 /** 서브그래프 → 표현식 트리. 비어 있으면 null. */
 export function graphToTree(g, id = FOUT, seen = new Set()) {
   const n = g.nodes[id];
@@ -35,15 +51,15 @@ export function graphToTree(g, id = FOUT, seen = new Set()) {
   seen.add(id);
   if (n.type === 'stream') {
     if (!n.sel) return null;
-    return { t: 'sel', name: n.sel, filters: (n.filters || []).filter(f => f.key) };
+    return { t: 'sel', name: n.sel, filters: usableFilters(n) };
   }
   const kids = operands(g, id)
     .map(k => graphToTree(g, k.id, new Set(seen)))
     .filter(Boolean);
   if (n.type === 'fout') return kids[0] || null;
   if (!kids.length) return null;
-  if (kids.length === 1) return kids[0];     // 피연산자가 하나면 연산자는 통과시킨다
-  return { t: n.type, kids };
+  if (kids.length === 1) return withFilters(kids[0], n);   // 연산자는 통과, 필터는 남는다
+  return withFilters({ t: n.type, kids }, n);
 }
 
 /** 서브그래프가 컴파일하는 --format 값. */
@@ -89,7 +105,7 @@ export function treeToGraph(tree, { nid, nodeW = 300, gapX = 90, gapY = 200 } = 
     const kids = n.kids.map(k => walk(k, depth + 1));
     const id = nid();
     const y = kids.reduce((a, k) => a + g.nodes[k].y, 0) / kids.length;
-    g.nodes[id] = { id, type: n.t, x: 0, y, _d: depth };
+    g.nodes[id] = { id, type: n.t, filters: n.filters || [], x: 0, y, _d: depth };
     for (const k of kids) g.edges.push({ from: k, to: id });
     return id;
   };

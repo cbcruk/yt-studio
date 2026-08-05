@@ -96,6 +96,44 @@ test('문자열 → 그래프 → 문자열 왕복', () => {
   }
 });
 
+test('그룹에 붙은 필터도 그래프를 왕복한다', () => {
+  for (const s of [
+    '(mp4,webm)[height<480]',
+    '(bv+ba)[height<=720]',
+    '(bv[height<=1080]+ba)[filesize<500M]',
+    '(mp4,webm)[height<480]+ba',
+  ]) {
+    const g = treeToGraph(parseFormat(s), { nid });
+    assert.equal(formatExpr(g), s, s);
+  }
+});
+
+test('필터는 연산자 노드가 들고 있다', () => {
+  const g = treeToGraph(parseFormat('(bv+ba)[height<=720]'), { nid });
+  const merge = Object.values(g.nodes).find(n => n.type === 'merge');
+  assert.deepEqual(merge.filters, [{ key: 'height', op: '<=', loose: false, value: '720' }]);
+  // 필터를 빼면 괄호도 같이 사라진다
+  merge.filters = [];
+  assert.equal(formatExpr(g), 'bv+ba');
+});
+
+test('통과되는 연산자의 필터는 피연산자로 흘러내린다', () => {
+  const g = treeToGraph(parseFormat('bv+ba'), { nid });
+  const merge = Object.values(g.nodes).find(n => n.type === 'merge');
+  // ba 를 떼면 입력이 하나 — 연산자는 통과되지만 필터는 남아야 한다
+  const ba = Object.values(g.nodes).find(n => n.sel === 'ba');
+  g.edges = g.edges.filter(e => e.from !== ba.id);
+  merge.filters = [{ key: 'height', op: '<=', value: '720' }];
+  assert.equal(formatExpr(g), 'bv[height<=720]');
+});
+
+test('키가 빈 필터는 아직 고르는 중이라 표현식에 안 들어간다', () => {
+  const g = treeToGraph(parseFormat('bv+ba'), { nid });
+  const merge = Object.values(g.nodes).find(n => n.type === 'merge');
+  merge.filters = [{ key: '', op: '<=', value: '720' }];
+  assert.equal(formatExpr(g), 'bv+ba');
+});
+
 test('빈 그래프는 빈 표현식', () => {
   assert.equal(formatExpr(blankFormat()), '');
   assert.equal(graphToTree(blankFormat()), null);

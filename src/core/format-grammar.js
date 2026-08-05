@@ -101,29 +101,35 @@ export function parseFormat(src) {
     while (peek() === '+') { i++; kids.push(atom()); ws(); }
     return kids.length === 1 ? kids[0] : { t: 'merge', kids };
   }
+  /**
+   * atom := (셀렉터 | '(' expr ')') 필터*
+   *
+   * 필터는 셀렉터에만 붙는 게 아니라 **그룹에도 붙는다** —
+   * `(mp4,webm)[height<480]` 은 yt-dlp 문서에 나오는 표현이다. 그래서 필터를
+   * 읽는 자리를 셀렉터 뒤가 아니라 atom 끝에 둔다. 무엇이 왔든 그 노드에 단다.
+   */
   function atom() {
     ws();
+    let node;
     if (peek() === '(') {
-      i++; const inner = expr(); ws();
+      i++; node = expr(); ws();
       if (peek() !== ')') throw new Error("')' 가 닫히지 않았다");
-      i++; ws();
-      if (peek() === '[') throw new Error('그룹에 바로 붙은 필터는 아직 그래프로 못 읽는다');
-      return inner;
+      i++;
+    } else {
+      const start = i;
+      while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s[i])) i++;
+      if (i === start) throw new Error(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`);
+      node = { t: 'sel', name: s.slice(start, i), filters: [] };
     }
-    const start = i;
-    while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s[i])) i++;
-    if (i === start) throw new Error(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`);
-    const name = s.slice(start, i);
-    const filters = [];
     ws();
     while (peek() === '[') {
       i++;
       const j = s.indexOf(']', i);
       if (j < 0) throw new Error("']' 가 닫히지 않았다");
-      filters.push(parseFilterBody(s.slice(i, j)));
+      (node.filters ||= []).push(parseFilterBody(s.slice(i, j)));
       i = j + 1; ws();
     }
-    return { t: 'sel', name, filters };
+    return node;
   }
 
   const tree = expr(); ws();
@@ -138,11 +144,21 @@ export function emitFilter(f) {
   return '[' + f.key + f.op + (f.loose ? '?' : '') + f.value + ']';
 }
 
+/**
+ * 괄호를 붙일지 정할 때 쓰는 실효 우선순위.
+ *
+ * 필터가 달린 연산자는 이미 제 괄호를 쓰고 나온다(`(mp4,webm)[…]`). 그러면
+ * 원자와 다를 바 없으므로 부모가 또 감싸지 않게 sel 취급한다.
+ */
+const effPrec = n => (n.t !== 'sel' && (n.filters || []).length) ? PREC.sel : PREC[n.t];
+
 export function emitTree(n) {
   if (!n) return '';
-  if (n.t === 'sel') return n.name + (n.filters || []).map(emitFilter).join('');
-  return n.kids.map(k => {
+  const filters = (n.filters || []).map(emitFilter).join('');
+  if (n.t === 'sel') return n.name + filters;
+  const body = n.kids.map(k => {
     const s = emitTree(k);
-    return PREC[k.t] < PREC[n.t] ? '(' + s + ')' : s;   // 우선순위가 낮으면 괄호로 묶는다
+    return effPrec(k) < PREC[n.t] ? '(' + s + ')' : s;  // 우선순위가 낮으면 괄호로 묶는다
   }).join(OP_SEP[n.t]);
+  return filters ? '(' + body + ')' + filters : body;
 }
