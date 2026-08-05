@@ -24,6 +24,7 @@
 import { extractCommand, repairText, userText } from './ask.js';
 import { lintCommand } from './lint.js';
 
+// 3인 이유, 그리고 이 상수가 왜 조절할 손잡이가 아닌지는 docs/repair.md 에 있다.
 export const MAX_ROUNDS = 3;
 
 const errorsOf = command =>
