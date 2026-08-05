@@ -1,0 +1,67 @@
+# npm test 와 같은 것을 돌린다. 단계를 쪼갠 건 실패를 한눈에 가르기 위해서다 —
+# 린트가 깨진 건지, 단위가 깨진 건지, e2e 가 흔들린 건지 잡 요약에서 바로 보인다.
+name: 테스트
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 같은 브랜치에 새로 밀면 돌던 건 접는다. e2e 가 브라우저를 띄우므로 겹쳐 돌 이유가 없다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # node --test 의 글로브(`tests/unit/*.test.mjs`)는 21 이상에서만 된다.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # 브라우저는 캐시하고, 시스템 라이브러리는 매번 깐다(캐시가 안 되는 apt 쪽이다).
+      - name: 크로미움 캐시
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 크로미움 받기
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: 크로미움 시스템 의존성
+        run: npx playwright install-deps chromium
+
+      - name: 린트
+        run: npm run lint
+
+      - name: 단위
+        run: npm run test:unit
+
+      - name: 개발 서버 스모크
+        run: npm run test:dev
+
+      # 이 단계가 스스로 vite build 를 돌린다 — 아래 dist 검사가 그 산출물을 본다.
+      - name: e2e
+        run: npm run test:e2e
+
+      # 배포물을 커밋해 두는 저장소라, 소스만 고치고 빌드를 잊으면 dist 가 늙는다.
+      # 위 e2e 가 방금 다시 구웠으므로, 차이가 나면 커밋된 쪽이 낡은 것이다.
+      - name: 배포물이 소스와 맞는가
+        run: |
+          if ! git diff --quiet -- dist/; then
+            echo "::error::dist/ 가 소스와 다르다 — 'npm run build' 를 돌리고 같이 커밋할 것"
+            git diff --stat -- dist/
+            exit 1
+          fi
