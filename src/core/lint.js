@@ -24,7 +24,6 @@ import { splitEntry } from './paths.js';
 export const LEVELS = ['error', 'warn', 'info'];
 const rank = l => LEVELS.indexOf(l);
 
-/* ── 오타 제안 ───────────────────────────── */
 /** 편집거리. 후보가 200개 남짓이라 단순 DP 로 충분하다. */
 export function distance(a, b) {
   if (a === b) return 0;
@@ -67,7 +66,6 @@ export function nearestFlags(flag, limit = 3) {
     .slice(0, limit).map(x => x.f);
 }
 
-/* ── 값 검사 ─────────────────────────────── */
 /** `--merge-output-format mp4` 처럼 고를 수 있는 값이 정해진 옵션. */
 function checkChoice(opt, value) {
   if (!opt.choices || value == null) return null;
@@ -78,7 +76,7 @@ function checkChoice(opt, value) {
   return `${bad.join(', ')} 는 고를 수 있는 값이 아니다 (${opt.choices.join(' · ')})`;
 }
 
-/* ── 문법 검사 ───────────────────────────── */
+/** `-f` 를 진짜 파서에 넣어 본다. 못 읽으면 파서가 한 말을 그대로 돌려준다. */
 function checkFormat(value) {
   try { parseFormat(value); return null; }
   catch (e) { return e.message; }
@@ -105,7 +103,6 @@ function checkPaths(values) {
   return out;
 }
 
-/* ── 어긋나는 조합 ───────────────────────── */
 /**
  * 문법은 맞지만 의도와 어긋나는 조합. 확실한 것만 둔다 —
  * 애매한 규칙을 늘리면 경고가 흔해지고, 흔한 경고는 안 읽힌다.
@@ -141,7 +138,6 @@ function crossChecks(has, val) {
   return out;
 }
 
-/* ── 본체 ────────────────────────────────── */
 /**
  * 명령어 문자열 → { items, urls, values, issues, ok }.
  *

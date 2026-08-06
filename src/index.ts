@@ -35,10 +35,14 @@ initSchema(raw);
 /** 이 타입과 메서드가 나온 yt-dlp 버전. */
 export const YTDLP_VERSION: string = raw.ytdlp_version;
 
-/* ── 코드로 쓰기 ─────────────────────────── */
+/**
+ * 빌더 — `ytdlp()` 와 그것이 쓰는 타입 전부.
+ *
+ * 옵션 메서드 188개는 `schema.json` 에서 자라므로 여기 이름이 하나씩 적혀
+ * 있지 않다. 무엇이 있는지는 에디터가 안다.
+ */
 export * from './core/build.js';
 
-/* ── 문자열 검사하기 ─────────────────────── */
 import { lintCommand as lintRaw } from './core/lint.js';
 import { previewFilename as previewRaw } from './core/explain.js';
 import type { Issue } from './core/build.js';

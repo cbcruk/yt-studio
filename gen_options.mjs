@@ -20,7 +20,8 @@ import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-te
 
 const SCHEMA = JSON.parse(readFileSync(new URL('./schema.json', import.meta.url), 'utf8'));
 
-/* ── 이름 규칙 (build.ts 와 같아야 한다) ──── */
+// 이름 규칙은 build.ts 와 **같아야 한다**. 여기서 타입 이름을, 저기서 런타임
+// 메서드 이름을 만드는데 둘이 어긋나면 타입은 있고 메서드는 없는 칸이 생긴다.
 const methodName = flag =>
   String(flag).replace(/^--?/, '').replace(/-+([a-z0-9])/g, (_, c) => c.toUpperCase());
 const selMethod = sel => sel.replace('*', 'Star');
@@ -30,7 +31,8 @@ const selMethod = sel => sel.replace('*', 'Star');
 const doc = s => String(s || '').replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
 const union = xs => xs.map(x => `'${x}'`).join(' | ');
 
-/* ── 어휘 ────────────────────────────────── */
+// 어휘 표들은 손으로 적는 층이다(format-grammar.js · output-template.js).
+// 자동완성에 뜨는 한국어 설명이 전부 거기서 나온다.
 const SELS = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const OUT_FIELDS = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 const TYPES = OUT_TYPES.map(([v]) => v).filter(Boolean);
@@ -40,7 +42,6 @@ const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
 ).join('\n');
 
-/* ── 191개 옵션 ──────────────────────────── */
 // -f · -o · -P 는 값 자체가 구조라 build.ts 가 손으로 쓴 시그니처를 갖는다.
 const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
 
@@ -68,7 +69,6 @@ const optionMethods = SCHEMA.options
   .filter(o => !HAND_WRITTEN.has(o.id))
   .map(optionMethod).join('\n\n');
 
-/* ── 조립 ────────────────────────────────── */
 const out = `// 이 파일은 gen_options.mjs 가 schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp ${SCHEMA.ytdlp_version} · 옵션 ${SCHEMA.options.length}개
@@ -80,7 +80,7 @@ export type Version = '${SCHEMA.ytdlp_version}';
 /** 값을 받는 옵션에 줄 수 있는 것. */
 export type Arg = string | number;
 
-/* ── 포맷 셀렉터 (-f) ────────────────────── */
+/** \`-f\` 가 받는 셀렉터. 빌더에서는 \`f.bv()\` 처럼 메서드가 된다. */
 export type Selector = ${union(SELS)};
 
 /** 셀렉터 팩토리의 메서드 이름. \`*\` 는 \`Star\` 로 옮긴다. */
@@ -125,7 +125,7 @@ export interface Filters {
 ${filterProps}
 }
 
-/* ── 출력 템플릿 (-o) ────────────────────── */
+/** \`-o\` 템플릿에 자주 쓰는 필드. 나머지는 \`t.field('이름')\` 으로. */
 export type OutField = ${union(OUT_FIELDS)};
 export type OutType = ${union(TYPES)};
 export type Conversion = ${union(CONVERSIONS.map(([c]) => c))};
@@ -140,7 +140,7 @@ export interface OutFields<P> {
 ${OUT_FIELDS.map(f => `  /** \`%(${f})s\` — ${doc(FIELD_HELP[f])} */\n  readonly ${f}: P;`).join('\n')}
 }
 
-/* ── 저장 경로 (-P) ──────────────────────── */
+/** \`-P\` 에 줄 수 있는 경로. \`home\` 만 접두어 없이 나간다. */
 export interface PathMap {
   /** 받은 파일이 최종적으로 놓일 곳. */
   home?: string;
@@ -149,7 +149,6 @@ export interface PathMap {
 ${TYPES.map(t => `  ${t}?: string;`).join('\n')}
 }
 
-/* ── 191개 옵션 ──────────────────────────── */
 /**
  * 설치된 yt-dlp 의 옵션 전부.
  *

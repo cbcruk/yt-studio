@@ -59,7 +59,6 @@ export function explainItem(it) {
 
 export const explainCommand = items => items.map(explainItem);
 
-/* ── 이어서 줄 만한 것 ───────────────────── */
 /**
  * 지금 조합에서 자연스럽게 따라오는 옵션들.
  *

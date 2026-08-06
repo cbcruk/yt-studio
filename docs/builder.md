@@ -91,9 +91,9 @@ ytdlp(u).extractAudio().format('bv').lint();
 ### 옵션 188개
 
 메서드 이름은 **긴 플래그**에서 나온다 — `--embed-subs` → `.embedSubs()`.
-명령어에 찍히는 건 **짧은 게 있으면 짧은 것**이다(`-f` · `-x` · `-R`). 그래프의
-`buildTokens` 가 그렇게 내므로, 같은 옵션이 어느 쪽으로 만들었느냐에 따라 다른
-문자열이 되지 않는다.
+명령어에 찍히는 건 **짧은 게 있으면 짧은 것**이다(`-f` · `-x` · `-R`) — 사람이
+손으로 쓰는 모양이 그쪽이고, `ytstudio lint` 가 뱉는 플래그와도 같아야 눈으로
+대조가 된다.
 
 ```ts
 .embedSubs()          // --embed-subs
@@ -188,7 +188,7 @@ t.field('release_year')          // 카탈로그에 없는 필드
 
 ```
 node gen_options.mjs      # schema.json → src/core/options.gen.ts   (npm run gen:types)
-npx tsc                   # src/ → lib/                             (npm run build:lib)
+npx tsc                   # src/ → lib/                             (npm run build)
 npx tsc -p tsconfig.test.json   # 타입 검사                          (npm run check:types)
 ```
 

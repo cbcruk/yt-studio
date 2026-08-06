@@ -69,7 +69,7 @@ interface SchemaOpt {
 
 const optOf = (id: string): SchemaOpt => (BY_ID as Record<string, SchemaOpt>)[id];
 
-/* ── 포맷 셀렉터 (-f) ────────────────────── */
+/** `[height<=?1080]` 한 칸. `loose` 가 참이면 `?` 가 붙는다. */
 export interface Filter { key: string; op: string; loose?: boolean; value: string }
 
 /** 트리 노드. `parseFormat` 이 내놓는 것과 **같은 모양**이다. */
@@ -161,7 +161,7 @@ export function formatFactory(): FormatFactory {
   return f as unknown as FormatFactory;
 }
 
-/* ── 출력 템플릿 (-o) ────────────────────── */
+/** `%(upload_date>%Y-%m-%d|Unknown)s` 한 칸을 풀어 놓은 것. */
 export interface FieldPiece {
   t: 'field'; name: string; strf: string; fallback: string | null; fmt: string; conv: string;
 }
@@ -220,7 +220,12 @@ export function outTag(): OutTag {
   return tag as unknown as OutTag;
 }
 
-/* ── 명령어 ──────────────────────────────── */
+/**
+ * 검증기가 잡은 것 하나.
+ *
+ * `error` 는 그대로 돌리면 안 되는 것, `warn` 은 의도와 다를 수 있는 것,
+ * `info` 는 참고다. `fixes` 는 없는 플래그일 때 가까운 후보 셋.
+ */
 export interface Issue {
   level: 'error' | 'warn' | 'info';
   msg: string;

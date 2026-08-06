@@ -20,7 +20,6 @@ import {
 } from './index.js';
 import type { LintResult } from './index.js';
 
-/* ── 꾸미기 ──────────────────────────────── */
 // 파이프로 넘길 때는 색을 끈다 — 색코드가 grep 에 걸리면 곤란하다.
 const tty = process.stdout.isTTY && !process.env.NO_COLOR;
 const c = (n: number, s: string) => (tty ? `\x1b[${n}m${s}\x1b[0m` : s);
@@ -56,7 +55,13 @@ function input(args: string[]): string {
   try { return readFileSync(0, 'utf8').trim(); } catch { return ''; }
 }
 
-/* ── lint ────────────────────────────────── */
+/**
+ * 검사 결과를 사람이 읽는 순서로 낸다.
+ *
+ * 심각한 것부터(lint.js 가 이미 그 순서로 준다), 그 다음 만들 파일명, 마지막에
+ * 한 줄 판정. 오류가 있을 때는 다음 걸음을 안 권한다 — 틀린 것을 두고 더 얹으라고
+ * 하면 소음이다.
+ */
 function report(r: LintResult): void {
   for (const i of r.issues) {
     console.log(`${MARK[i.level]} ${i.msg}`);
@@ -81,7 +86,7 @@ function report(r: LintResult): void {
   }
 }
 
-/* ── explain ─────────────────────────────── */
+/** 토큰마다 무슨 옵션인지. 검사는 안 하고 읽어 주기만 한다. */
 function explain(r: LintResult): void {
   for (const row of explainCommand(r.items)) {
     const where = row.stageLabel ? dim(`  [${row.stageLabel}]`) : '';
@@ -89,7 +94,8 @@ function explain(r: LintResult): void {
   }
 }
 
-/* ── 본체 ────────────────────────────────── */
+// 종료 코드가 셋이다 — 0 통과, 1 명령어에 오류, 2 이 CLI 를 잘못 불렀다.
+// 스크립트가 "명령어가 틀렸다"와 "인자를 잘못 줬다"를 갈라 봐야 한다.
 const [cmd, ...rest] = process.argv.slice(2);
 
 if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {

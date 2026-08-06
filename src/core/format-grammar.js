@@ -19,7 +19,13 @@ export const FORMAT_OPS = ['merge', 'fallback', 'multi'];
 /** 연산자 → 표기 기호. */
 export const OP_SEP = { merge: '+', fallback: '/', multi: ',' };
 
-/* ── 셀렉터 어휘 ─────────────────────────── */
+/**
+ * 셀렉터 어휘 — 이름과 한 줄 설명.
+ *
+ * 리플렉션이 못 주는 층이다. yt-dlp 는 `-f` 값을 그냥 문자열로 받으므로
+ * optparse 트리에는 `b` · `bv` 가 무슨 뜻인지가 없다. 손으로 적는다.
+ * 빌더의 메서드 이름과 자동완성 설명이 여기서 나온다.
+ */
 export const SELECTORS = [
   ['영상 + 음성 (한 파일)', [
     ['b',  'best — 영상·음성이 같이 든 것 중 최고'],
@@ -43,8 +49,8 @@ export const SELECTORS = [
 export const SEL_HELP = Object.fromEntries(SELECTORS.flatMap(([, items]) => items));
 export const SEL_SET = new Set(Object.keys(SEL_HELP));
 
-/* ── 필터 어휘 ───────────────────────────── */
 // yt-dlp 문서의 필터 필드. num/str 에 따라 쓸 수 있는 연산자가 다르다.
+// 이것도 손으로 적는 층이다 — 빌더의 Filters 타입이 여기서 나온다.
 export const FKEYS = [
   ['height','세로 해상도','num'], ['width','가로 해상도','num'], ['fps','프레임','num'],
   ['tbr','전체 비트레이트','num'], ['vbr','영상 비트레이트','num'], ['abr','음성 비트레이트','num'],
@@ -65,7 +71,6 @@ export const OP_LABEL = Object.fromEntries([...NUM_OPS, ...STR_OPS, ...EXIST_OPS
 
 export const isExistOp = op => op === 'has' || op === 'hasnot';
 
-/* ── 파싱 ────────────────────────────────── */
 /** `height<=?1080` · `format_note` · `!format_note` 를 {key, op, loose, value} 로. */
 export function parseFilterBody(body) {
   const b = body.trim();
@@ -137,7 +142,7 @@ export function parseFormat(src) {
   return tree;
 }
 
-/* ── 컴파일 ──────────────────────────────── */
+/** 필터 하나 → `[height<=1080]`. `has`/`hasnot` 은 값 없이 이름만 쓴다. */
 export function emitFilter(f) {
   if (f.op === 'has') return '[' + f.key + ']';
   if (f.op === 'hasnot') return '[!' + f.key + ']';

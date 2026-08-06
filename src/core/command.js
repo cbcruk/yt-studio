@@ -8,11 +8,12 @@
  */
 import { BY_FLAG } from './schema.js';
 
-/* ── 쓰기 ────────────────────────────────── */
+/** 셸이 그냥 넘길 수 있는 글자들. 이 밖이 하나라도 섞이면 감싼다. */
 const SAFE = /^[A-Za-z0-9._:,\/=+@%^-]+$/;
+
+/** 셸에 붙여넣어도 한 토큰으로 남게. 이미 안전하면 그대로 둔다. */
 export const quote = v => SAFE.test(v) ? v : '"' + String(v).replace(/([\\"$`])/g, '\\$1') + '"';
 
-/* ── 읽기 ────────────────────────────────── */
 /** 셸 인용을 존중하며 토큰으로 쪼갠다. */
 export function tokenize(s) {
   const out = []; let cur = '', q = null, open = false;

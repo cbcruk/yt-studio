@@ -20,7 +20,6 @@ const { scanCommand } = await import('../../lib/core/command.js');
 
 const U = 'https://youtu.be/abc';
 
-/* ── 이름 규칙 ───────────────────────────── */
 test('메서드 이름은 긴 플래그에서 나온다', () => {
   assert.equal(methodName('--embed-subs'), 'embedSubs');
   assert.equal(methodName('--no-part'), 'noPart');
@@ -33,7 +32,6 @@ test('설치된 yt-dlp 버전을 그대로 내놓는다', () => {
   assert.match(YTDLP_VERSION, /^\d{4}\.\d{2}\.\d{2}$/);
 });
 
-/* ── 뼈대 ────────────────────────────────── */
 test('URL 만 주면 URL 만 나온다', () => {
   assert.equal(ytdlp(U).build(), `yt-dlp ${U}`);
   assert.equal(ytdlp().url(U).url('https://b').build(), `yt-dlp ${U} https://b`);
@@ -53,7 +51,6 @@ test('짧은 플래그가 있으면 짧은 것을 쓴다 — 검사 결과와 �
   assert.ok(!s.includes('--format'), s);
 });
 
-/* ── 옵션 191개 ──────────────────────────── */
 test('스키마에서 자란다 — 손으로 적은 목록이 없다', () => {
   const c = ytdlp(U);
   for (const m of ['embedSubs', 'writeSubs', 'subLangs', 'fixup', 'matchFilters', 'part']) {
@@ -96,7 +93,6 @@ test('공백이 든 값은 따옴표로 감싸고, argv 에는 안 감싼다', (
   assert.equal(c.toArray().at(-1), U);
 });
 
-/* ── -f 식 ───────────────────────────────── */
 test('식이 문자열이 된다', () => {
   const c = ytdlp(U).format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()));
   assert.ok(c.build().includes('-f "bv[height<=1080]+ba/b"'), c.build());
@@ -145,7 +141,6 @@ test('빌더가 만든 트리는 파서가 낸 트리와 같다', () => {
   }
 });
 
-/* ── -o 템플릿 ───────────────────────────── */
 test('태그드 템플릿이 출력 템플릿이 된다', () => {
   const c = ytdlp(U).output(t => t`${t.title} [${t.id}].${t.ext}`);
   assert.ok(c.build().includes('-o "%(title)s [%(id)s].%(ext)s"'), c.build());
@@ -176,7 +171,6 @@ test('종류별 템플릿은 접두어가 붙는다', () => {
     .includes('-o "thumbnail:%(id)s.%(ext)s"'));
 });
 
-/* ── -P 경로 ─────────────────────────────── */
 test('home 은 접두어 없이, 나머지는 종류를 붙여서', () => {
   const c = ytdlp(U).paths({ home: '/dl', temp: '/tmp/yt', thumbnail: '/dl/thumbs' });
   const s = c.build();
@@ -185,7 +179,6 @@ test('home 은 접두어 없이, 나머지는 종류를 붙여서', () => {
   assert.ok(s.includes('-P thumbnail:/dl/thumbs'), s);
 });
 
-/* ── 복사 ────────────────────────────────── */
 test('clone 은 독립이다', () => {
   const base = ytdlp(U).format('b');
   const a = base.clone().embedSubs();
@@ -195,7 +188,6 @@ test('clone 은 독립이다', () => {
   assert.equal(base.build(), `yt-dlp -f b ${U}`);
 });
 
-/* ── 검증기는 여전히 필요하다 ────────────── */
 test('타입이 통과시킨 조합을 검증기가 잡는다', () => {
   // 타입으로는 아무 문제 없다 — 둘 다 실재하는 옵션이다
   const bad = ytdlp(U).extractAudio().format('bv');
@@ -223,7 +215,6 @@ test('URL 을 안 주면 검증기가 잡는다 — 빌더도 그건 못 막는�
   assert.ok(ytdlp().embedSubs().lint().issues.some(i => /URL 이 없다/.test(i.msg)));
 });
 
-/* ── 왕복 ────────────────────────────────── */
 test('빌더가 낸 명령어를 스캐너가 그대로 읽는다', () => {
   const c = ytdlp(U)
     .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()))
