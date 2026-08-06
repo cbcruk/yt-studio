@@ -15,10 +15,10 @@
  * DOM 도 앱 상태도 모른다. 문자열 하나가 들어가고 진단 목록이 나온다.
  */
 import { BY_FLAG, BY_ID, OPTS } from './schema.js';
-import { scanCommand } from './pipeline.js';
+import { scanCommand } from './command.js';
 import { parseFormat } from './format-grammar.js';
 import { parseTemplate, splitType } from './output-template.js';
-import { splitEntry } from './paths-graph.js';
+import { splitEntry } from './paths.js';
 
 /** error 는 그대로 돌리면 안 되는 것, warn 은 의도와 다를 수 있는 것, info 는 참고. */
 export const LEVELS = ['error', 'warn', 'info'];

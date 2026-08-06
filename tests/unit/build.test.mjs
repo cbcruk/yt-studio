@@ -6,7 +6,7 @@
  *
  * 여기서 보는 건 셋이다.
  *   · 문자열이 맞게 나오는가
- *   · **파서와 같은 트리를 만드는가** — 빌더로 만든 식을 그래프가 열 수 있어야 한다
+ *   · **파서와 같은 트리를 만드는가** — 읽기와 쓰기가 한 문법을 공유해야 한다
  *   · 검증기가 여전히 제 일을 하는가 — 타입이 못 보는 조합이 있다
  */
 import { test } from 'node:test';
@@ -16,7 +16,7 @@ const { ytdlp, formatFactory, outTag, methodName, selMethod, YTDLP_VERSION } =
   await import('../../lib/index.js');
 const { parseFormat } = await import('../../lib/core/format-grammar.js');
 const { parseTemplate } = await import('../../lib/core/output-template.js');
-const { scanCommand } = await import('../../lib/core/pipeline.js');
+const { scanCommand } = await import('../../lib/core/command.js');
 
 const U = 'https://youtu.be/abc';
 
@@ -44,7 +44,7 @@ test('URL 은 늘 맨 뒤다 — 옵션을 나중에 줘도', () => {
   assert.match(c.build(), /--embed-subs --write-subs https:\/\/youtu\.be\/abc$/);
 });
 
-test('짧은 플래그가 있으면 짧은 것을 쓴다 — 그래프와 같은 문자열이 나와야 한다', () => {
+test('짧은 플래그가 있으면 짧은 것을 쓴다 — 검사 결과와 눈으로 대조된다', () => {
   const c = ytdlp(U).format('b').output('%(title)s.%(ext)s').paths({ home: '/dl' }).extractAudio();
   const s = c.build();
   for (const t of ['-f b', '-o "%(title)s.%(ext)s"', '-P /dl', '-x']) {
@@ -140,7 +140,7 @@ test('빌더가 만든 트리는 파서가 낸 트리와 같다', () => {
     f.raw('mp4').also(f.raw('webm')).where({ height: { lt: 480 } }),
     f.bvStar({ ext: 'mp4' }).plus(f.baStar()).or(f.raw('b')),
   ]) {
-    // 이게 참이라야 "빌더로 만든 식을 그래프가 그대로 연다"가 참이 된다
+    // 이게 참이라야 읽기(parseFormat)와 쓰기(빌더)가 한 문법이라고 말할 수 있다
     assert.deepEqual(e.node, parseFormat(String(e)), String(e));
   }
 });

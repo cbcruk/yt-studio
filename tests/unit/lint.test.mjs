@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { initSchema } from '../../src/core/schema.js';
-import { scanCommand, parseCommand, commandString, blankPipeline } from '../../src/core/pipeline.js';
+import { scanCommand } from '../../src/core/command.js';
 
 initSchema(JSON.parse(await readFile(new URL('../../schema.json', import.meta.url), 'utf8')));
 const { lintCommand, nearestFlags, distance } = await import('../../src/core/lint.js');
@@ -136,13 +136,16 @@ test('진단은 명령어 앞의 yt-dlp 가 없어도 돈다', () => {
 });
 
 /* ── 원본이 명령어라는 것 ─────────────────── */
-test('모르는 토큰은 원문 그대로 왕복한다', () => {
-  const { extras, unknown } = parseCommand('yt-dlp --future-flag --embed-subs https://x/y');
-  assert.deepEqual(unknown, ['--future-flag']);
-  assert.deepEqual(extras, ['--future-flag']);
+test('스키마가 모르는 토큰도 원문 그대로 들고 있는다', () => {
+  // 우리가 모른다고 사용자가 쓴 것을 지우지 않는다. 새 yt-dlp 에서 생긴
+  // 플래그일 수도 있으므로 "모르겠다"고 말하되 글자는 그대로 넘긴다.
+  const { items } = scanCommand('yt-dlp --future-flag --embed-subs https://x/y');
+  const unknown = items.filter(i => i.kind === 'unknown');
+  assert.deepEqual(unknown.map(i => i.raw), ['--future-flag']);
+  assert.equal(unknown[0].why, 'no-flag');
 
-  const g = Object.assign(blankPipeline(), { extras });
-  assert.match(commandString(g), /--future-flag/);
+  const { issues } = lintCommand('yt-dlp --future-flag --embed-subs https://x/y');
+  assert.ok(issues.some(i => i.level === 'error' && i.flag === '--future-flag'));
 });
 
 test('scanCommand 는 순서와 원문을 지킨다', () => {

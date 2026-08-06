@@ -2,20 +2,13 @@
 
 [![테스트](https://github.com/cbcruk/yt-studio/actions/workflows/test.yml/badge.svg)](https://github.com/cbcruk/yt-studio/actions/workflows/test.yml)
 
-한국어로 쓰면 yt-dlp 명령어가 나온다. 그리고 **그게 맞는지 실물로 검사한다.**
-의존성 없는 단일 HTML 파일 하나로 굽는다.
+**설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.**
 
 ```
-npm run dev       # vite 개발 서버 (HMR)
-npm run build     # → dist/ytdlp-studio.html   (앱)
-npm run build:lib # → lib/                     (빌더 라이브러리)
+npm run build     # → lib/                            (tsc)
 npm run gen:types # schema.json → src/core/options.gen.ts
-npm test          # 린트 + 타입 + 단위(node) + 개발 서버 스모크 + e2e(playwright)
+npm test          # 린트 + 타입 + 단위 + CLI
 ```
-
-같은 것을 CI 가 push·PR 마다 돌린다. 다만 단계를 쪼개 두어서 무엇이 깨졌는지가
-잡 요약에 바로 보이고, 마지막에 **커밋된 `dist/` 가 소스와 맞는지**를 한 번 더
-본다 — 배포물을 커밋해 두는 저장소라 소스만 고치고 빌드를 잊으면 늙는다.
 
 ## 왜 만드나
 
@@ -28,19 +21,9 @@ yt-dlp 의 optparse 트리를 리플렉션해서 뽑은 것이고, `-f` · `-o` 
 
 > 이 명령어, 지금 내 yt-dlp 에서 돌려도 되나? 돌리면 무슨 파일이 생기나?
 
-**원본은 명령어 문자열이다.** 모델이 준 것이든 손으로 고친 것이든 어디선가 주운
-것이든 같은 칸으로 들어오고, 그 칸이 바뀔 때마다 전부 다시 검사한다.
+같은 스키마 위에 입구가 둘이다. **코드로 만들거나**, **문자열을 검사하거나.**
 
-## 입구가 셋, 핵심은 하나
-
-같은 스키마와 같은 파서 위에 입구가 셋 있다. 무엇을 쓰든 나오는 것은 명령어
-문자열이고, 검사하는 것은 같은 검증기다.
-
-| 입구 | 누구를 위한 것 |
-|---|---|
-| **프롬프트** | 한국어로 쓰면 명령어가 나온다 (첫 화면) |
-| **코드** — `ytdlp()` 빌더 | 자동화를 짜는 사람. 타입이 옵션 카탈로그가 된다 |
-| **그래프** | `-f` · `-o` 값을 손으로 짜기 싫을 때 여는 수리 뷰 |
+## 코드로 만들기
 
 ```ts
 import { ytdlp } from 'ytstudio';
@@ -48,24 +31,61 @@ import { ytdlp } from 'ytstudio';
 ytdlp('https://youtu.be/abc')
   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
   .output(t => t`${t.title} [${t.id}].${t.ext}`)
+  .paths({ home: '/dl', temp: '/tmp/yt' })
   .writeSubs().subLangs('ko,en').embedSubs()
   .build();
+
 // yt-dlp -f "bv[height<=1080]+ba/b" -o "%(title)s [%(id)s].%(ext)s"
-//        --write-subs --sub-langs ko,en --embed-subs https://youtu.be/abc
+//        -P /dl -P temp:/tmp/yt --write-subs --sub-langs ko,en --embed-subs
+//        https://youtu.be/abc
 ```
 
-타입은 `schema.json` 에서 자란다 — **자동완성에 뜨는 옵션 = 당신이 깐 yt-dlp 의
-옵션**이다. 그래서 검증기가 하던 일의 절반이 컴파일 타임으로 올라간다.
+메서드 188개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은 곳에서
+나오므로 **자동완성에 뜨는 옵션 = 당신이 깐 yt-dlp 의 옵션**이다. 그래서 검증기가
+하던 일의 절반이 컴파일 타임으로 올라간다.
 
 ```
 ytdlp(u).writeSub()      → Property 'writeSub' does not exist. Did you mean 'writeSubs'?
 ytdlp(u).fixup('nope')   → 'nope' is not assignable to '"never" | "ignore" | …'
 ```
 
-> 빌더 전체는 **[docs/builder.md](docs/builder.md)** 에 있다. 왜 그래프가 아니라
-> 이것이 맞는지도 거기 적어 뒀다.
+편집거리로 후보를 뽑던 코드를 컴파일러가 공짜로 대신한다. `.toArray()` 는 `spawn`
+에 넘길 argv 를 준다.
 
-## 검증기
+> 빌더 전체는 **[docs/builder.md](docs/builder.md)** 에 있다. 왜 노드 그래프가
+> 아니라 이것이 맞는지도 거기 적어 뒀다.
+
+## 문자열 검사하기
+
+빌더는 **빌더로 쓴 것만** 본다. 블로그에서 주웠든 동료가 붙여넣었든 LLM 이 줬든,
+남이 준 명령어는 문자열로 온다. 그걸 설치된 yt-dlp 에 대조하는 게 이 도구가 하는
+유일무이한 일이다.
+
+```
+$ ytstudio lint 'yt-dlp -f "bv+ba/" --write-sub -o "%(title)s" https://youtu.be/abc'
+✗ --write-sub 는 이 yt-dlp 버전에 없는 플래그다 — --write-subs · --write-srt · --write-link 를 찾은 것 아닐까
+    → --write-subs  --write-srt  --write-link
+✗ -f 값을 읽지 못했다 — 셀렉터를 찾지 못했다 (7번째 글자 근처)
+! -o 에 %(ext)s 가 없다 — 확장자 없는 파일이 만들어진다
+
+만들 파일  ‹제목›
+판정      오류 2개 · 옵션 2개를 스키마 191개와 대조
+```
+
+**오류가 있으면 1 로 끝난다** — 스크립트와 CI 에 그대로 걸린다. 파이프도 된다
+(`pbpaste | ytstudio lint`). 무슨 뜻인지 읽으려면 `ytstudio explain`.
+
+코드에서는 같은 것을 함수로 부른다.
+
+```ts
+import { lintCommand, previewFilename } from 'ytstudio';
+
+const r = lintCommand(누가준명령어);
+if (!r.ok) throw new Error(r.issues.map(i => i.msg).join('\n'));
+previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장자›'
+```
+
+## 검증기가 보는 것
 
 `src/core/lint.js` — 로컬에서, 결정적으로, 네트워크 없이 돈다.
 
@@ -77,202 +97,62 @@ ytdlp(u).fixup('nope')   → 'nope' is not assignable to '"never" | "ignore" | �
 | 고를 수 있는 값 중 하나인가 | `choices` |
 | `-f` 가 포맷 셀렉터 문법에 맞는가 | `core/format-grammar.js` 파서 |
 | `-o` 가 출력 템플릿 문법에 맞는가 · 확장자가 붙는가 | `core/output-template.js` 파서 |
-| `-P` 에 같은 종류가 두 번 오지 않는가 | `core/paths-graph.js` |
+| `-P` 에 같은 종류가 두 번 오지 않는가 | `core/paths.js` |
 | 서로 어긋나는 조합인가 | `-x` 인데 `-f` 가 영상 전용, `--embed-subs` 인데 자막을 안 받음 … |
 
-그리고 **만들 파일명**을 보여 준다 — `-P home` 과 `-o` 를 합쳐서
-`/dl/‹업로더›/‹제목›.‹확장자›` 처럼. 값은 모르니 자리표시자로 둔다.
-
-## 모델은 부품이다
-
-프롬프트를 명령어로 옮기는 일만 모델이 한다. 두 가지 길이 있고, 검증기와 판독
-화면은 어느 쪽이든 똑같이 돈다.
-
-- **키 넣기** — 브라우저에서 `api.anthropic.com` 을 바로 부른다. 서버가 없으므로
-  키는 사용자 것이고 `localStorage` 에만 있다. 옵션 카탈로그(≈6천 토큰)를 통째로
-  프롬프트에 넣고 — 골라 넣을 만큼 크지 않다 — 그 블록에 프롬프트 캐시를 건다.
-  `max_tokens` 는 생각과 답을 합쳐 재므로 넉넉히 잡는다(답이 한 줄이라고 줄이면
-  생각하다 잘린다). `effort` 는 모델마다 있고 없어서 `MODELS` 표에 같이 적는다.
-- **프롬프트 복사** — 키 없이. 카탈로그가 박힌 프롬프트를 만들어 주면 쓰던 LLM 에
-  붙여넣고, 돌아온 명령어를 명령어 칸에 붙여넣는다.
-
-### 검증기가 잡은 것은 사람 대신 되묻는다
-
-`src/core/repair.js` — 모델이 낸 명령어에 **오류**가 있으면 그 오류를 그대로 다음
-user 턴에 붙여 다시 묻는다. 툴콜이 아니라 그냥 문장이라 어느 모델에서나 돌고,
-사람이 오류를 읽고 다시 물어 주는 칸이 사라진다. 지키는 선이 넷 있다.
-
-- **오류만 되묻는다.** 경고와 참고는 판단이지 틀린 게 아니다 — 그걸로 다시 물으면
-  사용자가 시킨 것을 모델이 되돌린다.
-- **나아지지 않으면 멈춘다.** 오류가 줄지 않은 답이 오면 거기서 끊는다.
-- **가장 나은 라운드를 낸다.** 마지막이 첫 번째보다 나쁠 수 있다.
-- **최대 세 번.** 호출은 돈이고, 세 번에 못 고치면 사람이 봐야 한다.
-
-돌 때마다 버튼이 `고치는 중… 2/3` 으로 바뀌고, 끝나면 몇 번 만에 고쳤는지(또는
-못 고쳤는지) 명령어 위에 한 줄로 남는다. 되묻다 호출이 막히면 고치기 전 명령어를
-그대로 낸다.
-
-> 라운드 수를 무엇으로 정할 것인가 — 그리고 왜 `MAX_ROUNDS` 가 조절할 손잡이가
-> 아닌가는 **[docs/repair.md](docs/repair.md)** 에 있다.
-
-## 옵션 191개를 보여주는 법
-
-평평한 191개는 아무도 안 읽는다. 단계로 나눠도 "접속 36개"가 남고, 검색은 **찾을
-말을 이미 알 때만** 통한다. 그래서 넓은 것부터 좁혀 간다.
-
-```
-의도 16개  →  그 의도의 핵심 3~7개  →  관련 전체  →  단계별 191개
-```
-
-처음 보이는 건 "화질·해상도", "자막", "음원만 뽑기" 같은 의도 16개뿐이고 대부분
-거기서 끝난다. 축은 `src/core/catalog.js` 의 `INTENTS` 가 갖는다 — schema.json 에는
-"사람이 무엇을 원하는가"가 없고 리플렉션으로는 절대 안 나오므로 손으로 정한다.
-`schema.js` 의 KO 사전과 같은 층이다.
-
-값이 있는 옵션은 눌러도 바로 안 들어간다 — 값 칸이 먼저 열린다. `choices` 가
-있으면 고르는 칸으로, 없으면 metavar 를 힌트로 단 입력 칸으로.
-
-그리고 **지금 명령어가 부르는 다음 한 걸음**을 따로 낸다 — `-x` 가 있으면
-`--audio-format` · `--embed-thumbnail`, `--write-subs` 가 있으면 `--sub-langs` ·
-`--embed-subs`. 목록을 훑게 하는 것보다 이쪽이 옵션이 많을 때 낫다.
-
-## 그래프 — 수리 뷰
-
-검증기가 `-f` 값을 못 읽겠다고 하거나 값을 손으로 짜기 싫을 때, 명령어를 노드로
-풀어 고친다. 상단 **그래프** 탭이나 명령어 칸의 **그래프에서 고치기** 로
-들어가고, 나올 때 다시 문자열로 접힌다.
-
-```
-[source] ─→ [connect] ─→ [format] ─→ [process] ─→ [store] ─→ [command]
-   URL         접속         포맷        후처리       저장        yt-dlp …
-```
-
-옵션 191개는 이 9개 생애주기 단계로 나뉜다. **소스에서 명령어 노드까지 이어진
-노드만 결과에 들어가서**, 와이어를 끊으면 옵션을 지우지 않고 그 단계만 빼고
-돌려볼 수 있다. `-f` · `-o` · `-P` 는 값 자체가 구조라 **서브그래프**에서 따로
-편집한다.
-
-왕복은 무손실이다 — 스키마가 모르는 토큰도 **명령어에는 원문 그대로 남는다.**
-
-> 규칙과 문법(`-f` BNF · `-o` 조각 · `-P` 집합)과 캔버스 조작은
-> **[docs/graph.md](docs/graph.md)** 에 있다.
-
-명령어·프롬프트·히스토리·그래프는 전부 `localStorage` 에 자동 저장된다.
-
-## 조작
-
-| 하는 일 | 방법 |
-|---|---|
-| 명령어 만들기 | 프롬프트를 쓰고 `⌘·Ctrl + Enter` 또는 **명령어 만들기** |
-| 이미 있는 명령어 고치기 | 프롬프트에 "자막도 넣어 줘" → **고치기** (지금 명령어를 같이 보낸다) |
-| 어디선가 주운 명령어 검사 | 명령어 칸에 그대로 붙여넣는다 — 그 순간 검증기가 돈다 |
-| 오타 고치기 | 문제 목록의 후보 버튼을 누른다 (값은 그대로 둔 채 플래그만 바뀐다) |
-| 옵션 이어 넣기 | 판독의 **이어서** 칩 — 지금 조합이 부르는 것만 나온다 |
-| 옵션 찾아보기 | **옵션 찾아보기** → 의도 고르기 → 옵션. 값이 있으면 값 칸이 먼저 열린다 |
-| 이름으로 바로 찾기 | 찾아보기 안의 검색 칸 (`자막` · `sub` · `403` …) |
-| 무슨 뜻인지 읽기 | 판독 아래 **토큰별로 읽기** |
-| 키 없이 쓰기 | **프롬프트 복사** → 쓰던 LLM 에 붙여넣고 답을 명령어 칸에 |
-| 키·모델 | **키 넣기** (지우기도 같은 곳) · 왼쪽 셀렉트에서 모델 |
-| 지난 명령어 | 맨 아래 **지난 명령어 N개** — 프롬프트도 같이 남는다 |
-| 그래프로 · 그래프에서 | 상단 **프롬프트** / **그래프** 탭, 또는 명령어 칸의 **그래프에서 고치기** |
-
-캔버스 조작은 [docs/graph.md](docs/graph.md#캔버스-조작) 에 있다.
+마지막 줄이 빌더가 있어도 검증기가 안 없어지는 이유다. **조합은 타입이 못 본다** —
+`-x` 와 `-f bv` 는 둘 다 실재하는 옵션이라 컴파일러가 통과시킨다. 빌더에서도
+`.lint()` 로 같은 검사를 돌릴 수 있다.
 
 ## 구성
 
 ```
-src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
-  schema.js          색인 · 검색 · KO 사전
-  schema-data.js     개발은 JSON import, 배포는 빌드가 값으로 갈아 끼운다
-  lint.js            명령어 진단 — 이 도구의 중심
-  explain.js         토큰별 설명 · 파일명 미리보기 · 다음 걸음
-  edit.js            명령어 문자열 편집 (토큰 끼우기 · 플래그 갈아 끼우기)
-  catalog.js         의도 축(INTENTS) · LLM 에게 줄 옵션 카탈로그
-  ask.js             프롬프트 조립 · 답 파싱 · Anthropic 호출 (fetch 주입 가능)
-  repair.js          자동 수정 루프 — 검증기의 오류를 되먹여 다시 묻는다
+src/core/            DOM 도 파일 시스템도 모른다. node 로 단위 테스트가 된다
+  schema.js          리플렉션한 JSON → 색인
   build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
   options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.mjs 가 만든다)
-  graph.js           그래프 원시 연산 (연결 · 삭제 · 위상 정렬)
+  lint.js            명령어 진단 — 이 도구의 중심
+  explain.js         토큰별 설명 · 파일명 미리보기 · 다음 걸음
+  command.js         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
   format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
-  format-graph.js    트리 ↔ 그래프 · 문제 진단
   output-template.js -o 파서 · 컴파일러 · 필드/변환 어휘
-  output-graph.js    수열 ↔ 그래프 · 미리보기 · 문제 진단
-  paths-graph.js     -P 항목 집합 ↔ 그래프
-  pipeline.js        살아 있는 경로 · 명령어 조립/해석 (scanCommand 가 유일한 파서)
-  layout.js          정돈 · 화면 맞춤 · 줌 계산
-  persist.js         스냅샷 · 복원 · 마이그레이션 · 히스토리 · 화면
-src/ui/
-  ask.js             프롬프트 화면 (첫 화면)
-  report.js          판독 — 배지 · 문제 · 파일명 · 설명 · 다음 걸음
-  browse.js          옵션 찾아보기 (의도 → 핵심 → 관련 → 단계)
-  node-kinds.js      노드 종류 레지스트리 (색 · 표기 · 포트 · 팔레트)
-  graph-kinds.js     그래프 종류 레지스트리 (파이프라인 / 포맷 / 출력 / 경로)
-  bodies.js          노드 본문 템플릿 13종
-  chrome.js          캔버스 밖 화면 (팔레트 · 검색 · 명령어 · 브레드크럼)
-  canvas.js          캔버스 — Rete.js 어댑터 (노드 · 와이어 · 팬 · 줌)
-  graph-behavior.js  그래프 종류마다 다른 정렬 · 되돌려쓰기 · 새 노드
-  tpl.js · dom.js    lit 어댑터 · DOM 손잡이
-src/index.ts         빌더를 쓰는 입구 (스키마를 읽어 넣는다)
-src/ask-flow.js      프롬프트 화면의 흐름 (상태 · 모델 호출 · 키 · 저장물)
-src/app.js           그래프 상태 · 화면/모드 전환 · 배선 · 두 화면의 이음매
-src/app.css          스타일 전부
-index.html           개발 진입점이자 배포 템플릿
+  paths.js           -P 항목 한 줄 읽기
+src/index.ts         공개 API (빌더 + 검증기)
+src/cli.ts           ytstudio lint · explain
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
 gen_options.mjs      schema.json 을 옵션 타입으로
-tsconfig*.json       빌더만 TypeScript 다 (검사 전용 설정이 따로 있다)
-vite.config.js       개발 서버 + 배포 빌드(CSS·JS 를 HTML 한 장으로 접는다)
-.github/workflows/   CI — npm test 와 같은 것 + dist 최신 여부
-tests/               단위 175 · 개발 서버 스모크 13 · e2e 96
+tsconfig*.json       빌드용 · 타입 검사 전용
+.github/workflows/   CI — npm test 와 같은 것 + 타입이 스키마와 맞는지
 ```
 
-**배포물은 여전히 HTML 한 장이다.** `vite build` 가 묶고, `vite.config.js` 의
-플러그인이 CSS·JS 를 `index.html` 안으로 접는다. 외부 참조가 남으면 빌드가 막는다.
+`options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
+`lib/` 는 커밋하지 않는다(`prepare` 가 굽는다).
 
-**린트는 `no-undef` 하나를 위해 있다.** 번들러는 선언 안 된 이름을 "전역이겠지"
-하고 넘어가므로, 임포트 한 줄을 지워도 그 코드가 실제로 불릴 때까지 조용하다.
-스타일 규칙은 켜지 않는다.
+## 스키마 다시 뽑기
 
-캔버스 쪽 구조(Rete 어댑터 · 노드/그래프 종류 늘리는 법)는
-[docs/graph.md](docs/graph.md#구현) 에 있다.
-
-## 스키마 갱신
-
-스키마는 help 텍스트를 긁는 게 아니라 optparse 옵션 객체를 직접 읽는다.
-yt-dlp 릴리스마다 재실행할 것:
+yt-dlp 를 올렸으면 둘을 같이 돌린다. CI 가 **스키마만 고치고 타입을 다시 안
+뽑은 경우**를 잡는다.
 
 ```
-pip install -U yt-dlp
-python gen_schema.py > schema.json
-npm run build
+python3 gen_schema.py      # 설치된 yt-dlp → schema.json
+npm run gen:types          # schema.json → src/core/options.gen.ts
 ```
 
-손으로 정한 건 네 군데다.
+## 손으로 채우는 층
 
-1. `gen_schema.py` 의 **optparse 그룹 → 생애주기 단계** 매핑 (16 → 9)
-2. `gen_schema.py` 의 **`KIND_OVERRIDE`** — 리플렉션이 못 보는 누적 옵션
-   (`--paths` 처럼 `append` 로 안 잡히는 것)
-3. `src/core/schema.js` 의 **한국어 의도 → yt-dlp 어휘** 사전 (`KO`)
-4. `src/core/catalog.js` 의 **의도 축** (`INTENTS`) — 191개를 훑게 만드는 층
+리플렉션이 절대 못 주는 것이 둘 있고, 이 도구의 실제 부가가치가 거기 있다.
 
-3·4 가 이 도구의 실제 부가가치다. 안 걸리는 말이 나오면 계속 채울 것.
+1. `core/lint.js` 의 **어긋나는 조합** 규칙 (`crossChecks`)
+2. `core/format-grammar.js` · `core/output-template.js` 의 **어휘와 설명** — 필터
+   필드, 출력 필드, 변환 글자. 자동완성에 뜨는 한국어 설명이 여기서 나온다
 
-옵션 종류(`kind`)는 action 이름을 열거하지 않고 optparse 의 `takes_value()` 를
-묻는다. 열거하면 샌다 — `store_const` · `version` 처럼 인자를 안 받는 action 이
-여럿이고, 그래서 `--version` · `--write-thumbnail` 이 한동안 값을 받는 옵션으로
-잡혀 있었다. (검증기를 붙이고 나서야 드러났다.)
+## 한계
 
-## 알려진 제약
-
-- **키를 넣으면 네트워크가 필요하다.** 그 대신 서버가 없으므로 키가 브라우저를
-  떠나지 않는다. 다만 이 페이지의 스크립트는 키를 읽을 수 있으니 쓰고 버릴 키를
-  권한다. 검증기·판독·옵션 찾아보기·그래프는 키 없이도 전부 돈다.
-- **모델이 낸 명령어를 우리가 보증하지는 않는다.** 검증기는 "스키마와 문법에
-  어긋나는 곳이 없다"까지만 말한다. 문법이 맞아도 의도와 다를 수 있다 — 그래서
-  파일명 미리보기와 토큰별 설명을 같이 낸다.
-- 폰트를 Google Fonts CDN에서 가져온다. 오프라인에서는 시스템 모노스페이스로 폴백한다.
-- **자동 수정이 초록을 만들었다고 요구를 지킨 건 아니다.** 오류를 지워서 초록이
-  되는 길도 있다 — 지금 정지 규칙은 그걸 못 가른다. [docs/repair.md](docs/repair.md) 참고.
-- **빌더의 타입은 빌더로 쓴 것만 본다.** 남이 준 명령어 문자열을 검사하는 일은
-  여전히 검증기가 한다 — 그래서 빌더가 생겨도 `lint.js` 가 없어지지 않는다.
-- 그래프 쪽 제약은 [docs/graph.md](docs/graph.md), 빌더 쪽은
-  [docs/builder.md](docs/builder.md) 에 있다.
+- **타입은 이 저장소에 커밋된 yt-dlp 버전 기준이다.** "당신이 깐 버전"이 온전히
+  참이 되려면 설치 시점에 로컬 yt-dlp 를 리플렉션하는 단계가 있어야 한다. 지금은
+  `gen_schema.py` 를 직접 돌려야 한다.
+- **검증기는 "스키마와 문법에 어긋나는 곳이 없다"까지만 말한다.** 문법이 맞아도
+  의도와 다를 수 있어서 파일명 미리보기와 토큰별 설명을 같이 낸다.
+- **실제로 돌려 보지는 않는다.** 이 URL 에 그 포맷이 정말 있는지는 yt-dlp 를
+  실행해야 안다. 그 대가로 네트워크 없이, 결정적으로, 어제와 오늘 같은 답을 낸다.
+- 빌더 쪽 결정은 [docs/builder.md](docs/builder.md) 에 있다.

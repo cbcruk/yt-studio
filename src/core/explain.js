@@ -11,7 +11,7 @@
  */
 import { BY_ID, STAGE } from './schema.js';
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
-import { splitEntry } from './paths-graph.js';
+import { splitEntry } from './paths.js';
 
 /** -o 를 안 주면 yt-dlp 가 쓰는 기본 출력 템플릿. */
 export const DEFAULT_OUTTMPL = '%(title)s [%(id)s].%(ext)s';

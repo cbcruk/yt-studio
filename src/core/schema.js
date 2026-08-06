@@ -73,7 +73,7 @@ export function initSchema(raw) {
   STAGE = Object.fromEntries(STAGES.map(s => [s.id, s]));
   BY_STAGE = Object.fromEntries(STAGE_ORDER.map(s => [s, OPTS.filter(o => o.stage === s)]));
 
-  // 별칭·단축·부정형까지 전부 색인해 둔다 (명령어 → 그래프 역방향용).
+  // 별칭·단축·부정형까지 전부 색인해 둔다 — 검증기가 문자열을 되읽을 때 쓴다.
   BY_FLAG = {};
   for (const o of OPTS) {
     BY_FLAG[o.flag] = { opt: o, negated: false };
