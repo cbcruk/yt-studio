@@ -46,6 +46,21 @@ jobs:
       - name: 린트
         run: npm run lint
 
+      # 옵션 타입은 schema.json 에서 나온다. 스키마만 고치고 다시 안 뽑으면
+      # 자동완성이 설치된 yt-dlp 와 어긋난다 — 그게 이 층의 유일한 약속이다.
+      - name: 옵션 타입이 스키마와 맞는가
+        run: |
+          node gen_options.mjs
+          if ! git diff --quiet -- src/core/options.gen.ts; then
+            echo "::error::options.gen.ts 가 schema.json 과 다르다 — 'npm run gen:types' 를 돌리고 같이 커밋할 것"
+            git diff --stat -- src/core/options.gen.ts
+            exit 1
+          fi
+
+      # 막아야 할 것을 막고, 통과시킬 것은 통과시키는가 (@ts-expect-error 가 양쪽으로 문다)
+      - name: 타입
+        run: npm run check:types
+
       - name: 단위
         run: npm run test:unit
 

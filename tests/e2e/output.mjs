@@ -3,6 +3,7 @@
  *
  * -o 문자열 ↔ 노드 수열 왕복, 조각 편집, 가로 위치 = 파일명 순서.
  */
+import { reloadSaved } from '../harness.mjs';
 export const view = 'graph';
 export const name = '출력 템플릿 서브그래프';
 
@@ -212,9 +213,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await enter();
     const before = await p.evaluate(() =>
       [__yt.outExpr(), __yt.formatExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
-    await p.waitForTimeout(400);
-    await p.reload();
-    await p.waitForTimeout(400);
+    await reloadSaved(p);
     const after = await p.evaluate(() =>
       [__yt.outExpr(), __yt.formatExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
     assert(before === after, `불일치\n${before}\n${after}`);

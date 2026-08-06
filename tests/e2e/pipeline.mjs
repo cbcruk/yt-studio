@@ -3,6 +3,7 @@
  *
  * 노드 배치·배선·절단·우회 반영, 명령어 왕복, 저장 복원까지.
  */
+import { reloadSaved } from '../harness.mjs';
 export const view = 'graph';
 export const name = '파이프라인 그래프';
 
@@ -266,9 +267,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('localStorage 복원', async () => {
     const before = await p.evaluate(() => __yt.commandString());
-    await p.waitForTimeout(400);
-    await p.reload();
-    await p.waitForTimeout(400);
+    await reloadSaved(p);
     const after = await p.evaluate(() => __yt.commandString());
     assert(before === after, `복원 불일치\n${before}\n${after}`);
     return '동일';
@@ -288,7 +287,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     assert(await node.locator('.node-body').count() === 0, '접히지 않음');
     const c = await cmd();
     assert(c.includes('height<=720'), '접었더니 명령어가 바뀜: ' + c);
-    await p.waitForTimeout(400); await p.reload(); await p.waitForTimeout(400);
+    await reloadSaved(p);
     const node2 = p.locator('.node').filter({ hasText: '[format]' });
     assert(await node2.locator('.node-body').count() === 0, '접힘 상태가 저장 안 됨');
     await node2.locator('.node-x').first().click();

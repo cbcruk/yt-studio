@@ -1,0 +1,13 @@
+{
+  // 타입 검사 전용. tests/types/reject.ts 의 @ts-expect-error 가 양쪽으로 물기
+  // 때문에, 이걸 통과한다는 건 "막을 건 막고 통과시킬 건 통과시킨다"는 뜻이다.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src/index.ts", "tests/types/**/*.ts"]
+}

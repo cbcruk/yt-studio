@@ -1,0 +1,31 @@
+{
+  // 빌더만 TypeScript 다. 그래프·UI 는 그대로 JS 로 둔다 — 타입이 값을 하는
+  // 곳은 "설치된 yt-dlp 의 옵션 188개"이지 캔버스가 아니다.
+  //
+  // core/ 의 JS 모듈(schema · 파서 · 검증기)은 allowJs 로 같이 컴파일해서
+  // lib/ 에 넣는다. 그쪽은 추론에 맡긴다 — noImplicitAny 를 끈 이유다.
+  // 손님에게 나가는 타입(options.gen.ts · build.ts)은 strict 로 짠다.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+
+    "allowJs": true,
+    "checkJs": false,
+    "noImplicitAny": false,
+    "strict": true,
+    "skipLibCheck": true,
+
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "lib",
+    "rootDir": "src",
+
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/index.ts"]
+}

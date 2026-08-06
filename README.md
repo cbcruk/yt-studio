@@ -7,8 +7,10 @@
 
 ```
 npm run dev       # vite 개발 서버 (HMR)
-npm run build     # → dist/ytdlp-studio.html
-npm test          # 린트 + 단위(node) + 개발 서버 스모크 + e2e(playwright)
+npm run build     # → dist/ytdlp-studio.html   (앱)
+npm run build:lib # → lib/                     (빌더 라이브러리)
+npm run gen:types # schema.json → src/core/options.gen.ts
+npm test          # 린트 + 타입 + 단위(node) + 개발 서버 스모크 + e2e(playwright)
 ```
 
 같은 것을 CI 가 push·PR 마다 돌린다. 다만 단계를 쪼개 두어서 무엇이 깨졌는지가
@@ -28,6 +30,40 @@ yt-dlp 의 optparse 트리를 리플렉션해서 뽑은 것이고, `-f` · `-o` 
 
 **원본은 명령어 문자열이다.** 모델이 준 것이든 손으로 고친 것이든 어디선가 주운
 것이든 같은 칸으로 들어오고, 그 칸이 바뀔 때마다 전부 다시 검사한다.
+
+## 입구가 셋, 핵심은 하나
+
+같은 스키마와 같은 파서 위에 입구가 셋 있다. 무엇을 쓰든 나오는 것은 명령어
+문자열이고, 검사하는 것은 같은 검증기다.
+
+| 입구 | 누구를 위한 것 |
+|---|---|
+| **프롬프트** | 한국어로 쓰면 명령어가 나온다 (첫 화면) |
+| **코드** — `ytdlp()` 빌더 | 자동화를 짜는 사람. 타입이 옵션 카탈로그가 된다 |
+| **그래프** | `-f` · `-o` 값을 손으로 짜기 싫을 때 여는 수리 뷰 |
+
+```ts
+import { ytdlp } from 'ytstudio';
+
+ytdlp('https://youtu.be/abc')
+  .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
+  .output(t => t`${t.title} [${t.id}].${t.ext}`)
+  .writeSubs().subLangs('ko,en').embedSubs()
+  .build();
+// yt-dlp -f "bv[height<=1080]+ba/b" -o "%(title)s [%(id)s].%(ext)s"
+//        --write-subs --sub-langs ko,en --embed-subs https://youtu.be/abc
+```
+
+타입은 `schema.json` 에서 자란다 — **자동완성에 뜨는 옵션 = 당신이 깐 yt-dlp 의
+옵션**이다. 그래서 검증기가 하던 일의 절반이 컴파일 타임으로 올라간다.
+
+```
+ytdlp(u).writeSub()      → Property 'writeSub' does not exist. Did you mean 'writeSubs'?
+ytdlp(u).fixup('nope')   → 'nope' is not assignable to '"never" | "ignore" | …'
+```
+
+> 빌더 전체는 **[docs/builder.md](docs/builder.md)** 에 있다. 왜 그래프가 아니라
+> 이것이 맞는지도 거기 적어 뒀다.
 
 ## 검증기
 
@@ -154,6 +190,8 @@ src/core/            DOM 을 모른다. node 로 단위 테스트가 된다
   catalog.js         의도 축(INTENTS) · LLM 에게 줄 옵션 카탈로그
   ask.js             프롬프트 조립 · 답 파싱 · Anthropic 호출 (fetch 주입 가능)
   repair.js          자동 수정 루프 — 검증기의 오류를 되먹여 다시 묻는다
+  build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
+  options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.mjs 가 만든다)
   graph.js           그래프 원시 연산 (연결 · 삭제 · 위상 정렬)
   format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
   format-graph.js    트리 ↔ 그래프 · 문제 진단
@@ -174,11 +212,14 @@ src/ui/
   canvas.js          캔버스 — Rete.js 어댑터 (노드 · 와이어 · 팬 · 줌)
   graph-behavior.js  그래프 종류마다 다른 정렬 · 되돌려쓰기 · 새 노드
   tpl.js · dom.js    lit 어댑터 · DOM 손잡이
+src/index.ts         빌더를 쓰는 입구 (스키마를 읽어 넣는다)
 src/ask-flow.js      프롬프트 화면의 흐름 (상태 · 모델 호출 · 키 · 저장물)
 src/app.js           그래프 상태 · 화면/모드 전환 · 배선 · 두 화면의 이음매
 src/app.css          스타일 전부
 index.html           개발 진입점이자 배포 템플릿
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
+gen_options.mjs      schema.json 을 옵션 타입으로
+tsconfig*.json       빌더만 TypeScript 다 (검사 전용 설정이 따로 있다)
 vite.config.js       개발 서버 + 배포 빌드(CSS·JS 를 HTML 한 장으로 접는다)
 .github/workflows/   CI — npm test 와 같은 것 + dist 최신 여부
 tests/               단위 175 · 개발 서버 스모크 13 · e2e 96
@@ -231,4 +272,7 @@ npm run build
 - 폰트를 Google Fonts CDN에서 가져온다. 오프라인에서는 시스템 모노스페이스로 폴백한다.
 - **자동 수정이 초록을 만들었다고 요구를 지킨 건 아니다.** 오류를 지워서 초록이
   되는 길도 있다 — 지금 정지 규칙은 그걸 못 가른다. [docs/repair.md](docs/repair.md) 참고.
-- 그래프 쪽 제약은 [docs/graph.md](docs/graph.md) 에 있다.
+- **빌더의 타입은 빌더로 쓴 것만 본다.** 남이 준 명령어 문자열을 검사하는 일은
+  여전히 검증기가 한다 — 그래서 빌더가 생겨도 `lint.js` 가 없어지지 않는다.
+- 그래프 쪽 제약은 [docs/graph.md](docs/graph.md), 빌더 쪽은
+  [docs/builder.md](docs/builder.md) 에 있다.

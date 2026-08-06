@@ -30,6 +30,45 @@ export function assert(cond, msg) {
   if (!cond) throw new Failed(msg);
 }
 
+/* ── 저장을 기다렸다가 새로고침 ──────────── */
+// 앱의 저장은 250ms 디바운스이고, 렌더가 돌 때마다 타이머가 처음부터 다시
+// 시작한다(app.js 의 save). 그래서 "조금 기다렸다가 reload" 는 러너가 느리면
+// 진다 — 저장 전에 새로고침하면 복원할 게 없어서, 복원 테스트가 빈 상태를
+// 보고 실패한다. 실제로 CI 에서 이걸로 한 번 깨졌다.
+const SAVE_DEBOUNCE = 250;
+
+/** 저장소에 든 것 전부. 어느 키가 늦게 써지든 걸리도록 한꺼번에 본다. */
+const storeDump = p => p.evaluate(() =>
+  JSON.stringify(Object.keys(localStorage).filter(k => k.startsWith('ytstudio.'))
+    .sort().map(k => [k, localStorage.getItem(k)])));
+
+/**
+ * 저장이 **멎을 때까지** 기다린다.
+ *
+ * 디바운스보다 긴 시간 동안 저장소가 안 바뀌면 대기 중인 타이머가 없다는 뜻이다.
+ * 시계를 재는 게 아니라 값이 멎는 것을 보므로 러너 속도와 무관하다.
+ */
+export async function settled(p, quiet = SAVE_DEBOUNCE + 50, cap = 5000) {
+  const deadline = Date.now() + cap;
+  let prev = null, since = Date.now();
+  for (;;) {
+    const cur = await storeDump(p);
+    if (cur !== prev) { prev = cur; since = Date.now(); }
+    else if (Date.now() - since >= quiet) return;
+    // 저장이 안 멎으면 조용히 매달려 있지 말고 그렇다고 말한다
+    if (Date.now() > deadline) throw new Failed(`${cap}ms 동안 저장이 안 멎었다`);
+    await p.waitForTimeout(50);
+  }
+}
+
+/** 저장이 끝난 뒤 새로고침하고, 앱이 다시 설 때까지 기다린다. */
+export async function reloadSaved(p) {
+  await settled(p);
+  await p.reload();
+  await p.waitForFunction(() => !!window.__yt);
+  await p.waitForTimeout(120);          // 첫 렌더가 한 틱 뒤에 온다
+}
+
 /**
  * 스위트 하나를 브라우저 하나로 돌린다.
  * body 는 { p, step, dialogs, setDialog } 를 받는다.

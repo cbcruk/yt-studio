@@ -8,6 +8,7 @@
  * 모델 호출만 fetch 를 바꿔치기해서 확인한다. 키를 넣고 실제로 부르면
  * 테스트가 아니라 돈 드는 도박이 된다.
  */
+import { reloadSaved } from '../harness.mjs';
 export const view = 'ask';
 export const name = '프롬프트 화면';
 
@@ -305,8 +306,7 @@ export default async function ({ p, step, assert }) {
 
   await step('새로고침해도 명령어와 히스토리가 남는다', async () => {
     const before = await cmdBox();
-    await p.reload();
-    await p.waitForTimeout(400);
+    await reloadSaved(p);
     assert((await cmdBox()) === before, '명령어가 날아갔다');
     assert(await p.locator('.ak-hist').count() === 1, '히스토리가 날아갔다');
     assert((await p.locator('.ak-bar .btn', { hasText: '키 ' }).textContent()).includes('…0000'), '키가 날아갔다');

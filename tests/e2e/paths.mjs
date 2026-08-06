@@ -3,6 +3,7 @@
  *
  * 항목마다 -P 가 하나씩 붙는다. 값 안에 템플릿이 없고 TYPES 가 키다.
  */
+import { reloadSaved } from '../harness.mjs';
 export const view = 'graph';
 export const name = '저장 경로 서브그래프';
 
@@ -151,9 +152,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
     await enter();
     const before = await p.evaluate(() =>
       [__yt.formatExpr(), __yt.outExpr(), __yt.pathExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
-    await p.waitForTimeout(400);
-    await p.reload();
-    await p.waitForTimeout(400);
+    await reloadSaved(p);
     const after = await p.evaluate(() =>
       [__yt.formatExpr(), __yt.outExpr(), __yt.pathExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
     assert(before === after, `불일치\n${before}\n${after}`);
