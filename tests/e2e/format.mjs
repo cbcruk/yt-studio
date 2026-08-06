@@ -3,6 +3,7 @@
  *
  * -f 문자열 ↔ 노드 그래프 왕복, 필터 UI, 피연산자 순서, 괄호 자동 삽입.
  */
+import { reloadSaved } from '../harness.mjs';
 export const view = 'graph';
 export const name = '포맷 셀렉터 서브그래프';
 
@@ -429,9 +430,7 @@ export default async function ({ p, step, assert, dialogs, setDialog }) {
 
   await step('localStorage: 서브그래프와 모드까지 복원', async () => {
     const before = await p.evaluate(() => [__yt.formatExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
-    await p.waitForTimeout(400);
-    await p.reload();
-    await p.waitForTimeout(400);
+    await reloadSaved(p);
     const after = await p.evaluate(() => [__yt.formatExpr(), __yt.commandString(), __yt.ui.mode].join('|'));
     assert(before === after, `불일치\n${before}\n${after}`);
     assert(!(await p.locator('#crumb').isHidden()), '서브그래프 모드가 복원 안 됨');

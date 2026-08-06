@@ -1,4 +1,3 @@
-/* eslint-disable */
 // 이 파일은 gen_options.mjs 가 schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp 2026.07.04 · 옵션 191개

@@ -16,7 +16,7 @@ const rules = {
 };
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**'] },
+  { ignores: ['dist/**', 'lib/**', 'node_modules/**'] },   // dist·lib 은 빌드 산출물이다
   {
     files: ['src/**/*.js', 'vite.config.js'],
     languageOptions: {

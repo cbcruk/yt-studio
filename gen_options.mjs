@@ -69,8 +69,7 @@ const optionMethods = SCHEMA.options
   .map(optionMethod).join('\n\n');
 
 /* ── 조립 ────────────────────────────────── */
-const out = `/* eslint-disable */
-// 이 파일은 gen_options.mjs 가 schema.json 에서 만든다. 손으로 고치지 말 것.
+const out = `// 이 파일은 gen_options.mjs 가 schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp ${SCHEMA.ytdlp_version} · 옵션 ${SCHEMA.options.length}개
 //   node gen_options.mjs
