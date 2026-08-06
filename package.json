@@ -2,37 +2,22 @@
   "name": "ytstudio",
   "version": "0.1.0",
   "private": true,
-  "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더 · 검증기 · 단일 HTML 앱",
+  "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "build:lib": "tsc",
-    "check:types": "tsc -p tsconfig.test.json",
-    "dev": "vite",
     "gen:types": "node gen_options.mjs",
+    "build": "tsc",
+    "check:types": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
-    "prepare": "npm run build:lib",
-    "test": "npm run lint && npm run check:types && npm run test:unit && npm run test:dev && npm run test:e2e",
-    "test:dev": "node tests/dev-smoke.mjs",
-    "test:e2e": "node tests/run.mjs",
-    "test:unit": "npm run build:lib && node --test \"tests/unit/*.test.mjs\""
+    "test:unit": "npm run build && node --test \"tests/unit/*.test.mjs\"",
+    "test:cli": "node tests/cli.mjs",
+    "test": "npm run lint && npm run check:types && npm run test:unit && npm run test:cli",
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
-    "globals": "^17.8.0",
-    "playwright": "^1.56.0",
-    "typescript": "^7.0.2",
-    "vite": "^7.1.0"
-  },
-  "dependencies": {
-    "@retejs/lit-plugin": "^2.0.8",
-    "lit": "^3.3.3",
-    "rete": "^2.0.6",
-    "rete-area-plugin": "^2.3.2",
-    "rete-connection-plugin": "^2.0.5",
-    "rete-render-utils": "^2.0.3"
+    "typescript": "^7.0.2"
   },
   "types": "./lib/index.d.ts",
   "exports": {
@@ -44,5 +29,15 @@
   "files": [
     "lib",
     "schema.json"
+  ],
+  "bin": {
+    "ytstudio": "./lib/cli.js"
+  },
+  "keywords": [
+    "yt-dlp",
+    "builder",
+    "typescript",
+    "lint",
+    "cli"
   ]
 }

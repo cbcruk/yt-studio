@@ -6,7 +6,7 @@
  *
  * 여기서 보는 건 셋이다.
  *   · 문자열이 맞게 나오는가
- *   · **파서와 같은 트리를 만드는가** — 빌더로 만든 식을 그래프가 열 수 있어야 한다
+ *   · **파서와 같은 트리를 만드는가** — 읽기와 쓰기가 한 문법을 공유해야 한다
  *   · 검증기가 여전히 제 일을 하는가 — 타입이 못 보는 조합이 있다
  */
 import { test } from 'node:test';
@@ -16,11 +16,10 @@ const { ytdlp, formatFactory, outTag, methodName, selMethod, YTDLP_VERSION } =
   await import('../../lib/index.js');
 const { parseFormat } = await import('../../lib/core/format-grammar.js');
 const { parseTemplate } = await import('../../lib/core/output-template.js');
-const { scanCommand } = await import('../../lib/core/pipeline.js');
+const { scanCommand } = await import('../../lib/core/command.js');
 
 const U = 'https://youtu.be/abc';
 
-/* ── 이름 규칙 ───────────────────────────── */
 test('메서드 이름은 긴 플래그에서 나온다', () => {
   assert.equal(methodName('--embed-subs'), 'embedSubs');
   assert.equal(methodName('--no-part'), 'noPart');
@@ -33,7 +32,6 @@ test('설치된 yt-dlp 버전을 그대로 내놓는다', () => {
   assert.match(YTDLP_VERSION, /^\d{4}\.\d{2}\.\d{2}$/);
 });
 
-/* ── 뼈대 ────────────────────────────────── */
 test('URL 만 주면 URL 만 나온다', () => {
   assert.equal(ytdlp(U).build(), `yt-dlp ${U}`);
   assert.equal(ytdlp().url(U).url('https://b').build(), `yt-dlp ${U} https://b`);
@@ -44,7 +42,7 @@ test('URL 은 늘 맨 뒤다 — 옵션을 나중에 줘도', () => {
   assert.match(c.build(), /--embed-subs --write-subs https:\/\/youtu\.be\/abc$/);
 });
 
-test('짧은 플래그가 있으면 짧은 것을 쓴다 — 그래프와 같은 문자열이 나와야 한다', () => {
+test('짧은 플래그가 있으면 짧은 것을 쓴다 — 검사 결과와 눈으로 대조된다', () => {
   const c = ytdlp(U).format('b').output('%(title)s.%(ext)s').paths({ home: '/dl' }).extractAudio();
   const s = c.build();
   for (const t of ['-f b', '-o "%(title)s.%(ext)s"', '-P /dl', '-x']) {
@@ -53,7 +51,6 @@ test('짧은 플래그가 있으면 짧은 것을 쓴다 — 그래프와 같은
   assert.ok(!s.includes('--format'), s);
 });
 
-/* ── 옵션 191개 ──────────────────────────── */
 test('스키마에서 자란다 — 손으로 적은 목록이 없다', () => {
   const c = ytdlp(U);
   for (const m of ['embedSubs', 'writeSubs', 'subLangs', 'fixup', 'matchFilters', 'part']) {
@@ -96,7 +93,6 @@ test('공백이 든 값은 따옴표로 감싸고, argv 에는 안 감싼다', (
   assert.equal(c.toArray().at(-1), U);
 });
 
-/* ── -f 식 ───────────────────────────────── */
 test('식이 문자열이 된다', () => {
   const c = ytdlp(U).format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()));
   assert.ok(c.build().includes('-f "bv[height<=1080]+ba/b"'), c.build());
@@ -140,12 +136,11 @@ test('빌더가 만든 트리는 파서가 낸 트리와 같다', () => {
     f.raw('mp4').also(f.raw('webm')).where({ height: { lt: 480 } }),
     f.bvStar({ ext: 'mp4' }).plus(f.baStar()).or(f.raw('b')),
   ]) {
-    // 이게 참이라야 "빌더로 만든 식을 그래프가 그대로 연다"가 참이 된다
+    // 이게 참이라야 읽기(parseFormat)와 쓰기(빌더)가 한 문법이라고 말할 수 있다
     assert.deepEqual(e.node, parseFormat(String(e)), String(e));
   }
 });
 
-/* ── -o 템플릿 ───────────────────────────── */
 test('태그드 템플릿이 출력 템플릿이 된다', () => {
   const c = ytdlp(U).output(t => t`${t.title} [${t.id}].${t.ext}`);
   assert.ok(c.build().includes('-o "%(title)s [%(id)s].%(ext)s"'), c.build());
@@ -176,7 +171,6 @@ test('종류별 템플릿은 접두어가 붙는다', () => {
     .includes('-o "thumbnail:%(id)s.%(ext)s"'));
 });
 
-/* ── -P 경로 ─────────────────────────────── */
 test('home 은 접두어 없이, 나머지는 종류를 붙여서', () => {
   const c = ytdlp(U).paths({ home: '/dl', temp: '/tmp/yt', thumbnail: '/dl/thumbs' });
   const s = c.build();
@@ -185,7 +179,6 @@ test('home 은 접두어 없이, 나머지는 종류를 붙여서', () => {
   assert.ok(s.includes('-P thumbnail:/dl/thumbs'), s);
 });
 
-/* ── 복사 ────────────────────────────────── */
 test('clone 은 독립이다', () => {
   const base = ytdlp(U).format('b');
   const a = base.clone().embedSubs();
@@ -195,7 +188,6 @@ test('clone 은 독립이다', () => {
   assert.equal(base.build(), `yt-dlp -f b ${U}`);
 });
 
-/* ── 검증기는 여전히 필요하다 ────────────── */
 test('타입이 통과시킨 조합을 검증기가 잡는다', () => {
   // 타입으로는 아무 문제 없다 — 둘 다 실재하는 옵션이다
   const bad = ytdlp(U).extractAudio().format('bv');
@@ -223,7 +215,6 @@ test('URL 을 안 주면 검증기가 잡는다 — 빌더도 그건 못 막는�
   assert.ok(ytdlp().embedSubs().lint().issues.some(i => /URL 이 없다/.test(i.msg)));
 });
 
-/* ── 왕복 ────────────────────────────────── */
 test('빌더가 낸 명령어를 스캐너가 그대로 읽는다', () => {
   const c = ytdlp(U)
     .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()))

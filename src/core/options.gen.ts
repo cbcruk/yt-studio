@@ -9,7 +9,7 @@ export type Version = '2026.07.04';
 /** 값을 받는 옵션에 줄 수 있는 것. */
 export type Arg = string | number;
 
-/* ── 포맷 셀렉터 (-f) ────────────────────── */
+/** `-f` 가 받는 셀렉터. 빌더에서는 `f.bv()` 처럼 메서드가 된다. */
 export type Selector = 'b' | 'b*' | 'w' | 'w*' | 'bv' | 'bv*' | 'wv' | 'wv*' | 'ba' | 'ba*' | 'wa' | 'wa*';
 
 /** 셀렉터 팩토리의 메서드 이름. `*` 는 `Star` 로 옮긴다. */
@@ -118,7 +118,7 @@ export interface Filters {
   dynamic_range?: string | StrCond | boolean;
 }
 
-/* ── 출력 템플릿 (-o) ────────────────────── */
+/** `-o` 템플릿에 자주 쓰는 필드. 나머지는 `t.field('이름')` 으로. */
 export type OutField = 'title' | 'fulltitle' | 'id' | 'ext' | 'upload_date' | 'timestamp' | 'duration' | 'duration_string' | 'view_count' | 'like_count' | 'webpage_url' | 'uploader' | 'uploader_id' | 'channel' | 'channel_id' | 'artist' | 'album' | 'track' | 'playlist' | 'playlist_title' | 'playlist_id' | 'playlist_index' | 'playlist_count' | 'n_entries' | 'autonumber' | 'format' | 'format_id' | 'format_note' | 'resolution' | 'height' | 'width' | 'fps' | 'vcodec' | 'acodec' | 'filesize' | 'chapter' | 'chapter_number' | 'section_title' | 'section_number' | 'section_start' | 'section_end' | 'extractor' | 'extractor_key' | 'epoch';
 export type OutType = 'default' | 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
 export type Conversion = 's' | 'd' | 'f' | 'B' | 'j' | 'l' | 'q' | 'D' | 'S' | 'U' | 'h';
@@ -220,7 +220,7 @@ export interface OutFields<P> {
   readonly epoch: P;
 }
 
-/* ── 저장 경로 (-P) ──────────────────────── */
+/** `-P` 에 줄 수 있는 경로. `home` 만 접두어 없이 나간다. */
 export interface PathMap {
   /** 받은 파일이 최종적으로 놓일 곳. */
   home?: string;
@@ -239,7 +239,6 @@ export interface PathMap {
   pl_infojson?: string;
 }
 
-/* ── 191개 옵션 ──────────────────────────── */
 /**
  * 설치된 yt-dlp 의 옵션 전부.
  *

@@ -1,8 +1,8 @@
 /**
  * 코드로 쓰는 yt-dlp 명령어.
  *
- * 이 저장소는 입력을 세 번 바꿨다 — 그래프, 프롬프트, 그리고 코드. 세 번 다
- * 살아남은 건 **리플렉션한 스키마와 진짜 파서**였고, 여기서는 그 둘을 그대로
+ * 이 저장소는 입력을 세 번 바꿨다 — 노드 그래프, 프롬프트, 그리고 코드. 세 번
+ * 다 살아남은 건 **리플렉션한 스키마와 진짜 파서**였고, 여기서는 그 둘을 그대로
  * 뒤집어 쓴다. 읽는 파서를 이미 갖고 있으니 쓰는 쪽은 컴파일러만 부르면 된다.
  *
  *   parseFormat   문자열 → 트리   검증기가 쓴다
@@ -11,6 +11,7 @@
  * 그래프가 안 맞았던 이유가 여기서 뒤집힌다. yt-dlp 명령어는 평평한 플래그
  * 목록이라 엣지가 할 일이 없었는데, 메서드 체인에는 애초에 엣지가 없다. 값이
  * 구조를 갖는 셋(`-f` 식 · `-o` 수열 · `-P` 집합)만 따로 문법을 준다.
+ * 그 판단의 근거는 docs/builder.md 에 있다.
  *
  * 옵션 188개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은
  * 곳에서 나온다(gen_options.mjs). 그래서 사용자가 깐 yt-dlp 에 없는 옵션은
@@ -22,7 +23,7 @@ import { BY_ID, OPTS } from './schema.js';
 import { SELECTORS, emitTree } from './format-grammar.js';
 import { FIELDS, emitPiece } from './output-template.js';
 import { lintCommand } from './lint.js';
-import { quote } from './pipeline.js';
+import { quote } from './command.js';
 
 import type {
   Arg, Conversion, Filters, FormatFactory as GenFactory, NumCond,
@@ -46,9 +47,9 @@ export const selMethod = (sel: string): string => sel.replace('*', 'Star');
 /**
  * 명령어에 실제로 찍히는 형태.
  *
- * 짧은 게 있으면 짧은 것을 쓴다 — 그래프(`pipeline.js` 의 `buildTokens`)가
- * 그렇게 낸다. 여기서 다르게 내면 같은 옵션인데 어느 쪽으로 만들었느냐에 따라
- * 문자열이 갈리고, 무손실 왕복이 깨진다. 메서드 **이름**은 긴 쪽에서 나온다.
+ * 짧은 게 있으면 짧은 것을 쓴다 — 사람이 손으로 쓰는 모양이 그쪽이고, 검사
+ * 결과에 뜨는 플래그와도 같아야 눈으로 대조가 된다. 메서드 **이름**은 긴 쪽에서
+ * 나온다(`-f` 가 아니라 `.format()`) — 코드는 읽으라고 있다.
  */
 const flagOf = (opt: SchemaOpt): string => opt.short || opt.flag;
 
@@ -68,7 +69,7 @@ interface SchemaOpt {
 
 const optOf = (id: string): SchemaOpt => (BY_ID as Record<string, SchemaOpt>)[id];
 
-/* ── 포맷 셀렉터 (-f) ────────────────────── */
+/** `[height<=?1080]` 한 칸. `loose` 가 참이면 `?` 가 붙는다. */
 export interface Filter { key: string; op: string; loose?: boolean; value: string }
 
 /** 트리 노드. `parseFormat` 이 내놓는 것과 **같은 모양**이다. */
@@ -111,8 +112,9 @@ export function toFilters(spec?: Filters): Filter[] {
 /**
  * 식 노드 하나를 감싼 것.
  *
- * 안에 든 트리가 파서의 것과 같은 모양이라, 빌더가 만든 식을 그래프가 그대로
- * 열 수 있고 그 반대도 된다.
+ * 안에 든 트리가 `parseFormat` 이 내놓는 것과 **같은 모양**이다. 그래서 빌더로
+ * 쓴 식과 문자열로 받은 식을 같은 자리에서 다룰 수 있다 — 읽기와 쓰기가 한
+ * 문법을 공유한다는 뜻이고, 단위 테스트가 deepEqual 로 그걸 지킨다.
  */
 export class Expr {
   constructor(readonly node: FormatNode) {}
@@ -125,8 +127,8 @@ export class Expr {
     const flat = this.node.t === t && !(this.node.filters || []).length
       ? [...(this.node as { kids: FormatNode[] }).kids, ...kids.slice(1)]
       : kids;
-    // 필터가 없으면 칸 자체를 안 만든다 — parseFormat 이 그렇게 낸다. 트리가
-    // 글자 하나까지 같아야 "빌더가 만든 식을 그래프가 연다"가 참이 된다.
+    // 필터가 없으면 칸 자체를 안 만든다 — parseFormat 이 그렇게 낸다. 한 칸이라도
+    // 다르면 "빌더 트리 = 파서 트리"가 깨진다.
     return new Expr({ t, kids: flat });
   }
 
@@ -159,7 +161,7 @@ export function formatFactory(): FormatFactory {
   return f as unknown as FormatFactory;
 }
 
-/* ── 출력 템플릿 (-o) ────────────────────── */
+/** `%(upload_date>%Y-%m-%d|Unknown)s` 한 칸을 풀어 놓은 것. */
 export interface FieldPiece {
   t: 'field'; name: string; strf: string; fallback: string | null; fmt: string; conv: string;
 }
@@ -218,7 +220,12 @@ export function outTag(): OutTag {
   return tag as unknown as OutTag;
 }
 
-/* ── 명령어 ──────────────────────────────── */
+/**
+ * 검증기가 잡은 것 하나.
+ *
+ * `error` 는 그대로 돌리면 안 되는 것, `warn` 은 의도와 다를 수 있는 것,
+ * `info` 는 참고다. `fixes` 는 없는 플래그일 때 가까운 후보 셋.
+ */
 export interface Issue {
   level: 'error' | 'warn' | 'info';
   msg: string;

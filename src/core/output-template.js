@@ -83,8 +83,6 @@ export const STRF_PRESETS = [
   ['%H-%M-%S', '14-05-33'],
 ];
 
-/* ── 파싱 ────────────────────────────────── */
-
 /** `[TYPES:]TEMPLATE` 에서 접두어를 떼어 낸다. */
 export function splitType(src) {
   const s = src || '';
@@ -148,7 +146,7 @@ export function parseTemplate(src) {
   return out;
 }
 
-/* ── 컴파일 ──────────────────────────────── */
+/** 조각 하나 → 템플릿 문자열. 리터럴의 `%` 는 `%%` 로 되돌린다. */
 export const emitPiece = piece =>
   piece.t === 'text'
     ? String(piece.text || '').replace(/%/g, '%%')

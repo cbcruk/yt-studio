@@ -21,9 +21,10 @@ ytdlp('https://youtu.be/abc')
 
 ---
 
-## 왜 그래프가 아니라 이건가
+## 왜 노드 그래프가 아니라 이건가
 
-`docs/graph.md` 에 이 저장소가 직접 써 둔 문장이 있다.
+이 저장소는 원래 옵션을 노드 그래프로 조립하는 도구였다. 그 문서에 우리가 직접
+써 둔 문장이 진단이었다.
 
 > yt-dlp 명령어는 평평한 플래그 목록이라, 엣지가 ffmpeg 필터그래프처럼 실행 의미를
 > 갖지는 않는다. 강제하는 규칙은 하나다.
@@ -41,6 +42,9 @@ ytdlp('https://youtu.be/abc')
 | `-o` 조각의 **수열** | 가로 위치가 순서였다 | 태그드 템플릿 |
 | `-P` 키 있는 **집합** | 세로 위치가 순서였다 | 객체 |
 | 나머지 188개 = **평평한 목록** | 노드 종류 188개 | 메서드 188개 |
+
+그래프는 코드의 3/4 와 e2e 의 4/5 를 차지하고 있었다. 빌더가 그 넷을 전부 더 잘
+표현하게 된 뒤에 지웠다 — 되살릴 일이 있으면 git 히스토리에 있다.
 
 ## 타입이 카탈로그다
 
@@ -87,9 +91,9 @@ ytdlp(u).extractAudio().format('bv').lint();
 ### 옵션 188개
 
 메서드 이름은 **긴 플래그**에서 나온다 — `--embed-subs` → `.embedSubs()`.
-명령어에 찍히는 건 **짧은 게 있으면 짧은 것**이다(`-f` · `-x` · `-R`). 그래프의
-`buildTokens` 가 그렇게 내므로, 같은 옵션이 어느 쪽으로 만들었느냐에 따라 다른
-문자열이 되지 않는다.
+명령어에 찍히는 건 **짧은 게 있으면 짧은 것**이다(`-f` · `-x` · `-R`) — 사람이
+손으로 쓰는 모양이 그쪽이고, `ytstudio lint` 가 뱉는 플래그와도 같아야 눈으로
+대조가 된다.
 
 ```ts
 .embedSubs()          // --embed-subs
@@ -137,8 +141,8 @@ ytdlp(u).extractAudio().format('bv').lint();
 `a.plus(b).plus(c)` 는 `a+b+c` 지 `(a+b)+c` 가 아니다.
 
 **빌더가 만드는 트리는 `parseFormat` 이 내놓는 트리와 글자 하나까지 같다.**
-그래서 빌더로 쓴 식을 그래프가 그대로 열 수 있다. 단위 테스트가 이걸 `deepEqual`
-로 지킨다.
+읽기와 쓰기가 한 문법을 공유한다는 뜻이라, 문자열로 받은 식과 코드로 쓴 식을 같은
+자리에서 다룰 수 있다. 단위 테스트가 `deepEqual` 로 지킨다.
 
 ### `-o` — 출력 템플릿
 
@@ -184,13 +188,13 @@ t.field('release_year')          // 카탈로그에 없는 필드
 
 ```
 node gen_options.mjs      # schema.json → src/core/options.gen.ts   (npm run gen:types)
-npx tsc                   # src/ → lib/                             (npm run build:lib)
+npx tsc                   # src/ → lib/                             (npm run build)
 npx tsc -p tsconfig.test.json   # 타입 검사                          (npm run check:types)
 ```
 
 `options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
-`lib/` 는 커밋하지 않는다. CI 가 **스키마를 고치고 타입을 다시 안 뽑은 경우**를
-잡는다.
+`lib/` 는 커밋하지 않는다(`prepare` 가 굽는다). CI 가 **스키마를 고치고 타입을
+다시 안 뽑은 경우**를 잡는다.
 
 ### 타입은 타입으로 검사한다
 
@@ -199,5 +203,5 @@ npx tsc -p tsconfig.test.json   # 타입 검사                          (npm ru
 파일 하나를 `tsc --noEmit` 로 돌리면 "막을 건 막고, 통과시킬 건 통과시킨다"가
 한 번에 검사된다.
 
-빌더가 왜 TypeScript 인데 나머지는 JS 인지는 `tsconfig.json` 주석에 있다 —
-타입이 값을 하는 곳은 "설치된 yt-dlp 의 옵션 188개"이지 캔버스가 아니다.
+빌더가 왜 TypeScript 인데 `core/` 의 파서와 검증기는 JS 인지는 `tsconfig.json`
+주석에 있다 — 타입이 값을 하는 곳은 손님이 부르는 표면이지 파서 내부가 아니다.
