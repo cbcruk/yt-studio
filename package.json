@@ -2,22 +2,28 @@
   "name": "ytstudio",
   "version": "0.1.0",
   "private": true,
-  "description": "yt-dlp 옵션을 노드 그래프로 조립하는 단일 HTML 앱",
+  "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더 · 검증기 · 단일 HTML 앱",
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
+    "build:lib": "tsc",
+    "check:types": "tsc -p tsconfig.test.json",
+    "dev": "vite",
+    "gen:types": "node gen_options.mjs",
     "lint": "eslint .",
-    "test": "npm run lint && npm run test:unit && npm run test:dev && npm run test:e2e",
-    "test:unit": "node --test \"tests/unit/*.test.mjs\"",
+    "prepare": "npm run build:lib",
+    "test": "npm run lint && npm run check:types && npm run test:unit && npm run test:dev && npm run test:e2e",
+    "test:dev": "node tests/dev-smoke.mjs",
     "test:e2e": "node tests/run.mjs",
-    "test:dev": "node tests/dev-smoke.mjs"
+    "test:unit": "npm run build:lib && node --test \"tests/unit/*.test.mjs\""
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",
     "playwright": "^1.56.0",
+    "typescript": "^7.0.2",
     "vite": "^7.1.0"
   },
   "dependencies": {
@@ -27,5 +33,16 @@
     "rete-area-plugin": "^2.3.2",
     "rete-connection-plugin": "^2.0.5",
     "rete-render-utils": "^2.0.3"
-  }
+  },
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "schema.json"
+  ]
 }
