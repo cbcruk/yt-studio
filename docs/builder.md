@@ -49,7 +49,7 @@ ytdlp('https://youtu.be/abc')
 ## 타입이 카탈로그다
 
 `gen_schema.py` 가 설치된 yt-dlp 를 리플렉션해 `schema.json` 을 떨구고,
-`gen_options.mjs` 가 그걸 `src/core/options.gen.ts` 로 옮긴다. **자동완성에 뜨는
+`gen_options.ts` 가 그걸 `src/core/options.gen.ts` 로 옮긴다. **자동완성에 뜨는
 옵션 = 당신이 깐 yt-dlp 의 옵션**이다.
 
 그래서 검증기가 런타임에 하던 일의 절반이 컴파일 타임으로 올라간다.
@@ -187,7 +187,7 @@ t.field('release_year')          // 카탈로그에 없는 필드
 ## 만드는 법
 
 ```
-bun gen_options.mjs             # schema.json → options.gen.ts  (npm run gen:types)
+bun gen_options.ts              # schema.json → options.gen.ts  (npm run gen:types)
 tsc                             # src/ → lib/                   (npm run build)
 tsc -p tsconfig.test.json       # 타입 검사                      (npm run check:types)
 ```

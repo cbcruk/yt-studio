@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 const { lintCommand, nearestFlags, distance, scanCommand } =
   await import('../../src/index.js');
 
-const msgs = t => lintCommand(t).issues.map(i => i.msg).join(' | ');
-const levels = t => lintCommand(t).issues.map(i => i.level);
+const msgs = (t: string): string => lintCommand(t).issues.map(i => i.msg).join(' | ');
+const levels = (t: string): string[] => lintCommand(t).issues.map(i => i.level);
 
 test('맞는 명령어는 조용하다', () => {
   const r = lintCommand('yt-dlp -f "bv*[height<=1080]+ba/b" --merge-output-format mp4 -o "%(title)s.%(ext)s" https://x/y');
@@ -27,7 +27,7 @@ test('없는 플래그를 잡고 가까운 것을 제안한다', () => {
   assert.equal(r.ok, false);
   const hit = r.issues.find(i => i.flag === '--write-sub');
   assert.ok(hit, msgs('yt-dlp --write-sub https://x/y'));
-  assert.ok(hit.fixes.includes('--write-subs'), hit.fixes.join(','));
+  assert.ok(hit?.fixes?.includes('--write-subs'), String(hit?.fixes));
 });
 
 test('오타 제안은 길이에 비례한 문턱을 쓴다', () => {

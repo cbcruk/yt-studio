@@ -1,7 +1,8 @@
 {
-  // src/ 전체가 TypeScript 다. 예전에는 파서와 검증기가 JS 여서 allowJs 와
-  // noImplicitAny:false 로 받아 줬는데, 그러면 손님에게 나가는 타입이 안쪽이
-  // any 인 껍데기가 된다. 전부 옮기고 그 둘을 껐다.
+  // 저장소에 .js 가 없다. 소스도 테스트도 생성기도 전부 .ts 이고, bun 이 그걸
+  // 그대로 돌린다. 그래서 예전에 eslint 가 보던 둘(no-undef · no-unused-vars)을
+  // 여기서 본다 — tsc 가 선언 안 된 이름을 잡고, noUnusedLocals 가 죽은 지역
+  // 변수를 잡는다. 인자는 안 본다(옛 eslint 설정의 args:'none' 과 같게).
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -10,6 +11,7 @@
     "types": ["node"],
 
     "strict": true,
+    "noUnusedLocals": true,
     "skipLibCheck": true,
 
     "declaration": true,

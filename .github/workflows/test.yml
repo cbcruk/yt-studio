@@ -1,5 +1,7 @@
 # npm test 와 같은 것을 돌린다. 단계를 쪼갠 건 실패를 한눈에 가르기 위해서다 —
 # 타입이 깨진 건지, 단위가 깨진 건지, CLI 가 깨진 건지 잡 요약에서 바로 보인다.
+#
+# bun 은 devDependency 라 npm ci 가 같이 깔아 준다 — setup 액션이 따로 없다.
 name: 테스트
 
 on:
@@ -27,9 +29,6 @@ jobs:
 
       - run: npm ci
 
-      - name: 린트
-        run: npm run lint
-
       # 옵션 타입은 schema.json 에서 나온다. 스키마만 고치고 다시 안 뽑으면
       # 자동완성이 설치된 yt-dlp 와 어긋난다 — 그게 이 층의 유일한 약속이다.
       - name: 옵션 타입이 스키마와 맞는가
@@ -41,7 +40,9 @@ jobs:
             exit 1
           fi
 
-      # 막아야 할 것을 막고, 통과시킬 것은 통과시키는가 (@ts-expect-error 가 양쪽으로 문다)
+      # 소스·테스트·생성기 전부를 본다. 예전에 eslint 가 보던 것(선언 안 된 이름,
+      # 죽은 지역 변수)도 여기 들어왔다. 그리고 tests/types/reject.ts 의
+      # @ts-expect-error 가 양쪽으로 문다 — 막을 건 막고 통과시킬 건 통과시킨다.
       - name: 타입
         run: npm run check:types
 

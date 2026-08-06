@@ -1,7 +1,7 @@
-// 이 파일은 gen_options.mjs 가 schema.json 에서 만든다. 손으로 고치지 말 것.
+// 이 파일은 gen_options.ts 가 schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp 2026.07.04 · 옵션 191개
-//   node gen_options.mjs
+//   bun gen_options.ts
 
 /** 이 타입들이 나온 yt-dlp 버전. */
 export type Version = '2026.07.04';

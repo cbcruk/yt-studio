@@ -5,20 +5,18 @@
   "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기",
   "type": "module",
   "scripts": {
-    "gen:types": "bun gen_options.mjs",
+    "gen:types": "bun gen_options.ts",
     "build": "tsc",
     "check:types": "tsc -p tsconfig.test.json",
-    "lint": "eslint .",
     "test:unit": "bun test tests/unit",
-    "test:cli": "npm run build && node tests/cli.mjs",
-    "test": "npm run lint && npm run check:types && npm run test:unit && npm run test:cli",
+    "test:cli": "npm run build && bun tests/cli.ts",
+    "test": "npm run check:types && npm run test:unit && npm run test:cli",
     "cli": "bun src/cli.ts",
     "prepare": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
     "bun": "^1.3.14",
-    "eslint": "^10.8.0",
     "typescript": "^7.0.2"
   },
   "types": "./lib/index.d.ts",

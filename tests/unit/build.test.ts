@@ -21,6 +21,15 @@ const { scanCommand } = await import('../../src/core/command.js');
 
 const U = 'https://youtu.be/abc';
 
+/**
+ * 타입을 벗기고 런타임 표면만 본다.
+ *
+ * 메서드는 스키마에서 **자라므로** 타입에 있다고 런타임에도 있는 건 아니다.
+ * 그 둘이 짝이 맞는지가 이 파일이 볼 것이라, 여기서만 의도적으로 벗긴다.
+ * 타입이 무엇을 막는지는 tests/types/reject.ts 가 따로 본다.
+ */
+const raw = (c: unknown): Record<string, unknown> => c as Record<string, unknown>;
+
 test('메서드 이름은 긴 플래그에서 나온다', () => {
   assert.equal(methodName('--embed-subs'), 'embedSubs');
   assert.equal(methodName('--no-part'), 'noPart');
@@ -53,7 +62,7 @@ test('짧은 플래그가 있으면 짧은 것을 쓴다 — 검사 결과와 �
 });
 
 test('스키마에서 자란다 — 손으로 적은 목록이 없다', () => {
-  const c = ytdlp(U);
+  const c = raw(ytdlp(U));
   for (const m of ['embedSubs', 'writeSubs', 'subLangs', 'fixup', 'matchFilters', 'part']) {
     assert.equal(typeof c[m], 'function', `${m} 가 없다`);
   }
@@ -127,6 +136,9 @@ test('필터 — 그냥 준 값은 =, 참/거짓은 있음/없음, loose 는 ?',
 
 test('모르는 비교를 주면 거기서 멈춘다', () => {
   const f = formatFactory();
+  // 타입은 이미 막는다(reject.ts). 여기서 보는 건 타입을 우회해서 들어왔을 때
+  // 런타임이 조용히 넘기지 않고 멈추는가다 — 라이브러리는 JS 에서도 불린다.
+  // @ts-expect-error 없는 비교를 일부러 준다
   assert.throws(() => f.bv({ height: { roughly: 1080 } }), /모르는 비교/);
 });
 

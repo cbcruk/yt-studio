@@ -8,12 +8,16 @@
 npm run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
 npm run gen:types # schema.json → src/core/options.gen.ts
 npm run cli       # 빌드 없이 CLI 를 돌려 본다
-npm test          # 린트 + 타입 + 단위 + CLI
+npm test          # 타입 + 단위 + CLI
 ```
 
-**돌리는 건 bun, 타입과 산출물은 tsc.** bun 이 `.ts` 를 그대로 읽고 `./x.js` 를
-`x.ts` 로 풀어 주므로 단위 테스트와 생성기는 빌드를 안 거친다. 대신 bun 은 타입
-검사를 안 하고 `.d.ts` 도 못 내므로, 배포물과 타입 검사는 `tsc` 가 맡는다.
+**저장소에 `.js` 가 없다.** 소스도 테스트도 생성기도 전부 `.ts` 이고, **돌리는 건
+bun, 타입과 산출물은 tsc** 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를 `x.ts` 로
+풀어 주므로 단위 테스트와 생성기는 빌드를 안 거친다. 대신 bun 은 타입 검사를 안
+하고 `.d.ts` 도 못 내므로 그쪽은 tsc 가 맡는다.
+
+린터는 없다. eslint 가 켜 두던 규칙이 둘(`no-undef` · `no-unused-vars`)뿐이었는데
+전부 `.ts` 가 되면서 tsc 와 `noUnusedLocals` 가 그대로 잡는다.
 
 ## 왜 만드나
 
@@ -115,7 +119,7 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript 다
   schema.ts          리플렉션한 JSON → 색인 (Opt · Stage 타입이 여기서 난다)
   build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
-  options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.mjs 가 만든다)
+  options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.ts 가 만든다)
   lint.ts            명령어 진단 — 이 도구의 중심
   explain.ts         토큰별 설명 · 파일명 미리보기 · 다음 걸음
   command.ts         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
@@ -124,9 +128,11 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   paths.ts           -P 항목 한 줄 읽기
 src/index.ts         공개 API (빌더 + 검증기)
 src/cli.ts           ytstudio lint · explain
-gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
-gen_options.mjs      schema.json 을 옵션 타입으로
-tsconfig*.json       빌드용 · 타입 검사 전용
+tests/               단위(bun) · 타입(tsc) · CLI(빌드물을 노드로)
+gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로   ← 유일한 비-TS
+gen_options.ts       schema.json 을 옵션 타입으로
+tsconfig.json        빌드용 (src → lib)
+tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전부)
 .github/workflows/   CI — npm test 와 같은 것 + 타입이 스키마와 맞는지
 ```
 
@@ -137,9 +143,9 @@ tsconfig*.json       빌드용 · 타입 검사 전용
 
 | | 무엇으로 | 왜 |
 |---|---|---|
-| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 78ms |
+| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 124ms |
 | 옵션 타입 생성 | **bun** | `.ts` 어휘 표를 그대로 읽는다 |
-| 타입 검사 | **tsc** | bun 은 타입을 안 본다 |
+| 타입 검사 | **tsc** | bun 은 타입을 안 본다. 린터 자리도 여기가 대신한다 |
 | 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |
 | CLI 검사 | **node**, `lib/` 를 상대로 | 배포하는 게 `#!/usr/bin/env node` 짜리라서 |
 

@@ -7,11 +7,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import type { FormatNode } from '../../src/core/format-grammar.js';
+
 const { PREC, parseFormat, emitTree, parseFilterBody, emitFilter } =
   await import('../../src/core/format-grammar.js');
 
 /** 읽고 다시 뱉는다. 왕복이 이 문법의 핵심 성질이다. */
-const round = s => emitTree(parseFormat(s));
+const round = (s: string): string => emitTree(parseFormat(s));
+
+/** 파싱 결과가 있다고 보고 꺼낸다. 없으면 그 자리에서 실패한다. */
+const tree = (s: string): FormatNode => {
+  const t = parseFormat(s);
+  assert.ok(t, `${s} 를 못 읽었다`);
+  return t;
+};
+
+/** 연산자 노드라고 보고 자식을 꺼낸다. */
+const kids = (n: FormatNode): FormatNode[] => {
+  assert.notEqual(n.t, 'sel', '연산자 노드가 아니다');
+  return (n as { kids: FormatNode[] }).kids;
+};
 
 test('실제로 쓰이는 표현식이 글자 그대로 왕복한다', () => {
   const cases = [
@@ -41,28 +56,29 @@ test('빈 입력은 트리가 없다', () => {
 });
 
 test('+ 가 / 보다 강하게 묶인다 — bv+ba/b 는 (bv+ba)/b', () => {
-  const t = parseFormat('bv+ba/b');
+  const t = tree('bv+ba/b');
   assert.equal(t.t, 'fallback');
-  assert.deepEqual(t.kids.map(k => k.t), ['merge', 'sel']);
+  assert.deepEqual(kids(t).map(k => k.t), ['merge', 'sel']);
 
-  const u = parseFormat('b/bv+ba');
+  const u = tree('b/bv+ba');
   assert.equal(u.t, 'fallback');
-  assert.deepEqual(u.kids.map(k => k.t), ['sel', 'merge']);
+  assert.deepEqual(kids(u).map(k => k.t), ['sel', 'merge']);
 });
 
 test(', 가 가장 약하게 묶인다', () => {
-  const t = parseFormat('bv+ba,b/w');
+  const t = tree('bv+ba,b/w');
   assert.equal(t.t, 'multi');
-  assert.deepEqual(t.kids.map(k => k.t), ['merge', 'fallback']);
+  assert.deepEqual(kids(t).map(k => k.t), ['merge', 'fallback']);
 });
 
 test('우선순위가 낮은 자식에는 괄호가 자동으로 붙는다', () => {
-  const sel = name => ({ t: 'sel', name, filters: [] });
-  const tree = {
+  // 파서를 안 거치고 트리를 손으로 세운다 — emitTree 만 따로 본다
+  const sel = (name: string): FormatNode => ({ t: 'sel', name, filters: [] });
+  const hand: FormatNode = {
     t: 'merge',
     kids: [{ t: 'fallback', kids: [sel('bv'), sel('wv')] }, sel('ba')],
   };
-  assert.equal(emitTree(tree), '(bv/wv)+ba');
+  assert.equal(emitTree(hand), '(bv/wv)+ba');
   assert.equal(round('(bv/wv)+ba'), '(bv/wv)+ba');
 });
 
@@ -131,17 +147,17 @@ test('<= 를 < 보다 먼저 읽는다', () => {
 
 test('? 는 필터마다 독립이다', () => {
   const s = 'bv[height<=?1080][fps>30]';
-  const t = parseFormat(s);
-  assert.equal(t.filters[0].loose, true);
-  assert.equal(t.filters[1].loose, false);
+  const t = tree(s);
+  assert.equal(t.filters?.[0].loose, true);
+  assert.equal(t.filters?.[1].loose, false);
   assert.equal(emitTree(t), s);
 });
 
 test('필터를 다시 뱉는 규칙', () => {
   assert.equal(emitFilter({ key: 'ext', op: '=', value: 'mp4' }), '[ext=mp4]');
   assert.equal(emitFilter({ key: 'height', op: '<=', loose: true, value: '720' }), '[height<=?720]');
-  assert.equal(emitFilter({ key: 'format_note', op: 'has' }), '[format_note]');
-  assert.equal(emitFilter({ key: 'format_note', op: 'hasnot' }), '[!format_note]');
+  assert.equal(emitFilter({ key: 'format_note', op: 'has', value: '' }), '[format_note]');
+  assert.equal(emitFilter({ key: 'format_note', op: 'hasnot', value: '' }), '[!format_note]');
 });
 
 test('우선순위 표는 sel > merge > fallback > multi', () => {

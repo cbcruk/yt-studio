@@ -23,32 +23,36 @@ const CLI = path.join(ROOT, 'lib', 'cli.js');
 
 let pass = 0, fail = 0;
 
+interface Run { code: number; out: string }
+
 // bun 으로 이 파일을 돌려도 CLI 는 node 로 띄운다 — process.execPath 를 쓰면
 // 러너를 따라가는데, 우리가 배포하는 건 `#!/usr/bin/env node` 짜리다.
 const NODE = 'node';
 
 /** CLI 를 돌리고 { code, out } 을 준다. NO_COLOR 로 색을 끈다. */
-function run(args, stdin = '') {
+function run(args: string[], stdin = ''): Run {
   try {
     const out = execFileSync(NODE, [CLI, ...args], {
       input: stdin, encoding: 'utf8', stdio: 'pipe',
       env: { ...process.env, NO_COLOR: '1' },
     });
     return { code: 0, out };
-  } catch (e) {
-    return { code: e.status, out: (e.stdout || '') + (e.stderr || '') };
+  } catch (err) {
+    // execFileSync 는 종료 코드가 0 이 아니면 던진다 — 그게 우리가 볼 것이다
+    const e = err as { status?: number; stdout?: string; stderr?: string };
+    return { code: e.status ?? -1, out: (e.stdout || '') + (e.stderr || '') };
   }
 }
 
-function check(title, fn) {
+function check(title: string, fn: () => string | void): void {
   try {
     const note = fn();
     pass++; console.log(`  ✓ ${title}${note ? ` — ${note}` : ''}`);
   } catch (e) {
-    fail++; console.log(`  ✗ ${title} — ${e.message}`);
+    fail++; console.log(`  ✗ ${title} — ${(e as Error).message}`);
   }
 }
-const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
+const assert = (cond: unknown, msg: string): void => { if (!cond) throw new Error(msg); };
 
 console.log('▸ CLI');
 
