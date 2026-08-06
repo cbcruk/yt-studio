@@ -43,43 +43,21 @@ export const YTDLP_VERSION: string = raw.ytdlp_version;
  */
 export * from './core/build.js';
 
-import { lintCommand as lintRaw } from './core/lint.js';
-import { previewFilename as previewRaw } from './core/explain.js';
-import type { Issue } from './core/build.js';
-
-export interface LintResult {
-  /** 토큰 하나하나. `kind` 는 `url` · `opt` · `unknown`. */
-  items: { kind: 'url' | 'opt' | 'unknown'; raw: string; [k: string]: unknown }[];
-  urls: string[];
-  /** 옵션 id → 값. 플래그는 boolean, repeatable 은 배열. */
-  values: Record<string, string | boolean | string[]>;
-  issues: Issue[];
-  /** 오류가 하나도 없으면 참. 경고는 여기 안 센다. */
-  ok: boolean;
-  counts: { error: number; warn: number; info: number; opts: number; total: number };
-}
-
 /**
- * 명령어 문자열을 설치된 yt-dlp 에 대조한다.
+ * 검증기 — 어디서 왔든 명령어 문자열을 본다.
  *
- * 빌더로 만들지 **않은** 것도 본다 — 그게 이 함수가 있는 이유다.
+ * 빌더가 못 하는 일이다. 빌더는 빌더로 쓴 것만 보지만, 블로그에서 주웠거나
+ * 동료가 붙여넣었거나 LLM 이 준 명령어는 문자열로 온다.
  */
-export const lintCommand = (text: string): LintResult => lintRaw(text) as LintResult;
+export { lintCommand, nearestFlags, distance, LEVELS } from './core/lint.js';
+export type { Issue, Level, LintResult, Values } from './core/lint.js';
 
-export interface FilePreview {
-  /** `-o` 를 읽지 못했으면 거짓. 그때 `text` 는 원문 그대로다. */
-  ok: boolean;
-  /** `-o` 앞에 붙은 종류 접두어(`thumbnail:` 의 `thumbnail`). */
-  type: string;
-  text: string;
-  /** `-o` 가 없어서 yt-dlp 기본 템플릿을 쓴 경우. */
-  dflt?: boolean;
-}
+/** 명령어를 사람 말로 — 만들 파일명 · 토큰별 설명 · 다음 걸음. */
+export {
+  previewFilename, explainCommand, explainItem, suggestNext, DEFAULT_OUTTMPL,
+} from './core/explain.js';
+export type { FilePreview, Explained, Suggestion } from './core/explain.js';
 
-/** 이 명령어가 만들 파일명. 값은 모르므로 `‹제목›` 처럼 자리표시자로 둔다. */
-export const previewFilename = (values: LintResult['values']): FilePreview =>
-  previewRaw(values) as FilePreview;
-
-export { nearestFlags, distance } from './core/lint.js';
-export { explainCommand, explainItem, suggestNext, DEFAULT_OUTTMPL } from './core/explain.js';
+/** 명령어 문자열을 읽고 쓰는 밑바닥. 직접 다뤄야 할 때만. */
 export { scanCommand, tokenize, quote } from './core/command.js';
+export type { Item, UnknownWhy } from './core/command.js';

@@ -54,7 +54,7 @@ ytdlp('https://youtu.be/abc')
 
 그래서 검증기가 런타임에 하던 일의 절반이 컴파일 타임으로 올라간다.
 
-| 예전 (`core/lint.js`) | 지금 |
+| 예전 (`core/lint.ts`, 런타임) | 지금 (에디터) |
 |---|---|
 | `--write-sub 는 없는 플래그다 — --write-subs … 를 찾은 것 아닐까` | `Property 'writeSub' does not exist. Did you mean 'writeSubs'?` |
 | `never\|ignore\|… 중 하나가 아니다` | `'nope' is not assignable to '"never" \| "ignore" \| …'` |
@@ -75,7 +75,7 @@ ytdlp(u).extractAudio().format('bv').lint();
 // warn: -x 로 음원만 뽑는데 -f 가 영상 전용이다 ("bv") — …
 ```
 
-둘 다 실재하는 옵션이라 타입은 통과시킨다. `.lint()` 가 `core/lint.js` 를 그대로
+둘 다 실재하는 옵션이라 타입은 통과시킨다. `.lint()` 가 `core/lint.ts` 를 그대로
 돌려서 이런 것들을 잡는다. 그리고 검증기에는 빌더가 못 하는 일이 하나 더 있다 —
 **어디서 왔든 문자열을 검사하는 것.** 블로그에서 주웠든 동료가 붙여넣었든.
 빌더는 빌더로 쓴 것만 본다.
@@ -203,5 +203,7 @@ npx tsc -p tsconfig.test.json   # 타입 검사                          (npm ru
 파일 하나를 `tsc --noEmit` 로 돌리면 "막을 건 막고, 통과시킬 건 통과시킨다"가
 한 번에 검사된다.
 
-빌더가 왜 TypeScript 인데 `core/` 의 파서와 검증기는 JS 인지는 `tsconfig.json`
-주석에 있다 — 타입이 값을 하는 곳은 손님이 부르는 표면이지 파서 내부가 아니다.
+`src/` 는 전부 TypeScript 다. 한동안 파서와 검증기는 JS 였고 `allowJs` 와
+`noImplicitAny: false` 로 받아 줬는데, 그러면 손님에게 나가는 타입이 **안쪽이 any 인
+껍데기**가 된다. 전부 옮기고 그 둘을 껐다 — `Filter` · `FormatNode` · `Issue` 처럼
+빌더가 따로 적어 두던 타입도 이제 진짜 정의를 그대로 쓴다.

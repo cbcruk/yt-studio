@@ -87,7 +87,7 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 
 ## 검증기가 보는 것
 
-`src/core/lint.js` — 로컬에서, 결정적으로, 네트워크 없이 돈다.
+`src/core/lint.ts` — 로컬에서, 결정적으로, 네트워크 없이 돈다.
 
 | 보는 것 | 근거 |
 |---|---|
@@ -95,9 +95,9 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 | 오타라면 무엇을 쓰려던 건가 | 편집거리 + 접두어 가중치로 후보 세 개 |
 | 값이 필요한 자리에 값이 있는가 | `kind` · `metavar` |
 | 고를 수 있는 값 중 하나인가 | `choices` |
-| `-f` 가 포맷 셀렉터 문법에 맞는가 | `core/format-grammar.js` 파서 |
-| `-o` 가 출력 템플릿 문법에 맞는가 · 확장자가 붙는가 | `core/output-template.js` 파서 |
-| `-P` 에 같은 종류가 두 번 오지 않는가 | `core/paths.js` |
+| `-f` 가 포맷 셀렉터 문법에 맞는가 | `core/format-grammar.ts` 파서 |
+| `-o` 가 출력 템플릿 문법에 맞는가 · 확장자가 붙는가 | `core/output-template.ts` 파서 |
+| `-P` 에 같은 종류가 두 번 오지 않는가 | `core/paths.ts` |
 | 서로 어긋나는 조합인가 | `-x` 인데 `-f` 가 영상 전용, `--embed-subs` 인데 자막을 안 받음 … |
 
 마지막 줄이 빌더가 있어도 검증기가 안 없어지는 이유다. **조합은 타입이 못 본다** —
@@ -107,16 +107,16 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 ## 구성
 
 ```
-src/core/            DOM 도 파일 시스템도 모른다. node 로 단위 테스트가 된다
-  schema.js          리플렉션한 JSON → 색인
+src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript 다
+  schema.ts          리플렉션한 JSON → 색인 (Opt · Stage 타입이 여기서 난다)
   build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
   options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.mjs 가 만든다)
-  lint.js            명령어 진단 — 이 도구의 중심
-  explain.js         토큰별 설명 · 파일명 미리보기 · 다음 걸음
-  command.js         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
-  format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
-  output-template.js -o 파서 · 컴파일러 · 필드/변환 어휘
-  paths.js           -P 항목 한 줄 읽기
+  lint.ts            명령어 진단 — 이 도구의 중심
+  explain.ts         토큰별 설명 · 파일명 미리보기 · 다음 걸음
+  command.ts         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
+  format-grammar.ts  -f 파서 · 컴파일러 · 셀렉터/필터 어휘   ← import 금지
+  output-template.ts -o 파서 · 컴파일러 · 필드/변환 어휘     ← import 금지
+  paths.ts           -P 항목 한 줄 읽기
 src/index.ts         공개 API (빌더 + 검증기)
 src/cli.ts           ytstudio lint · explain
 gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
@@ -127,6 +127,11 @@ tsconfig*.json       빌드용 · 타입 검사 전용
 
 `options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
 `lib/` 는 커밋하지 않는다(`prepare` 가 굽는다).
+
+위 표에서 **import 금지**라고 적은 두 파일은 어휘 표를 들고 있고, `gen_options.mjs`
+가 **빌드 전에** node 로 그대로 읽는다. node 는 타입만 벗겨 낼 뿐 `./x.js` 를
+`x.ts` 로 되짚어 주지 않으므로, 거기에 import 가 하나라도 생기면 생성기가 깨진다.
+단위 테스트가 그 불변식을 지킨다.
 
 ## 스키마 다시 뽑기
 
@@ -142,8 +147,8 @@ npm run gen:types          # schema.json → src/core/options.gen.ts
 
 리플렉션이 절대 못 주는 것이 둘 있고, 이 도구의 실제 부가가치가 거기 있다.
 
-1. `core/lint.js` 의 **어긋나는 조합** 규칙 (`crossChecks`)
-2. `core/format-grammar.js` · `core/output-template.js` 의 **어휘와 설명** — 필터
+1. `core/lint.ts` 의 **어긋나는 조합** 규칙 (`crossChecks`)
+2. `core/format-grammar.ts` · `core/output-template.ts` 의 **어휘와 설명** — 필터
    필드, 출력 필드, 변환 글자. 자동완성에 뜨는 한국어 설명이 여기서 나온다
 
 ## 한계

@@ -1,19 +1,20 @@
 /**
  * yt-dlp 출력 템플릿 문법.
  *
- * -o 는 포맷 셀렉터처럼 트리는 아니지만, 리터럴과 필드 참조가 번갈아 놓인
- * 하나의 수열이다. 그래서 노드는 왼쪽에서 오른쪽으로 늘어서고 x 좌표가
- * 곧 순서가 된다.
+ * `-o` 는 포맷 셀렉터처럼 트리는 아니지만, 리터럴과 필드 참조가 번갈아 놓인
+ * 하나의 수열이다.
  *
  *   [TYPES:]  %(NAME[>STRF][|DEFAULT])[FMT]CONV  또는 리터럴
  *
- * 파싱은 구조를 알아보는 데까지만 하고, 다시 뱉을 때는 읽은 그대로를
- * 되돌린다. 그래서 우리가 모르는 문법이 섞여 있어도 문자열이 상하지 않는다.
- * (`|` 를 먼저, 그다음 `>` 를 자르고 같은 순서로 붙이므로 무손실이다.)
+ * 파싱은 구조를 알아보는 데까지만 하고, 다시 뱉을 때는 읽은 그대로를 되돌린다.
+ * 그래서 우리가 모르는 문법이 섞여 있어도 문자열이 상하지 않는다 — `|` 를 먼저,
+ * 그다음 `>` 를 자르고 같은 순서로 붙이므로 무손실이다.
+ *
+ * **아무것도 import 하지 않는다.** 이유는 format-grammar.ts 와 같다 —
+ * `gen_options.mjs` 가 빌드 전에 이 파일을 그대로 읽는다.
  */
 
-/** -o TYPES: 접두어. 아는 것만 잘라 낸다 — "C:/dl/…" 같은 경로를 오인하지 않도록. */
-export const OUT_TYPES = [
+export const OUT_TYPES: [type: string, label: string][] = [
   ['', '기본 (모든 파일)'],
   ['default', 'default — 기본'],
   ['chapter', 'chapter — 챕터별 분할 파일'],
@@ -27,10 +28,8 @@ export const OUT_TYPES = [
   ['pl_description', 'pl_description — 재생목록 설명'],
   ['pl_infojson', 'pl_infojson — 재생목록 JSON'],
 ];
-const TYPE_SET = new Set(OUT_TYPES.map(([v]) => v).filter(Boolean));
 
-/** 파일명에 자주 쓰는 필드. 전부는 아니고, 나머지는 직접 입력으로 넣는다. */
-export const FIELDS = [
+export const FIELDS: [group: string, items: [field: string, label: string][]][] = [
   ['영상', [
     ['title', '제목'], ['fulltitle', '제목 (원본)'], ['id', '영상 ID'], ['ext', '확장자'],
     ['upload_date', '업로드 날짜 (YYYYMMDD)'], ['timestamp', '업로드 시각 (epoch)'],
@@ -61,30 +60,37 @@ export const FIELDS = [
     ['extractor', '추출기'], ['extractor_key', '추출기 키'], ['epoch', '현재 시각 (epoch)'],
   ]],
 ];
-export const FIELD_HELP = Object.fromEntries(FIELDS.flatMap(([, items]) => items));
-export const FIELD_SET = new Set(Object.keys(FIELD_HELP));
 
-/** 변환 종류 — %(…) 뒤에 붙는 글자. */
-export const CONVERSIONS = [
+export const CONVERSIONS: [conv: string, label: string][] = [
   ['s', 's — 문자열'], ['d', 'd — 정수'], ['f', 'f — 실수'],
   ['B', 'B — 바이트'], ['j', 'j — JSON'], ['l', 'l — 목록(쉼표)'],
   ['q', 'q — 셸 인용'], ['D', 'D — 1.05M 꼴'], ['S', 'S — 파일명 안전'],
   ['U', 'U — 유니코드 정규화'], ['h', 'h — HTML 이스케이프'],
 ];
-const CONV_SET = new Set(CONVERSIONS.map(([v]) => v));
 
-/** 날짜 서식 예시 (`>` 뒤에 붙는 strftime). */
-export const STRF_PRESETS = [
-  ['', '(그대로)'],
-  ['%Y-%m-%d', '2026-07-29'],
-  ['%Y%m%d', '20260729'],
-  ['%Y/%m', '2026/07'],
-  ['%Y', '2026'],
-  ['%H-%M-%S', '14-05-33'],
-];
+const TYPE_SET = new Set(OUT_TYPES.map(([v]) => v).filter(Boolean));
 
-/** `[TYPES:]TEMPLATE` 에서 접두어를 떼어 낸다. */
-export function splitType(src) {
+export const FIELD_HELP: Record<string, string> =
+  Object.fromEntries(FIELDS.flatMap(([, items]) => items));
+
+/** 템플릿을 이루는 조각. 리터럴 아니면 필드 참조다. */
+export type Piece =
+  | { t: 'text'; text: string }
+  | {
+      t: 'field';
+      name: string;
+      /** `>` 뒤의 strftime 서식. */
+      strf: string;
+      /** `|` 뒤의 없을 때 값. 없으면 null. */
+      fallback: string | null;
+      /** 괄호와 변환 글자 사이의 플래그·폭·정밀도 (`03` · `.40`). */
+      fmt: string;
+      /** 맨 뒤 변환 글자 (`s` · `d` · `B` …). */
+      conv: string;
+    };
+
+/** `[TYPES:]TEMPLATE` 에서 접두어를 떼어 낸다. 아는 종류일 때만 자른다. */
+export function splitType(src: string): { type: string; template: string } {
   const s = src || '';
   const i = s.indexOf(':');
   if (i > 0) {
@@ -94,8 +100,10 @@ export function splitType(src) {
   return { type: '', template: s };
 }
 
-/** 괄호 안쪽을 { name, strf, fallback } 으로. 자른 순서 그대로 되붙이면 원문이 된다. */
-export function splitBody(body) {
+type Body = { name: string; strf: string; fallback: string | null };
+
+/** 괄호 안쪽을 셋으로. 자른 순서 그대로 되붙이면 원문이 된다. */
+function splitBody(body: string): Body {
   const bar = body.indexOf('|');
   const head = bar < 0 ? body : body.slice(0, bar);
   const fallback = bar < 0 ? null : body.slice(bar + 1);
@@ -106,20 +114,16 @@ export function splitBody(body) {
     fallback,
   };
 }
-export const joinBody = ({ name, strf, fallback }) =>
+
+const joinBody = ({ name, strf, fallback }: Body): string =>
   name + (strf ? '>' + strf : '') + (fallback != null ? '|' + fallback : '');
 
-/**
- * 템플릿 문자열 → 조각들.
- *   { t:'text', text }         리터럴 (%% 는 % 하나로 풀어 둔다)
- *   { t:'field', name, strf, fallback, fmt, conv }
- * 못 읽으면 이유를 담아 던진다.
- */
-export function parseTemplate(src) {
+/** 템플릿 문자열 → 조각들. 못 읽으면 이유를 담아 던진다. */
+export function parseTemplate(src: string): Piece[] {
   const s = src || '';
-  const out = [];
+  const out: Piece[] = [];
   let text = '';
-  const flush = () => { if (text) { out.push({ t: 'text', text }); text = ''; } };
+  const flush = (): void => { if (text) { out.push({ t: 'text', text }); text = ''; } };
 
   for (let i = 0; i < s.length; i++) {
     if (s[i] !== '%') { text += s[i]; continue; }
@@ -135,11 +139,9 @@ export function parseTemplate(src) {
     let j = close + 1;
     while (j < s.length && /[#0\-+ .,\d]/.test(s[j])) j++;
     if (j >= s.length) throw new Error(`%(${body}) 뒤에 변환 글자가 없다`);
-    const fmt = s.slice(close + 1, j);
-    const conv = s[j];
 
     flush();
-    out.push(Object.assign({ t: 'field', fmt, conv }, splitBody(body)));
+    out.push({ t: 'field', fmt: s.slice(close + 1, j), conv: s[j], ...splitBody(body) });
     i = j;
   }
   flush();
@@ -147,27 +149,16 @@ export function parseTemplate(src) {
 }
 
 /** 조각 하나 → 템플릿 문자열. 리터럴의 `%` 는 `%%` 로 되돌린다. */
-export const emitPiece = piece =>
+export const emitPiece = (piece: Piece): string =>
   piece.t === 'text'
     ? String(piece.text || '').replace(/%/g, '%%')
     : '%(' + joinBody(piece) + ')' + (piece.fmt || '') + (piece.conv || 's');
 
-export const emitTemplate = pieces => pieces.map(emitPiece).join('');
-
-export const emitOutput = (type, pieces) => {
-  const body = emitTemplate(pieces);
-  return type ? type + ':' + body : body;
-};
-
 /** 사람이 읽을 미리보기. 값을 모르므로 필드는 자리표시자로 둔다. */
-export function previewTemplate(pieces) {
+export function previewTemplate(pieces: Piece[]): string {
   return pieces.map(p => {
     if (p.t === 'text') return p.text;
     if (p.fallback != null && !p.name) return p.fallback;
-    const label = FIELD_HELP[p.name] || p.name || '?';
-    return '‹' + label + '›';
+    return '‹' + (FIELD_HELP[p.name] || p.name || '?') + '›';
   }).join('');
 }
-
-/** 변환 글자가 우리가 아는 것인지. 모른다고 막지는 않고 알려만 준다. */
-export const knownConversion = c => CONV_SET.has(c);

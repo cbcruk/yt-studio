@@ -7,14 +7,10 @@
 import { OUT_TYPES } from './output-template.js';
 
 /** `-P` 가 받는 종류. `-o` 의 종류에 저장 전용인 home·temp 가 더 붙는다. */
-export const PATH_TYPES = [
-  ['home', 'home — 최종 파일이 놓일 곳 (기본)'],
-  ['temp', 'temp — 받는 동안 쓰는 임시 폴더'],
-  ...OUT_TYPES.filter(([v]) => v),
-];
-const PATH_TYPE_SET = new Set(PATH_TYPES.map(([v]) => v));
+const PATH_TYPES = ['home', 'temp', ...OUT_TYPES.map(([v]) => v).filter(Boolean)];
+const PATH_TYPE_SET = new Set(PATH_TYPES);
 
-export function splitEntry(line) {
+export function splitEntry(line: string): { type: string; path: string } {
   const s = (line || '').trim();
   const i = s.indexOf(':');
   if (i > 0 && PATH_TYPE_SET.has(s.slice(0, i))) {

@@ -15,8 +15,8 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { FKEYS, SELECTORS, SEL_HELP } from './src/core/format-grammar.js';
-import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-template.js';
+import { FKEYS, SELECTORS, SEL_HELP } from './src/core/format-grammar.ts';
+import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-template.ts';
 
 const SCHEMA = JSON.parse(readFileSync(new URL('./schema.json', import.meta.url), 'utf8'));
 

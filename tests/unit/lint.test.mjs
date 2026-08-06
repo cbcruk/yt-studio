@@ -7,13 +7,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 
-import { initSchema } from '../../src/core/schema.js';
-import { scanCommand } from '../../src/core/command.js';
-
-initSchema(JSON.parse(await readFile(new URL('../../schema.json', import.meta.url), 'utf8')));
-const { lintCommand, nearestFlags, distance } = await import('../../src/core/lint.js');
+// 컴파일한 것을 본다 — 손님이 받는 물건이 그거다. src/ 는 전부 .ts 라 node 가
+// 바로 못 읽는다(`./x.js` 를 x.ts 로 되짚어 주지 않는다).
+const { lintCommand, nearestFlags, distance, scanCommand } =
+  await import('../../lib/index.js');
 
 const msgs = t => lintCommand(t).issues.map(i => i.msg).join(' | ');
 const levels = t => lintCommand(t).issues.map(i => i.level);

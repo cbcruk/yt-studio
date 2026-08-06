@@ -1,12 +1,17 @@
 /**
- * 포맷 셀렉터 문법. 브라우저 없이 도는 유일한 층이다.
+ * -f 포맷 셀렉터 문법.
+ *
+ * 파서와 컴파일러가 한 쌍이라 왕복으로 검사한다 — 읽은 것을 다시 뱉으면
+ * 같아야 하고, 괄호는 필요한 자리에만 붙어야 한다.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  parseFormat, emitTree, parseFilterBody, emitFilter, PREC,
-} from '../../src/core/format-grammar.js';
+import { readFileSync } from 'node:fs';
 
+const { PREC, parseFormat, emitTree, parseFilterBody, emitFilter } =
+  await import('../../lib/core/format-grammar.js');
+
+/** 읽고 다시 뱉는다. 왕복이 이 문법의 핵심 성질이다. */
 const round = s => emitTree(parseFormat(s));
 
 test('실제로 쓰이는 표현식이 글자 그대로 왕복한다', () => {
@@ -144,4 +149,16 @@ test('우선순위 표는 sel > merge > fallback > multi', () => {
   assert.ok(PREC.sel > PREC.merge);
   assert.ok(PREC.merge > PREC.fallback);
   assert.ok(PREC.fallback > PREC.multi);
+});
+
+test('어휘 파일은 아무것도 import 하지 않는다 — 생성기가 그대로 읽는다', () => {
+  // gen_options.mjs 는 빌드 **전에** 이 두 파일을 node 로 직접 읽어 어휘를
+  // 타입으로 옮긴다. node 는 타입만 벗겨 낼 뿐 `./x.js` 를 x.ts 로 되짚어
+  // 주지 않으므로, 여기에 import 가 하나라도 생기면 생성기가 깨진다.
+  // 그때 나는 오류는 원인에서 멀어서(ERR_MODULE_NOT_FOUND) 여기서 못 박는다.
+  for (const f of ['format-grammar', 'output-template']) {
+    const src = readFileSync(new URL(`../../src/core/${f}.ts`, import.meta.url), 'utf8');
+    const imports = src.split('\n').filter(l => /^\s*import\b/.test(l));
+    assert.deepEqual(imports, [], `${f}.ts 에 import 가 생겼다`);
+  }
 });

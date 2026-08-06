@@ -19,19 +19,45 @@ import { scanCommand } from './command.js';
 import { parseFormat } from './format-grammar.js';
 import { parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
+import type { Opt } from './schema.js';
+import type { Item } from './command.js';
+import type { Piece } from './output-template.js';
 
 /** error 는 그대로 돌리면 안 되는 것, warn 은 의도와 다를 수 있는 것, info 는 참고. */
-export const LEVELS = ['error', 'warn', 'info'];
-const rank = l => LEVELS.indexOf(l);
+export const LEVELS = ['error', 'warn', 'info'] as const;
+export type Level = (typeof LEVELS)[number];
+const rank = (l: Level): number => LEVELS.indexOf(l);
+
+/** 검증기가 잡은 것 하나. `fixes` 는 없는 플래그일 때 가까운 후보 셋. */
+export interface Issue {
+  level: Level;
+  msg: string;
+  flag?: string;
+  opt?: string;
+  fixes?: string[];
+}
+
+/** 옵션 id → 읽어 낸 값. 플래그는 boolean, repeatable 은 배열이다. */
+export type Values = Record<string, string | boolean | (string | null)[] | null>;
+
+export interface LintResult {
+  items: Item[];
+  urls: string[];
+  values: Values;
+  issues: Issue[];
+  /** 오류가 하나도 없으면 참. 경고는 여기 안 센다. */
+  ok: boolean;
+  counts: { error: number; warn: number; info: number; opts: number; total: number };
+}
 
 /** 편집거리. 후보가 200개 남짓이라 단순 DP 로 충분하다. */
-export function distance(a, b) {
+export function distance(a: string, b: string): number {
   if (a === b) return 0;
   const m = a.length, n = b.length;
   if (!m || !n) return m || n;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  let prev: number[] = Array.from({ length: n + 1 }, (_, j) => j);
   for (let i = 1; i <= m; i++) {
-    const cur = [i];
+    const cur: number[] = [i];
     for (let j = 1; j <= n; j++) {
       cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
     }
@@ -46,7 +72,7 @@ export function distance(a, b) {
  * 거리로만 고르면 `--foo` 에 엉뚱한 세 글자짜리가 붙는다. 길이에 비례한
  * 문턱을 두고, 그래도 없으면 부분 문자열로 한 번 더 본다.
  */
-export function nearestFlags(flag, limit = 3) {
+export function nearestFlags(flag: string, limit = 3): string[] {
   const q = String(flag || '').replace(/^-+/, '').toLowerCase();
   if (!q) return [];
   // 앞이 같으면 가깝게 본다. 거리만 보면 --embed-subtitle 에 엉뚱한 짧은
@@ -67,32 +93,33 @@ export function nearestFlags(flag, limit = 3) {
 }
 
 /** `--merge-output-format mp4` 처럼 고를 수 있는 값이 정해진 옵션. */
-function checkChoice(opt, value) {
-  if (!opt.choices || value == null) return null;
+function checkChoice(opt: Opt, value: string | null): string | null {
+  const { choices } = opt;
+  if (!choices || value == null) return null;
   // 쉼표로 여러 개를 주는 옵션이 있다 (--sponsorblock-remove 등).
   const parts = String(value).split(',').map(s => s.trim()).filter(Boolean);
-  const bad = parts.filter(p => !opt.choices.includes(p));
+  const bad = parts.filter(p => !choices.includes(p));
   if (!bad.length) return null;
-  return `${bad.join(', ')} 는 고를 수 있는 값이 아니다 (${opt.choices.join(' · ')})`;
+  return `${bad.join(', ')} 는 고를 수 있는 값이 아니다 (${choices.join(' · ')})`;
 }
 
 /** `-f` 를 진짜 파서에 넣어 본다. 못 읽으면 파서가 한 말을 그대로 돌려준다. */
-function checkFormat(value) {
+function checkFormat(value: string): string | null {
   try { parseFormat(value); return null; }
-  catch (e) { return e.message; }
+  catch (e) { return (e as Error).message; }
 }
 
-function checkOutput(value) {
+function checkOutput(value: string): { error?: string; pieces?: Piece[]; hasExt?: boolean } {
   const { template } = splitType(value);
   let pieces;
   try { pieces = parseTemplate(template); }
-  catch (e) { return { error: e.message }; }
+  catch (e) { return { error: (e as Error).message }; }
   const hasExt = pieces.some(p => p.t === 'field' && (p.name === 'ext' || /(^|\.)ext$/.test(p.name)));
   return { pieces, hasExt };
 }
 
-function checkPaths(values) {
-  const seen = new Map(), out = [];
+function checkPaths(values: string[]): string[] {
+  const seen = new Map<string, string>(), out: string[] = [];
   for (const line of values) {
     const { type, path } = splitEntry(line);
     const key = type || 'home';
@@ -107,8 +134,8 @@ function checkPaths(values) {
  * 문법은 맞지만 의도와 어긋나는 조합. 확실한 것만 둔다 —
  * 애매한 규칙을 늘리면 경고가 흔해지고, 흔한 경고는 안 읽힌다.
  */
-function crossChecks(has, val) {
-  const out = [];
+function crossChecks(has: (id: string) => boolean, val: (id: string) => string | null): Issue[] {
+  const out: Issue[] = [];
   const f = val('format');
 
   if (has('extract-audio') && f && /(^|[^a-z*])(bv|wv)\b|bestvideo|worstvideo/.test(f) && !/\bba\b|bestaudio/.test(f)) {
@@ -143,12 +170,12 @@ function crossChecks(has, val) {
  *
  * issues: { level, msg, flag?, opt?, fixes? } — 심각한 것부터.
  */
-export function lintCommand(text) {
+export function lintCommand(text: string): LintResult {
   const { items } = scanCommand(text);
-  const issues = [];
+  const issues: Issue[] = [];
   const urls = items.filter(i => i.kind === 'url').map(i => i.raw);
-  const values = {};                       // optId → 값 (repeatable 은 배열)
-  const count = {};
+  const values: Values = {};               // optId → 값 (repeatable 은 배열)
+  const count: Record<string, number> = {};
 
   for (const it of items) {
     if (it.kind === 'unknown') {
@@ -158,7 +185,7 @@ export function lintCommand(text) {
           msg: `${it.flag} 는 이 yt-dlp 버전에 없는 플래그다`
             + (fixes.length ? ` — ${fixes.join(' · ')} 를 찾은 것 아닐까` : '') });
       } else if (it.why === 'no-value') {
-        const o = BY_FLAG[it.flag].opt;
+        const o: Opt = BY_FLAG[it.flag].opt;
         issues.push({ level: 'error', flag: it.flag, opt: o.id,
           msg: `${it.flag} 는 값이 필요하다 (${o.metavar || 'VALUE'})` });
       } else {
@@ -171,7 +198,7 @@ export function lintCommand(text) {
 
     const { opt, value, negated } = it;
     count[opt.id] = (count[opt.id] || 0) + 1;
-    if (opt.kind === 'repeatable') (values[opt.id] ||= []).push(value);
+    if (opt.kind === 'repeatable') ((values[opt.id] ||= []) as (string | null)[]).push(value);
     else if (opt.kind === 'flag') values[opt.id] = !negated;
     else values[opt.id] = value;
 
@@ -191,15 +218,15 @@ export function lintCommand(text) {
     }
   }
 
-  const has = id => id in values && values[id] !== false;
-  const val = id => (typeof values[id] === 'string' ? values[id] : null);
+  const has = (id: string): boolean => id in values && values[id] !== false;
+  const val = (id: string): string | null => (typeof values[id] === 'string' ? values[id] : null);
 
   if (has('format')) {
-    const err = checkFormat(values.format);
+    const err = checkFormat(values.format as string);
     if (err) issues.push({ level: 'error', opt: 'format', msg: `-f 값을 읽지 못했다 — ${err}` });
   }
   if (has('output')) {
-    const first = Array.isArray(values.output) ? values.output[0] : values.output;
+    const first = (Array.isArray(values.output) ? values.output[0] : values.output) as string;
     const r = checkOutput(first);
     if (r.error) issues.push({ level: 'error', opt: 'output', msg: `-o 값을 읽지 못했다 — ${r.error}` });
     else if (!r.hasExt) {
@@ -208,7 +235,7 @@ export function lintCommand(text) {
     }
   }
   if (has('paths')) {
-    for (const m of checkPaths([].concat(values.paths)))
+    for (const m of checkPaths(([] as string[]).concat(values.paths as string | string[])))
       issues.push({ level: 'warn', opt: 'paths', msg: m });
   }
   if (!urls.length && !has('batch-file') && !has('load-info-json')

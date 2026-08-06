@@ -1,10 +1,7 @@
 {
-  // 빌더만 TypeScript 다. 그래프·UI 는 그대로 JS 로 둔다 — 타입이 값을 하는
-  // 곳은 "설치된 yt-dlp 의 옵션 188개"이지 캔버스가 아니다.
-  //
-  // core/ 의 JS 모듈(schema · 파서 · 검증기)은 allowJs 로 같이 컴파일해서
-  // lib/ 에 넣는다. 그쪽은 추론에 맡긴다 — noImplicitAny 를 끈 이유다.
-  // 손님에게 나가는 타입(options.gen.ts · build.ts)은 strict 로 짠다.
+  // src/ 전체가 TypeScript 다. 예전에는 파서와 검증기가 JS 여서 allowJs 와
+  // noImplicitAny:false 로 받아 줬는데, 그러면 손님에게 나가는 타입이 안쪽이
+  // any 인 껍데기가 된다. 전부 옮기고 그 둘을 껐다.
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -12,9 +9,6 @@
     "lib": ["ES2022"],
     "types": ["node"],
 
-    "allowJs": true,
-    "checkJs": false,
-    "noImplicitAny": false,
     "strict": true,
     "skipLibCheck": true,
 
