@@ -34,7 +34,7 @@ jobs:
       # 자동완성이 설치된 yt-dlp 와 어긋난다 — 그게 이 층의 유일한 약속이다.
       - name: 옵션 타입이 스키마와 맞는가
         run: |
-          node gen_options.mjs
+          npm run gen:types
           if ! git diff --quiet -- src/core/options.gen.ts; then
             echo "::error::options.gen.ts 가 schema.json 과 다르다 — 'npm run gen:types' 를 돌리고 같이 커밋할 것"
             git diff --stat -- src/core/options.gen.ts
@@ -45,9 +45,10 @@ jobs:
       - name: 타입
         run: npm run check:types
 
+      # bun 이 소스를 그대로 읽는다 — 빌드를 안 거친다.
       - name: 단위
         run: npm run test:unit
 
-      # 종료 코드와 파이프까지 본다 — 진짜 프로세스를 띄운다.
+      # 이쪽은 반대로 컴파일한 lib/ 를 노드로 띄운다. 배포하는 물건이 그거다.
       - name: CLI
         run: npm run test:cli

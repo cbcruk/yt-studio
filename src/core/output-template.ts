@@ -9,9 +9,6 @@
  * 파싱은 구조를 알아보는 데까지만 하고, 다시 뱉을 때는 읽은 그대로를 되돌린다.
  * 그래서 우리가 모르는 문법이 섞여 있어도 문자열이 상하지 않는다 — `|` 를 먼저,
  * 그다음 `>` 를 자르고 같은 순서로 붙이므로 무손실이다.
- *
- * **아무것도 import 하지 않는다.** 이유는 format-grammar.ts 와 같다 —
- * `gen_options.mjs` 가 빌드 전에 이 파일을 그대로 읽는다.
  */
 
 export const OUT_TYPES: [type: string, label: string][] = [

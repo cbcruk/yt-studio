@@ -187,10 +187,14 @@ t.field('release_year')          // 카탈로그에 없는 필드
 ## 만드는 법
 
 ```
-node gen_options.mjs      # schema.json → src/core/options.gen.ts   (npm run gen:types)
-npx tsc                   # src/ → lib/                             (npm run build)
-npx tsc -p tsconfig.test.json   # 타입 검사                          (npm run check:types)
+bun gen_options.mjs             # schema.json → options.gen.ts  (npm run gen:types)
+tsc                             # src/ → lib/                   (npm run build)
+tsc -p tsconfig.test.json       # 타입 검사                      (npm run check:types)
 ```
+
+돌리는 건 bun, 타입과 산출물은 tsc 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를
+`x.ts` 로 풀어 주므로 생성기가 빌드를 기다리지 않아도 되고, 대신 bun 은 타입을
+안 보고 `.d.ts` 도 못 내므로 그쪽은 tsc 가 맡는다.
 
 `options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
 `lib/` 는 커밋하지 않는다(`prepare` 가 굽는다). CI 가 **스키마를 고치고 타입을

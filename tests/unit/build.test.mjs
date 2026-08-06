@@ -1,8 +1,9 @@
 /**
  * 코드로 쓰는 명령어.
  *
- * 컴파일한 것(`lib/`)을 검사한다 — 손님이 실제로 받는 물건이 그거다. 타입이
- * 막는 것들은 여기 없다. 그건 `tests/types/reject.ts` 가 `tsc` 로 검사한다.
+ * 소스를 직접 검사한다 — bun 이 .ts 를 그대로 읽으므로 빌드를 안 거친다.
+ * 컴파일 결과(`lib/`)는 CLI 검사가 진짜 프로세스로 exercise 한다.
+ * 타입이 막는 것들은 여기 없다 — `tests/types/reject.ts` 가 `tsc` 로 검사한다.
  *
  * 여기서 보는 건 셋이다.
  *   · 문자열이 맞게 나오는가
@@ -13,10 +14,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { ytdlp, formatFactory, outTag, methodName, selMethod, YTDLP_VERSION } =
-  await import('../../lib/index.js');
-const { parseFormat } = await import('../../lib/core/format-grammar.js');
-const { parseTemplate } = await import('../../lib/core/output-template.js');
-const { scanCommand } = await import('../../lib/core/command.js');
+  await import('../../src/index.js');
+const { parseFormat } = await import('../../src/core/format-grammar.js');
+const { parseTemplate } = await import('../../src/core/output-template.js');
+const { scanCommand } = await import('../../src/core/command.js');
 
 const U = 'https://youtu.be/abc';
 

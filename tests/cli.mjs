@@ -11,6 +11,8 @@
  *   · 색을 안 쓸 때 글자만 깨끗이 나오는가 (grep)
  *
  * 실제로 프로세스를 띄운다 — 함수를 부르면 종료 코드도 파이프도 안 보인다.
+ * 그리고 **컴파일한 lib/ 를 노드로** 띄운다. 배포하는 물건이 그거라서,
+ * 이 검사만은 소스가 아니라 산출물을 상대한다.
  */
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -21,10 +23,14 @@ const CLI = path.join(ROOT, 'lib', 'cli.js');
 
 let pass = 0, fail = 0;
 
+// bun 으로 이 파일을 돌려도 CLI 는 node 로 띄운다 — process.execPath 를 쓰면
+// 러너를 따라가는데, 우리가 배포하는 건 `#!/usr/bin/env node` 짜리다.
+const NODE = 'node';
+
 /** CLI 를 돌리고 { code, out } 을 준다. NO_COLOR 로 색을 끈다. */
 function run(args, stdin = '') {
   try {
-    const out = execFileSync(process.execPath, [CLI, ...args], {
+    const out = execFileSync(NODE, [CLI, ...args], {
       input: stdin, encoding: 'utf8', stdio: 'pipe',
       env: { ...process.env, NO_COLOR: '1' },
     });

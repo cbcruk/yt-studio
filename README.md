@@ -5,10 +5,15 @@
 **설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.**
 
 ```
-npm run build     # → lib/                            (tsc)
+npm run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
 npm run gen:types # schema.json → src/core/options.gen.ts
+npm run cli       # 빌드 없이 CLI 를 돌려 본다
 npm test          # 린트 + 타입 + 단위 + CLI
 ```
+
+**돌리는 건 bun, 타입과 산출물은 tsc.** bun 이 `.ts` 를 그대로 읽고 `./x.js` 를
+`x.ts` 로 풀어 주므로 단위 테스트와 생성기는 빌드를 안 거친다. 대신 bun 은 타입
+검사를 안 하고 `.d.ts` 도 못 내므로, 배포물과 타입 검사는 `tsc` 가 맡는다.
 
 ## 왜 만드나
 
@@ -114,8 +119,8 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   lint.ts            명령어 진단 — 이 도구의 중심
   explain.ts         토큰별 설명 · 파일명 미리보기 · 다음 걸음
   command.ts         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
-  format-grammar.ts  -f 파서 · 컴파일러 · 셀렉터/필터 어휘   ← import 금지
-  output-template.ts -o 파서 · 컴파일러 · 필드/변환 어휘     ← import 금지
+  format-grammar.ts  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
+  output-template.ts -o 파서 · 컴파일러 · 필드/변환 어휘
   paths.ts           -P 항목 한 줄 읽기
 src/index.ts         공개 API (빌더 + 검증기)
 src/cli.ts           ytstudio lint · explain
@@ -128,10 +133,19 @@ tsconfig*.json       빌드용 · 타입 검사 전용
 `options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
 `lib/` 는 커밋하지 않는다(`prepare` 가 굽는다).
 
-위 표에서 **import 금지**라고 적은 두 파일은 어휘 표를 들고 있고, `gen_options.mjs`
-가 **빌드 전에** node 로 그대로 읽는다. node 는 타입만 벗겨 낼 뿐 `./x.js` 를
-`x.ts` 로 되짚어 주지 않으므로, 거기에 import 가 하나라도 생기면 생성기가 깨진다.
-단위 테스트가 그 불변식을 지킨다.
+## 무엇을 무엇으로 돌리는가
+
+| | 무엇으로 | 왜 |
+|---|---|---|
+| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 78ms |
+| 옵션 타입 생성 | **bun** | `.ts` 어휘 표를 그대로 읽는다 |
+| 타입 검사 | **tsc** | bun 은 타입을 안 본다 |
+| 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |
+| CLI 검사 | **node**, `lib/` 를 상대로 | 배포하는 게 `#!/usr/bin/env node` 짜리라서 |
+
+마지막 줄이 중요하다. 단위 테스트가 소스를 보는 대신, CLI 검사가 **컴파일된
+산출물을 진짜 프로세스로** 띄운다 — 소스만 보고 끝나면 `tsc` 가 낸 것이 도는지는
+아무도 안 본 게 된다.
 
 ## 스키마 다시 뽑기
 

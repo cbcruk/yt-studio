@@ -8,10 +8,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// 컴파일한 것을 본다 — 손님이 받는 물건이 그거다. src/ 는 전부 .ts 라 node 가
-// 바로 못 읽는다(`./x.js` 를 x.ts 로 되짚어 주지 않는다).
+// 소스를 직접 본다. bun 이 `./x.js` 를 x.ts 로 풀어 주므로 빌드를 안 거친다.
 const { lintCommand, nearestFlags, distance, scanCommand } =
-  await import('../../lib/index.js');
+  await import('../../src/index.js');
 
 const msgs = t => lintCommand(t).issues.map(i => i.msg).join(' | ');
 const levels = t => lintCommand(t).issues.map(i => i.level);

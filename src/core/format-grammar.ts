@@ -7,10 +7,6 @@
  *   merge    := atom ('+' atom)*                bv+ba
  *   fallback := merge ('/' merge)*              bv+ba/b   ==   (bv+ba)/b
  *   multi    := fallback (',' fallback)*        bv,ba
- *
- * **아무것도 import 하지 않는다.** `gen_options.mjs` 가 빌드 전에 이 파일을
- * 그대로 읽어 어휘를 타입으로 옮기는데, node 는 타입만 벗겨 낼 뿐 `./x.js` 를
- * `x.ts` 로 되짚어 주지 않는다. 여기에 import 가 생기면 생성기가 깨진다.
  */
 
 /** 연산자 우선순위. 자식이 부모보다 낮으면 괄호로 묶는다. */
