@@ -152,12 +152,29 @@ export const SCHEMA_SOURCE: SchemaSource = {
 export const YTDLP_VERSION: string = SCHEMA_SOURCE.version;
 
 /**
- * 빌더 — `ytdlp()` 와 그것이 쓰는 타입 전부.
+ * 빌더 — 손님이 부르는 것은 `ytdlp()` 하나다.
  *
  * 옵션 메서드 188개는 스키마에서 자라므로 여기 이름이 하나씩 적혀 있지 않다.
  * 무엇이 있는지는 에디터가 안다.
+ *
+ * 한동안 여기가 `export * from './core/build.js'` 였는데, 그러면 내부가 딸려
+ * 나간다 — `grow`(프로토타입에 메서드를 심는다) · `methodName` · `selMethod`
+ * (이름 규칙) · `toFilters` · `formatFactory` · `outTag`. **배포하고 나면 그
+ * 여섯도 API 라서 빼는 게 breaking 이 된다.** 그래서 목록을 손으로 적는다.
  */
-export * from './core/build.js';
+export { ytdlp } from './core/build.js';
+
+/**
+ * 식과 조각의 타입.
+ *
+ * 값으로는 안 내보낸다 — `f.bv()` 와 `t.title` 이 이미 만들어서 주므로 손님이
+ * `new` 할 일이 없다. 대신 헬퍼 함수 시그니처에 적을 일은 있어서 타입은 낸다.
+ */
+export type { Expr, FormatFactory, OutTag, Piece, Template, Ytdlp } from './core/build.js';
+export type {
+  Arg, Conversion, FieldPiece, Filter, Filters, FormatNode, NumCond, OutField,
+  OutNode, OutType, PathMap, Selector, StrCond, Version,
+} from './core/build.js';
 
 /**
  * 검증기 — 어디서 왔든 명령어 문자열을 본다.
