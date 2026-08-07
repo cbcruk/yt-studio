@@ -1,7 +1,6 @@
 {
   "name": "ytstudio",
   "version": "0.1.0",
-  "private": true,
   "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기",
   "type": "module",
   "scripts": {
@@ -28,8 +27,17 @@
   },
   "files": [
     "lib",
-    "schema.json"
+    "ytstudio.schema.json"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cbcruk/yt-studio.git"
+  },
+  "homepage": "https://github.com/cbcruk/yt-studio#readme",
+  "bugs": "https://github.com/cbcruk/yt-studio/issues",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "ytstudio": "./lib/cli.js"
   },

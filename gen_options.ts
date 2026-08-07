@@ -1,15 +1,18 @@
 /**
- * schema.json → src/core/options.gen.ts
+ * ytstudio.schema.json → src/core/options.gen.ts
  *
- * gen_schema.py 가 설치된 yt-dlp 를 리플렉션해서 schema.json 을 떨구고, 이
- * 파일이 그걸 **타입**으로 옮긴다. 그래서 자동완성에 뜨는 옵션 = 당신이 깐
- * yt-dlp 의 옵션이다. 모델의 기억에서 나온 게 아니다.
+ * gen_schema.py 가 설치된 yt-dlp 를 리플렉션해서 ytstudio.schema.json 을
+ * 떨구고, 이 파일이 그걸 **타입**으로 옮긴다. 그래서 자동완성에 뜨는 옵션 =
+ * 이 저장소를 구울 때의 yt-dlp 옵션이다. 모델의 기억에서 나온 게 아니다.
+ *
+ * 검증기는 런타임에 로컬 스키마를 집을 수 있지만(src/index.ts) 타입은 못
+ * 바꾼다 — 여기서 나온 파일이 그대로 .d.ts 가 되어 배포된다.
  *
  * 검증기가 런타임에 하던 일의 절반이 여기서 컴파일 타임으로 올라간다 —
  * 없는 플래그는 없는 메서드가 되고, choices 는 유니온이 된다.
  *
  * 내는 것은 타입뿐이다. 런타임 메서드는 build.ts 가 같은 스키마에서 기른다.
- * 한 곳(schema.json)에서 둘이 같이 나오므로 어긋날 수가 없다.
+ * 한 곳(ytstudio.schema.json)에서 둘이 같이 나오므로 어긋날 수가 없다.
  *
  *   bun gen_options.ts
  */
@@ -20,7 +23,7 @@ import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-te
 import type { Opt, RawSchema } from './src/core/schema.js';
 
 const SCHEMA: RawSchema = JSON.parse(
-  readFileSync(new URL('./schema.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./ytstudio.schema.json', import.meta.url), 'utf8'),
 );
 
 // 이름 규칙은 build.ts 와 **같아야 한다**. 여기서 타입 이름을, 저기서 런타임
@@ -73,7 +76,7 @@ const optionMethods = SCHEMA.options
   .filter(o => !HAND_WRITTEN.has(o.id))
   .map(optionMethod).join('\n\n');
 
-const out = `// 이 파일은 gen_options.ts 가 schema.json 에서 만든다. 손으로 고치지 말 것.
+const out = `// 이 파일은 gen_options.ts 가 ytstudio.schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp ${SCHEMA.ytdlp_version} · 옵션 ${SCHEMA.options.length}개
 //   bun gen_options.ts
@@ -157,7 +160,7 @@ ${TYPES.map(t => `  ${t}?: string;`).join('\n')}
  * 설치된 yt-dlp 의 옵션 전부.
  *
  * \`Ytdlp\` 클래스와 선언 병합된다 — 런타임 메서드는 build.ts 가 같은
- * schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
+ * ytstudio.schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
  */
 export interface Options {
 ${optionMethods}

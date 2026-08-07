@@ -1,4 +1,4 @@
-// 이 파일은 gen_options.ts 가 schema.json 에서 만든다. 손으로 고치지 말 것.
+// 이 파일은 gen_options.ts 가 ytstudio.schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp 2026.07.04 · 옵션 191개
 //   bun gen_options.ts
@@ -243,7 +243,7 @@ export interface PathMap {
  * 설치된 yt-dlp 의 옵션 전부.
  *
  * `Ytdlp` 클래스와 선언 병합된다 — 런타임 메서드는 build.ts 가 같은
- * schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
+ * ytstudio.schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
  */
 export interface Options {
   /**

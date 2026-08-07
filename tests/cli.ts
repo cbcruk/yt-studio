@@ -15,11 +15,28 @@
  * 이 검사만은 소스가 아니라 산출물을 상대한다.
  */
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'lib', 'cli.js');
+const SCHEMA_FILE = 'ytstudio.schema.json';
+
+// 스키마 해석 순서를 보려면 저장소 밖의 디렉터리 둘이 필요하다 — 가짜 버전을
+// 박은 진짜 스키마 하나, 이름만 같고 우리 것이 아닌 JSON 하나.
+const TMP = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-cli-'));
+const FAKE = path.join(TMP, 'fake.schema.json');
+writeFileSync(FAKE, JSON.stringify({
+  ...JSON.parse(readFileSync(path.join(ROOT, SCHEMA_FILE), 'utf8')),
+  ytdlp_version: '9999.01.01',
+}));
+
+const DECOY = path.join(TMP, 'decoy');
+mkdirSync(DECOY, { recursive: true });
+writeFileSync(path.join(DECOY, SCHEMA_FILE),
+  JSON.stringify({ $schema: 'https://json-schema.org/draft/2020-12/schema' }));
 
 let pass = 0, fail = 0;
 
@@ -29,12 +46,18 @@ interface Run { code: number; out: string }
 // 러너를 따라가는데, 우리가 배포하는 건 `#!/usr/bin/env node` 짜리다.
 const NODE = 'node';
 
-/** CLI 를 돌리고 { code, out } 을 준다. NO_COLOR 로 색을 끈다. */
-function run(args: string[], stdin = ''): Run {
+/**
+ * CLI 를 돌리고 { code, out } 을 준다. NO_COLOR 로 색을 끈다.
+ *
+ * `cwd` 를 저장소 밖으로 돌리면 로컬 스키마 탐색을 피할 수 있다 — 스키마 해석
+ * 순서를 보는 검사가 그걸 쓴다.
+ */
+function run(args: string[], stdin = '', extra: Partial<Env> = {}): Run {
   try {
     const out = execFileSync(NODE, [CLI, ...args], {
       input: stdin, encoding: 'utf8', stdio: 'pipe',
-      env: { ...process.env, NO_COLOR: '1' },
+      cwd: extra.cwd ?? ROOT,
+      env: { ...process.env, NO_COLOR: '1', ...extra.env },
     });
     return { code: 0, out };
   } catch (err) {
@@ -43,6 +66,8 @@ function run(args: string[], stdin = ''): Run {
     return { code: e.status ?? -1, out: (e.stdout || '') + (e.stderr || '') };
   }
 }
+
+interface Env { cwd: string; env: Record<string, string> }
 
 function check(title: string, fn: () => string | void): void {
   try {
@@ -113,8 +138,47 @@ check('explain 은 토큰마다 무슨 옵션인지 말한다', () => {
 
 check('version 은 스키마가 나온 버전을 낸다', () => {
   const r = run(['version']);
-  assert(/^\d{4}\.\d{2}\.\d{2}$/.test(r.out.trim()), r.out);
-  return r.out.trim();
+  // 첫 줄만 버전이다 — 스키마 출처는 표준 오류로 나가므로 스크립트가 안 본다
+  assert(/^\d{4}\.\d{2}\.\d{2}$/.test(r.out.split('\n')[0]!.trim()), r.out);
+  return r.out.split('\n')[0]!.trim();
+});
+
+// 검증기의 값어치는 "설치된 실물과 대조한다"에 있다. 패키지에 실린 스키마는
+// 이 저장소를 구울 때의 yt-dlp 이지 손님 것이 아니므로, 손님이 제 것을 놓으면
+// 그게 이겨야 한다. 아래 셋이 그 순서를 지킨다.
+check('작업 디렉터리에 스키마가 없으면 패키지 내장을 쓴다', () => {
+  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '', { cwd: os.tmpdir() });
+  assert(r.code === 0, `종료 코드 ${r.code}\n${r.out}`);
+  assert(r.out.includes('패키지 내장'), r.out);
+});
+
+check('작업 디렉터리의 ytstudio.schema.json 이 이긴다', () => {
+  const r = run(['lint', 'yt-dlp https://youtu.be/abc']);
+  assert(r.out.includes(path.join(ROOT, SCHEMA_FILE)), r.out);
+});
+
+check('YTSTUDIO_SCHEMA 가 가장 세다', () => {
+  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '',
+    { cwd: os.tmpdir(), env: { YTSTUDIO_SCHEMA: FAKE } });
+  assert(r.out.includes('9999.01.01'), `가리킨 스키마를 안 봤다\n${r.out}`);
+  return '환경변수 > 작업 디렉터리 > 내장';
+});
+
+// 가리킨 것이 안 읽히면 조용히 내장으로 떨어지면 안 된다 — 그러면 엉뚱한
+// 버전으로 검사해 놓고 통과했다고 말하게 된다.
+check('YTSTUDIO_SCHEMA 가 헛다리면 조용히 넘어가지 않는다', () => {
+  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '',
+    { cwd: os.tmpdir(), env: { YTSTUDIO_SCHEMA: path.join(TMP, 'none.json') } });
+  assert(r.code !== 0, `조용히 통과했다\n${r.out}`);
+  assert(r.out.includes('읽지 못했다'), r.out);
+});
+
+// 남의 프로젝트 루트에 JSON Schema 가 이 이름으로 있을 수 있다. 모양이 아니면
+// 없는 것으로 쳐야지, 집어 들고 터지면 안 된다.
+check('우리 것이 아닌 JSON 은 없는 것으로 친다', () => {
+  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '', { cwd: DECOY });
+  assert(r.code === 0, `종료 코드 ${r.code}\n${r.out}`);
+  assert(r.out.includes('패키지 내장'), r.out);
 });
 
 check('인자 없이 부르면 쓰는 법을 낸다', () => {

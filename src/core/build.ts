@@ -210,7 +210,7 @@ const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
  * 스키마에서 자란 188개 메서드가 여기 합쳐진다.
  *
  * 클래스와 인터페이스 선언 병합 — 런타임은 `grow()` 가 프로토타입에 심고,
- * 타입은 생성기가 낸다. 둘 다 schema.json 한 곳에서 나오므로 어긋날 수 없다.
+ * 타입은 생성기가 낸다. 둘 다 스키마 한 곳에서 나오므로 어긋날 수 없다.
  */
 export interface Ytdlp extends Options {}
 

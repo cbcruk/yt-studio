@@ -16,7 +16,8 @@
 import { readFileSync } from 'node:fs';
 
 import {
-  YTDLP_VERSION, explainCommand, lintCommand, previewFilename, suggestNext,
+  SCHEMA_SOURCE, YTDLP_VERSION,
+  explainCommand, lintCommand, previewFilename, suggestNext,
 } from './index.js';
 import type { LintResult } from './index.js';
 
@@ -34,14 +35,25 @@ const HELP = `ytstudio — 설치된 yt-dlp(${YTDLP_VERSION}) 에 명령어를 �
 
   ytstudio lint <명령어>       스키마와 문법에 어긋나는 곳을 찾는다
   ytstudio explain <명령어>    토큰마다 무슨 옵션인지 말한다
-  ytstudio version             이 타입들이 나온 yt-dlp 버전
+  ytstudio version             지금 대조하는 스키마의 yt-dlp 버전
 
 명령어를 인자로 주거나 표준 입력으로 흘려 넣는다.
 
   ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
   pbpaste | ytstudio lint
 
-오류가 있으면 1 로 끝난다.`;
+오류가 있으면 1 로 끝난다.
+
+기본은 패키지에 실린 스키마다. 당신이 깐 yt-dlp 에 대조하려면 리플렉션한 것을
+작업 디렉터리에 ytstudio.schema.json 으로 두거나 YTSTUDIO_SCHEMA 로 가리킨다.
+
+  python3 gen_schema.py > ytstudio.schema.json`;
+
+/** 어느 스키마를 봤는지 한 줄. 이게 없으면 판정이 무엇에 대한 판정인지 모른다. */
+function source(): string {
+  const where = SCHEMA_SOURCE.from === 'bundled' ? '패키지 내장' : SCHEMA_SOURCE.path;
+  return `${where} ${dim(`(yt-dlp ${SCHEMA_SOURCE.version})`)}`;
+}
 
 /**
  * 인자로 줬으면 그걸, 아니면 표준 입력을 통째로.
@@ -78,6 +90,7 @@ function report(r: LintResult): void {
     : warn ? yellow(`경고 ${warn}개`)
       : c(32, '확인됨');
   console.log(`${dim('판정')}      ${verdict} ${dim(`· 옵션 ${opts}개를 스키마 ${total}개와 대조`)}`);
+  console.log(`${dim('스키마')}    ${source()}`);
 
   // 오류가 없을 때만 다음 걸음을 권한다 — 틀린 걸 두고 권하면 소음이다
   if (!error) {
@@ -103,7 +116,9 @@ if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
   process.exit(0);
 }
 if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
+  // 버전만 표준 출력으로 낸다 — 스크립트가 이걸 그대로 읽는다.
   console.log(YTDLP_VERSION);
+  console.error(dim(`스키마  ${source()}`));
   process.exit(0);
 }
 if (cmd !== 'lint' && cmd !== 'explain') {
