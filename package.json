@@ -2,6 +2,8 @@
   "name": "ytstudio",
   "version": "0.1.0",
   "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기",
+  "license": "MIT",
+  "author": "cbcruk",
   "type": "module",
   "scripts": {
     "gen:types": "bun gen_options.ts",
