@@ -17,14 +17,14 @@
  * 곳에서 나온다(gen_options.mjs). 그래서 사용자가 깐 yt-dlp 에 없는 옵션은
  * 자동완성에 뜨지 않고, 런타임과 타입이 어긋날 수도 없다.
  *
- * DOM 도 파일 시스템도 모른다. `initSchema` 가 먼저 불려 있어야 한다.
+ * DOM 도 파일 시스템도 모른다. 스키마는 인자로 받는다 — `makeYtdlp(schema)`.
  */
-import { BY_ID, OPTS } from './schema.js';
+
 import { SELECTORS, emitTree } from './format-grammar.js';
 import { FIELDS, emitPiece } from './output-template.js';
 import { lintCommand } from './lint.js';
 import { quote } from './command.js';
-import type { Opt } from './schema.js';
+import type { Opt, Schema } from './schema.js';
 import { methodName, selMethod } from './env-types.js';
 
 import type { Filter, FormatNode, FormatOp } from './format-grammar.js';
@@ -59,7 +59,6 @@ export { methodName, selMethod };
  */
 const flagOf = (opt: Opt): string => opt.short || opt.flag;
 
-const optOf = (id: string): Opt => BY_ID[id];
 
 const COND_OPS: Record<string, string> = {
   lt: '<', lte: '<=', gt: '>', gte: '>=', eq: '=', ne: '!=',
@@ -215,10 +214,18 @@ const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
 export interface Ytdlp extends Options {}
 
 export class Ytdlp {
+  /** 이 명령어가 대조하는 스키마. 인스턴스마다 제 것을 든다. */
+  readonly schema: Schema;
   urls: string[] = [];
   parts: Part[] = [];                  // 쓴 순서 그대로 나간다
 
-  constructor(urls: string[] = []) { this.url(...urls); }
+  constructor(schema: Schema, urls: string[] = []) {
+    this.schema = schema;
+    this.url(...urls);
+  }
+
+  /** 옵션 하나를 스키마에서 꺼낸다. */
+  private opt(id: string): Opt { return this.schema.byId[id]!; }
 
   /** URL 을 더한다. 늘 명령어 끝에 온다. */
   url(...urls: string[]): this {
@@ -234,7 +241,7 @@ export class Ytdlp {
    * repeatable 만 쌓인다.
    */
   place(id: string, flag: string, value?: string): this {
-    if (optOf(id).kind !== 'repeatable') {
+    if (this.opt(id).kind !== 'repeatable') {
       const at = this.parts.findIndex(p => p.id === id);
       if (at >= 0) { this.parts[at] = { id, flag, value }; return this; }
     }
@@ -258,7 +265,7 @@ export class Ytdlp {
   format(selector: string): this;
   format(arg: string | ((f: FormatFactory) => Expr)): this {
     const v = typeof arg === 'function' ? String(arg(formatFactory())) : String(arg);
-    return this.place('format', flagOf(optOf('format')), v);
+    return this.place('format', flagOf(this.opt('format')), v);
   }
 
   /**
@@ -277,21 +284,24 @@ export class Ytdlp {
     const body = typeof arg === 'function'
       ? (arg as (t: OutTag) => Template)(outTag()) : arg;
     const text = String(body);
-    return this.place('output', flagOf(optOf('output')), type ? `${type}:${text}` : text);
+    return this.place('output', flagOf(this.opt('output')), type ? `${type}:${text}` : text);
   }
 
   /** `-P` — 종류별 저장 경로. */
   paths(map: PathMap): this {
     for (const [type, path] of Object.entries(map || {})) {
       if (path == null) continue;
-      this.place('paths', flagOf(optOf('paths')), type === 'home' ? String(path) : `${type}:${path}`);
+      this.place('paths', flagOf(this.opt('paths')), type === 'home' ? String(path) : `${type}:${path}`);
     }
     return this;
   }
 
   /** 지금까지 쌓은 것을 그대로 복사한다. */
-  clone(): Ytdlp {
-    const c = new Ytdlp();
+  clone(): this {
+    // new Ytdlp() 로 만들면 자란 메서드가 없는 껍데기가 된다 — 옵션 메서드는
+    // 스키마마다 만든 하위 클래스의 프로토타입에 심겨 있다.
+    const Self = this.constructor as new (schema: Schema) => this;
+    const c = new Self(this.schema);
     c.urls = [...this.urls];
     c.parts = this.parts.map(p => ({ ...p }));
     return c;
@@ -325,7 +335,7 @@ export class Ytdlp {
    * 타입이 못 보는 층이라 빌더가 있어도 검증기가 없어지지 않는다.
    */
   lint(): { ok: boolean; issues: Issue[] } {
-    const { ok, issues } = lintCommand(this.build());
+    const { ok, issues } = lintCommand(this.schema, this.build());
     return { ok, issues };
   }
 
@@ -333,22 +343,17 @@ export class Ytdlp {
 }
 
 /**
- * 188개 메서드를 스키마에서 기른다.
+ * 188개 메서드를 스키마에서 길러 프로토타입에 심는다.
  *
  * 손으로 적은 목록이 없다는 게 요점이다 — yt-dlp 가 옵션을 더하면
- * `gen_schema.py` 와 `gen_options.mjs` 를 다시 돌리는 것만으로 메서드와 타입이
+ * `gen_schema.py` 와 `gen_options.ts` 를 다시 돌리는 것만으로 메서드와 타입이
  * 같이 생긴다.
  *
- * 첫 `ytdlp()` 때 기른다. 모듈 본문에서 하면 `initSchema` 보다 먼저 돌아서
- * 아무것도 안 생긴다 — ESM 은 본문보다 import 를 먼저 실행한다.
+ * **프로토타입을 인자로 받는다.** 스키마마다 옵션 목록이 다를 수 있으므로
+ * `Ytdlp.prototype` 한 곳에 심으면 나중 스키마가 앞엣것을 덮는다.
  */
-let grown = -1;
-
-export function grow(): void {
-  if (grown === OPTS.length) return;
-  const proto = Ytdlp.prototype as unknown as Record<string, unknown>;
-
-  for (const opt of OPTS) {
+function grow(schema: Schema, proto: Record<string, unknown>): void {
+  for (const opt of schema.opts) {
     if (HAND_WRITTEN.has(opt.id)) continue;
 
     proto[methodName(opt.flag)] =
@@ -367,11 +372,17 @@ export function grow(): void {
             return this.place(opt.id, flagOf(opt), String(value));
           };
   }
-  grown = OPTS.length;
 }
 
-/** 새 명령어를 시작한다. */
-export function ytdlp(...urls: string[]): Ytdlp {
-  grow();
-  return new Ytdlp(urls);
+/**
+ * 스키마 하나에 묶인 `ytdlp()` 를 만든다.
+ *
+ * 스키마마다 **제 하위 클래스**를 만들어 거기에 메서드를 심는다. 그래서 스키마
+ * 둘을 나란히 들어도 서로의 메서드를 덮지 않는다 — 예전에는 `Ytdlp.prototype`
+ * 한 곳에 심어서 나중 것이 이겼다.
+ */
+export function makeYtdlp(schema: Schema): (...urls: string[]) => Ytdlp {
+  class Bound extends Ytdlp {}
+  grow(schema, Bound.prototype as unknown as Record<string, unknown>);
+  return (...urls: string[]) => new Bound(schema, urls);
 }

@@ -250,13 +250,35 @@ declare module 'ytstudio' {
 돌리지 않았거나 돌린 뒤 yt-dlp 를 또 올렸으면, 코드에서 그 어긋남을 볼 수 있다.
 
 ```ts
-import { SCHEMA_SOURCE } from 'ytstudio';
+import { ytstudio } from 'ytstudio';
 
-SCHEMA_SOURCE.from;          // 'local' | 'env' | 'bundled'
-SCHEMA_SOURCE.version;       // '2026.09.01'  검증기가 대조하는 것
-SCHEMA_SOURCE.typesVersion;  // '2026.07.04'  패키지에 박힌 것
-SCHEMA_SOURCE.stale;         // true — 둘이 갈렸다
+const yt = ytstudio();
+yt.source.from;          // 'local' | 'env' | 'bundled'
+yt.source.version;       // '2026.09.01'  이 손잡이가 대조하는 것
+yt.source.typesVersion;  // '2026.07.04'  패키지에 박힌 것
+yt.source.stale;         // true — 둘이 갈렸다
 ```
+
+### 스키마는 값이다
+
+`ytstudio()` 가 스키마 하나에 묶인 **손잡이**를 준다. 평평한 함수들
+(`lintCommand` · `ytdlp` …)은 게으르게 만든 기본 손잡이에 얹혀 있을 뿐이라,
+직접 만들면 **스키마 둘을 나란히 들 수 있다.**
+
+```ts
+const mine = ytstudio();                        // 환경변수 → 작업 디렉터리 → 내장
+const theirs = ytstudio({ cwd: '/other/repo' });
+const pinned = ytstudio({ raw: someSchemaJson });
+
+mine.lint(cmd);          theirs.lint(cmd);      // 서로를 안 건드린다
+mine.ytdlp(url);         theirs.ytdlp(url);     // 메서드 목록도 각자다
+```
+
+한동안은 반대였다 — `core/schema.ts` 가 `export let OPTS/BY_ID/…` 를 들고
+`initSchema` 가 채우는 모양이라, 스키마를 두 번 로드하면 앞엣것이 오염됐다.
+그것도 `VERSION` 은 그대로 두고 동작만 바뀌어서 **모듈이 자기 상태에 대해
+거짓말을 했다.** 검사가 해석 순서를 보려면 경우마다 프로세스를 새로 띄워야 했고,
+그게 모양이 틀렸다는 신호였다.
 
 ### 왜 파이썬이 아니라 `--help` 인가
 
@@ -281,7 +303,7 @@ SCHEMA_SOURCE.stale;         // true — 둘이 갈렸다
 
 ```
 src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript 다
-  schema.ts          리플렉션한 JSON → 색인 (Opt · Stage 타입이 여기서 난다)
+  schema.ts          리플렉션한 JSON → 색인. 값이다 — 가변 전역이 없다
   build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
   options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.ts 가 만든다)
   lint.ts            명령어 진단 — 이 도구의 중심
@@ -292,10 +314,10 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   paths.ts           -P 항목 한 줄 읽기
   help-schema.ts     yt-dlp --help 파서 — 손님 쪽 리플렉션
   env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
-src/index.ts         공개 API (빌더 + 검증기) · 스키마를 읽는 유일한 자리
+src/index.ts         공개 API — ytstudio() 손잡이 · 스키마를 읽는 유일한 자리
 src/cli.ts           ytstudio lint · explain · types
 tests/               전부 bun:test. `bun test` 하나로 다 돈다
-  unit/*.test.ts     순수 로직 (92개)
+  unit/*.test.ts     순수 로직 (101개 — 스키마 해석 순서도 여기다)
   cli.test.ts        프로세스로서의 CLI — 종료 코드 · 파이프 · 스키마 해석 순서
   types.test.ts      ytstudio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
   drift.test.ts      실물 yt-dlp 와 대조. yt-dlp 가 없으면 건너뛴다
@@ -400,7 +422,7 @@ git push --follow-tags            # 태그가 밀리면 발행 잡이 돈다
 ## 한계
 
 - **`ytstudio types` 를 안 돌렸으면 이 저장소에 커밋된 yt-dlp 버전 기준이다.**
-  기본값이 그쪽이라 명시적으로 한 번 뽑아야 한다. `SCHEMA_SOURCE.stale` 과
+  기본값이 그쪽이라 명시적으로 한 번 뽑아야 한다. `ytstudio().source.stale` 과
   `ytstudio lint` 의 `스키마` 줄이 어느 쪽인지 늘 말한다.
 - **확장 선언은 더하기만 된다.** 당신 yt-dlp 에서 **없어진** 옵션은 자동완성에
   계속 뜬다. `@deprecated` 로 취소선만 긋는다 — 검증기는 제대로 잡는다.

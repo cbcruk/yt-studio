@@ -9,10 +9,10 @@
  *   · 이 명령어가 만들 **파일명**이 어떤 모양인지
  *   · 지금 옵션 조합에 이어서 줄 만한 것이 무엇인지
  */
-import { BY_ID, STAGE } from './schema.js';
+
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
-import type { Opt } from './schema.js';
+import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Values } from './lint.js';
 
@@ -71,7 +71,7 @@ export function previewFilename(values: Values): FilePreview {
 }
 
 /** 토큰 하나를 한 줄로 설명한다. */
-export function explainItem(it: Item): Explained {
+export function explainItem(schema: Schema, it: Item): Explained {
   if (it.kind === 'url') return { kind: 'url', text: it.raw, ko: '받을 대상' };
   if (it.kind === 'unknown') return { kind: 'unknown', text: it.raw, ko: '읽지 못한 토큰' };
   const { opt, negated, value } = it;
@@ -81,13 +81,14 @@ export function explainItem(it: Item): Explained {
     id: opt.id,
     text: it.raw,
     stage: opt.stage,
-    stageLabel: STAGE[opt.stage]?.label || opt.stage,
+    stageLabel: schema.stage[opt.stage]?.label || opt.stage,
     value,
     ko: negated ? `${help} — 끄기` : help,
   };
 }
 
-export const explainCommand = (items: Item[]): Explained[] => items.map(explainItem);
+export const explainCommand = (schema: Schema, items: Item[]): Explained[] =>
+  items.map(it => explainItem(schema, it));
 
 /**
  * 지금 조합에서 자연스럽게 따라오는 옵션들.
@@ -116,10 +117,10 @@ const RULES: { when: (v: Values) => unknown; ids: string[]; why: string }[] = [
 /** 아무 규칙도 안 걸릴 때. 처음 만든 명령어에도 다음 걸음이 있어야 한다. */
 const STARTERS = ['format', 'output', 'paths', 'download-archive', 'embed-metadata'];
 
-export function suggestNext(values: Values, limit = 6): Suggestion[] {
+export function suggestNext(schema: Schema, values: Values, limit = 6): Suggestion[] {
   const out: Suggestion[] = [];
   const push = (id: string, why: string): void => {
-    const o = BY_ID[id];
+    const o = schema.byId[id];
     if (!o || id in values || out.some(x => x.opt.id === id)) return;
     out.push({ opt: o, why });
   };

@@ -17,13 +17,13 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
-import {
-  BUNDLED, SCHEMA_SOURCE, YTDLP_VERSION,
-  explainCommand, lintCommand, previewFilename, suggestNext,
-} from './index.js';
+import { BUNDLED, previewFilename, ytstudio } from './index.js';
 import { emitEnvTypes } from './core/env-types.js';
 import { parseHelp } from './core/help-schema.js';
 import type { LintResult } from './index.js';
+
+// 스키마를 여기서 한 번 정한다. 이 프로세스가 무엇에 대조하는지가 이 한 줄이다.
+const yt = ytstudio();
 
 // 파이프로 넘길 때는 색을 끈다 — 색코드가 grep 에 걸리면 곤란하다.
 const tty = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -35,7 +35,7 @@ const bold = (s: string) => c(1, s);
 
 const MARK = { error: red('✗'), warn: yellow('!'), info: dim('·') };
 
-const HELP = `ytstudio — 설치된 yt-dlp(${YTDLP_VERSION}) 에 명령어를 대조한다
+const HELP = `ytstudio — 설치된 yt-dlp(${yt.source.version}) 에 명령어를 대조한다
 
   ytstudio lint <명령어>       스키마와 문법에 어긋나는 곳을 찾는다
   ytstudio explain <명령어>    토큰마다 무슨 옵션인지 말한다
@@ -60,8 +60,8 @@ const HELP = `ytstudio — 설치된 yt-dlp(${YTDLP_VERSION}) 에 명령어를 �
 
 /** 어느 스키마를 봤는지 한 줄. 이게 없으면 판정이 무엇에 대한 판정인지 모른다. */
 function source(): string {
-  const where = SCHEMA_SOURCE.from === 'bundled' ? '패키지 내장' : SCHEMA_SOURCE.path;
-  return `${where} ${dim(`(yt-dlp ${SCHEMA_SOURCE.version})`)}`;
+  const where = yt.source.from === 'bundled' ? '패키지 내장' : yt.source.path;
+  return `${where} ${dim(`(yt-dlp ${yt.source.version})`)}`;
 }
 
 /**
@@ -103,14 +103,14 @@ function report(r: LintResult): void {
 
   // 오류가 없을 때만 다음 걸음을 권한다 — 틀린 걸 두고 권하면 소음이다
   if (!error) {
-    const next = suggestNext(r.values).slice(0, 4);
+    const next = yt.suggest(r.values).slice(0, 4);
     if (next.length) console.log(`${dim('이어서')}    ${next.map(s => s.opt.flag).join('  ')}`);
   }
 }
 
 /** 토큰마다 무슨 옵션인지. 검사는 안 하고 읽어 주기만 한다. */
 function explain(r: LintResult): void {
-  for (const row of explainCommand(r.items)) {
+  for (const row of yt.explain(r.items)) {
     const where = row.stageLabel ? dim(`  [${row.stageLabel}]`) : '';
     console.log(`${bold(row.text)}${where}\n    ${row.ko}`);
   }
@@ -213,7 +213,7 @@ if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
 }
 if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
   // 버전만 표준 출력으로 낸다 — 스크립트가 이걸 그대로 읽는다.
-  console.log(YTDLP_VERSION);
+  console.log(yt.source.version);
   console.error(dim(`스키마  ${source()}`));
   process.exit(0);
 }
@@ -230,7 +230,7 @@ if (!text) {
   process.exit(2);
 }
 
-const result = lintCommand(text);
+const result = yt.lint(text);
 if (cmd === 'explain') explain(result);
 else report(result);
 

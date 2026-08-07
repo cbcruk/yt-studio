@@ -8,19 +8,20 @@
  *   · 종료 코드로 말하는가 (스크립트와 CI 가 그걸 본다)
  *   · 표준 입력으로 흘려 넣어도 되는가 (파이프)
  *   · 색을 안 쓸 때 글자만 깨끗이 나오는가 (grep)
+ *   · 배포하는 `lib/` 가 노드에서 실제로 도는가
  *
- * 그중 **스키마 해석 순서**가 이 파일을 대체 불가능하게 만든다. `src/index.ts`
- * 는 모듈 최상단에서 스키마를 정하고 `initSchema` 가 프로세스 전역을 덮어쓰기
- * 때문에, 한 프로세스에서 두 번 로드하면 앞엣것이 오염된다 — 그것도 버전은
- * 그대로 두고 동작만 바뀐다. 경우마다 새 프로세스를 띄우는 수밖에 없다.
+ * **여기 스키마 해석 순서 검사가 다섯 개 있었다.** 스키마가 프로세스 전역이라
+ * 경우마다 프로세스를 새로 띄우는 수밖에 없었기 때문이다. 그건 이 파일이 필요한
+ * 이유가 아니라 `core/schema.ts` 가 잘못 생겼다는 증상이었다 — 검사가 인터페이스를
+ * 우회하는 정도가 아니라 프로세스를 갈라야 했으니까.
  *
- * (`lib/` 를 노드로 띄우는 것 자체는 `types.test.ts` 도 한다. 그건 이 파일만의
- * 이유가 아니다.)
+ * 스키마를 값으로 바꾸면서 그 다섯은 `unit/resolve.test.ts` 로 갔다. 여기 남은
+ * 하나는 순서가 아니라 **CLI 가 그걸 화면에 말하는가**다.
  */
 import { beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -29,24 +30,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'lib', 'cli.js');
 const SCHEMA_FILE = 'ytstudio.schema.json';
 
-// 스키마 해석 순서를 보려면 저장소 밖의 디렉터리 둘이 필요하다 — 가짜 버전을
-// 박은 진짜 스키마 하나, 이름만 같고 우리 것이 아닌 JSON 하나.
-const TMP = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-cli-'));
-const FAKE = path.join(TMP, 'fake.schema.json');
-const DECOY = path.join(TMP, 'decoy');
-
 beforeAll(() => {
   // 이 검사는 소스가 아니라 **컴파일한 산출물**을 상대한다. 없으면 왜 없는지
   // 말해 준다 — 안 그러면 "빌드를 안 했다"가 엉뚱한 실패로 보인다.
   assert.ok(existsSync(CLI), `${CLI} 가 없다 — 'bun run build' 를 먼저 돌릴 것`);
-
-  writeFileSync(FAKE, JSON.stringify({
-    ...JSON.parse(readFileSync(path.join(ROOT, SCHEMA_FILE), 'utf8')),
-    ytdlp_version: '9999.01.01',
-  }));
-  mkdirSync(DECOY, { recursive: true });
-  writeFileSync(path.join(DECOY, SCHEMA_FILE),
-    JSON.stringify({ $schema: 'https://json-schema.org/draft/2020-12/schema' }));
 });
 
 interface Run { code: number; out: string }
@@ -120,41 +107,15 @@ test('version 은 첫 줄에 버전만 낸다 — 스크립트가 그걸 읽는�
   assert.match(r.out.split('\n')[0]!.trim(), /^\d{4}\.\d{2}\.\d{2}$/);
 });
 
-// 검증기의 값어치는 "설치된 실물과 대조한다"에 있다. 패키지에 실린 스키마는
-// 이 저장소를 구울 때의 yt-dlp 이지 손님 것이 아니므로, 손님이 제 것을 놓으면
-// 그게 이겨야 한다. 아래 셋이 그 순서를 지킨다.
-test('작업 디렉터리에 스키마가 없으면 패키지 내장을 쓴다', () => {
-  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '', { cwd: os.tmpdir() });
-  assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /패키지 내장/);
-});
+// 해석 순서 자체는 unit/resolve.test.ts 가 본다 — 스키마가 값이 된 뒤로는
+// 프로세스를 안 갈라도 된다. 여기 남은 하나는 **CLI 가 그걸 화면에 말하는가**다.
+// 판정만 있고 무엇에 대조했는지가 없으면 판정을 읽을 수 없다.
+test('무엇에 대조했는지 판정 옆에 적는다', () => {
+  const here = run(['lint', 'yt-dlp https://youtu.be/abc']);
+  assert.ok(here.out.includes(path.join(ROOT, SCHEMA_FILE)), here.out);
 
-test('작업 디렉터리의 ytstudio.schema.json 이 이긴다', () => {
-  const r = run(['lint', 'yt-dlp https://youtu.be/abc']);
-  assert.ok(r.out.includes(path.join(ROOT, SCHEMA_FILE)), r.out);
-});
-
-test('YTSTUDIO_SCHEMA 가 가장 세다 — 환경변수 > 작업 디렉터리 > 내장', () => {
-  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '',
-    { cwd: os.tmpdir(), env: { YTSTUDIO_SCHEMA: FAKE } });
-  assert.match(r.out, /9999\.01\.01/, `가리킨 스키마를 안 봤다\n${r.out}`);
-});
-
-// 가리킨 것이 안 읽히면 조용히 내장으로 떨어지면 안 된다 — 그러면 엉뚱한
-// 버전으로 검사해 놓고 통과했다고 말하게 된다.
-test('YTSTUDIO_SCHEMA 가 헛다리면 조용히 넘어가지 않는다', () => {
-  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '',
-    { cwd: os.tmpdir(), env: { YTSTUDIO_SCHEMA: path.join(TMP, 'none.json') } });
-  assert.notEqual(r.code, 0, `조용히 통과했다\n${r.out}`);
-  assert.match(r.out, /읽지 못했다/);
-});
-
-// 남의 프로젝트 루트에 JSON Schema 가 이 이름으로 있을 수 있다. 모양이 아니면
-// 없는 것으로 쳐야지, 집어 들고 터지면 안 된다.
-test('우리 것이 아닌 JSON 은 없는 것으로 친다', () => {
-  const r = run(['lint', 'yt-dlp https://youtu.be/abc'], '', { cwd: DECOY });
-  assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /패키지 내장/);
+  const outside = run(['lint', 'yt-dlp https://youtu.be/abc'], '', { cwd: os.tmpdir() });
+  assert.match(outside.out, /패키지 내장/);
 });
 
 test('인자 없이 부르면 쓰는 법을 낸다', () => {

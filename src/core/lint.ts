@@ -14,12 +14,12 @@
  *
  * DOM 도 앱 상태도 모른다. 문자열 하나가 들어가고 진단 목록이 나온다.
  */
-import { BY_FLAG, BY_ID, OPTS } from './schema.js';
+
 import { scanCommand } from './command.js';
 import { parseFormat } from './format-grammar.js';
 import { parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
-import type { Opt } from './schema.js';
+import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Piece } from './output-template.js';
 
@@ -72,12 +72,12 @@ export function distance(a: string, b: string): number {
  * 거리로만 고르면 `--foo` 에 엉뚱한 세 글자짜리가 붙는다. 길이에 비례한
  * 문턱을 두고, 그래도 없으면 부분 문자열로 한 번 더 본다.
  */
-export function nearestFlags(flag: string, limit = 3): string[] {
+export function nearestFlags(schema: Schema, flag: string, limit = 3): string[] {
   const q = String(flag || '').replace(/^-+/, '').toLowerCase();
   if (!q) return [];
   // 앞이 같으면 가깝게 본다. 거리만 보면 --embed-subtitle 에 엉뚱한 짧은
   // 플래그가 붙는다 — 사람이 틀리는 자리는 대개 뒤쪽이다.
-  const scored = Object.keys(BY_FLAG).filter(f => f.startsWith('--')).map(f => {
+  const scored = Object.keys(schema.byFlag).filter(f => f.startsWith('--')).map(f => {
     const name = f.replace(/^-+/, '').toLowerCase();
     let p = 0;
     while (p < q.length && p < name.length && q[p] === name[p]) p++;
@@ -170,8 +170,8 @@ function crossChecks(has: (id: string) => boolean, val: (id: string) => string |
  *
  * issues: { level, msg, flag?, opt?, fixes? } — 심각한 것부터.
  */
-export function lintCommand(text: string): LintResult {
-  const { items } = scanCommand(text);
+export function lintCommand(schema: Schema, text: string): LintResult {
+  const { items } = scanCommand(schema, text);
   const issues: Issue[] = [];
   const urls = items.filter(i => i.kind === 'url').map(i => i.raw);
   const values: Values = {};               // optId → 값 (repeatable 은 배열)
@@ -180,12 +180,12 @@ export function lintCommand(text: string): LintResult {
   for (const it of items) {
     if (it.kind === 'unknown') {
       if (it.why === 'no-flag') {
-        const fixes = nearestFlags(it.flag);
+        const fixes = nearestFlags(schema, it.flag);
         issues.push({ level: 'error', flag: it.flag, fixes,
           msg: `${it.flag} 는 이 yt-dlp 버전에 없는 플래그다`
             + (fixes.length ? ` — ${fixes.join(' · ')} 를 찾은 것 아닐까` : '') });
       } else if (it.why === 'no-value') {
-        const o: Opt = BY_FLAG[it.flag].opt;
+        const o: Opt = schema.byFlag[it.flag]!.opt;
         issues.push({ level: 'error', flag: it.flag, opt: o.id,
           msg: `${it.flag} 는 값이 필요하다 (${o.metavar || 'VALUE'})` });
       } else {
@@ -211,7 +211,7 @@ export function lintCommand(text: string): LintResult {
   }
 
   for (const id in count) {
-    const o = BY_ID[id];
+    const o = schema.byId[id];
     if (count[id] > 1 && o.kind !== 'repeatable') {
       issues.push({ level: 'warn', opt: id,
         msg: `${o.flag} 를 ${count[id]}번 줬다 — 마지막 것만 쓰인다` });
@@ -254,7 +254,7 @@ export function lintCommand(text: string): LintResult {
       warn: issues.filter(i => i.level === 'warn').length,
       info: issues.filter(i => i.level === 'info').length,
       opts: Object.keys(count).length,
-      total: OPTS.length,
+      total: schema.opts.length,
     },
   };
 }
