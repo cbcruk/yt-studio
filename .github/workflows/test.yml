@@ -21,7 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # node --test 의 글로브(`tests/unit/*.test.mjs`)는 21 이상에서만 된다.
+      # 단위 테스트는 bun 이 돌린다. 노드가 여기 있는 건 CLI 검사 때문이다 —
+      # 배포하는 물건이 `#!/usr/bin/env node` 짜리라 그걸로 띄워 봐야 한다.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
