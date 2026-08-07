@@ -97,7 +97,15 @@ function readBundled(): RawSchema {
   if (!raw) throw new Error(`패키지에 ${SCHEMA_FILE} 이 없다 — 설치가 깨졌다`);
   return raw;
 }
-const bundled = readBundled();
+/**
+ * 패키지에 실려 온 스키마 그대로.
+ *
+ * **타입이 나온 자리**라서 `ytstudio types` 가 기준선으로 쓴다 — 만드는 `.d.ts`
+ * 가 이걸 확장하므로, "새 옵션"은 늘 이것 대비여야 한다. 지금 켜진 스키마
+ * (`SCHEMA_SOURCE`)를 기준으로 잡으면 두 번째 실행부터 어긋난다.
+ */
+export const BUNDLED: RawSchema = readBundled();
+const bundled = BUNDLED;
 
 /**
  * 로컬 우선, 없으면 패키지에 실린 것.

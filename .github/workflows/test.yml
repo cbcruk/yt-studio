@@ -54,3 +54,10 @@ jobs:
       # 이쪽은 반대로 컴파일한 lib/ 를 노드로 띄운다. 배포하는 물건이 그거다.
       - name: CLI
         run: npm run test:cli
+
+      # ytstudio types 는 손님 프로젝트에 파일을 쓴다. 그래서 임시 프로젝트를
+      # 세우고, 만들어진 .d.ts 를 진짜 tsc 로 컴파일해 본다. yt-dlp 는 안
+      # 깔아도 된다 — 이 명령이 보는 건 --version 과 --help 출력뿐이라
+      # 붙박이 도움말을 뱉는 껍데기가 곧 실물이다.
+      - name: types 명령
+        run: npm run test:types

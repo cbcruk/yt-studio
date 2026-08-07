@@ -11,9 +11,10 @@
     "check:types": "tsc -p tsconfig.test.json",
     "test:unit": "bun test tests/unit",
     "test:cli": "npm run build && bun tests/cli.ts",
-    "test": "npm run check:types && npm run test:unit && npm run test:cli",
+    "test": "npm run check:types && npm run test:unit && npm run test:cli && npm run test:types",
     "cli": "bun src/cli.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test:types": "npm run build && bun tests/types-cmd.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

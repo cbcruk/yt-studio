@@ -18,25 +18,17 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
+// 이름 규칙 · JSDoc 이스케이프 · 메서드 시그니처는 여기 한 벌만 있다.
+// `ytstudio types` 도 같은 것을 쓴다 — 두 생성기가 같은 모양을 내야 한다.
+import { HAND_WRITTEN, doc, optionMethod, selMethod, union } from './src/core/env-types.js';
 import { FKEYS, SELECTORS, SEL_HELP } from './src/core/format-grammar.js';
 import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-template.js';
-import type { Opt, RawSchema } from './src/core/schema.js';
+import type { RawSchema } from './src/core/schema.js';
 
 const SCHEMA: RawSchema = JSON.parse(
   readFileSync(new URL('./ytstudio.schema.json', import.meta.url), 'utf8'),
 );
 
-// 이름 규칙은 build.ts 와 **같아야 한다**. 여기서 타입 이름을, 저기서 런타임
-// 메서드 이름을 만드는데 둘이 어긋나면 타입은 있고 메서드는 없는 칸이 생긴다.
-const methodName = (flag: string): string =>
-  String(flag).replace(/^--?/, '').replace(/-+([a-z0-9])/g, (_, c: string) => c.toUpperCase());
-const selMethod = (sel: string): string => sel.replace('*', 'Star');
-
-// 도움말을 JSDoc 안에 안전하게 넣는다. 닫는 기호가 그대로 들어오면 주석이
-// 거기서 끝나 버린다 — 방금 이 파일이 그것 때문에 한 번 깨졌다.
-const doc = (s: string): string =>
-  String(s || '').replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
-const union = (xs: readonly string[]): string => xs.map(x => `'${x}'`).join(' | ');
 
 // 어휘 표들은 손으로 적는 층이다(format-grammar.ts · output-template.ts).
 // 자동완성에 뜨는 한국어 설명이 전부 거기서 나온다.
@@ -49,32 +41,10 @@ const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
 ).join('\n');
 
-// -f · -o · -P 는 값 자체가 구조라 build.ts 가 손으로 쓴 시그니처를 갖는다.
-const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
-
-function optionMethod(o: Opt): string {
-  const name = methodName(o.flag);
-  const alias = [o.short, ...(o.aliases || [])].filter(Boolean);
-  const lines = [
-    '  /**',
-    `   * \`${o.flag}\`${alias.length ? ` (${alias.join(' · ')})` : ''} — ${doc(o.help)}`,
-    '   *',
-    `   * @stage ${o.stage} · ${doc(o.group)}`,
-  ];
-  if (o.negation) lines.push(`   * @remarks \`.${name}(false)\` → \`${o.negation}\``);
-  lines.push('   */');
-
-  const sig = o.kind === 'flag' ? 'on?: boolean'
-    : o.kind === 'choice' ? `value: ${union(o.choices ?? [])}`
-      : o.kind === 'repeatable' ? '...values: Arg[]'
-        : `value: Arg`;
-  lines.push(`  ${name}(${sig}): this;`);
-  return lines.join('\n');
-}
-
+// map 에 그대로 넘기면 안 된다 — optionMethod 의 둘째 인자에 인덱스가 꽂힌다.
 const optionMethods = SCHEMA.options
   .filter(o => !HAND_WRITTEN.has(o.id))
-  .map(optionMethod).join('\n\n');
+  .map(o => optionMethod(o)).join('\n\n');
 
 const out = `// 이 파일은 gen_options.ts 가 ytstudio.schema.json 에서 만든다. 손으로 고치지 말 것.
 //

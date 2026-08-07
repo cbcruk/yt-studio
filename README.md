@@ -132,7 +132,7 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 | | 무엇을 보나 | 바꿀 수 있나 |
 |---|---|---|
 | **런타임** — `lintCommand` · `ytdlp()` 메서드 | 파일을 읽는다 | **된다.** 당신이 깐 것을 볼 수 있다 |
-| **타입** — 자동완성 · `.d.ts` | 패키지를 구울 때 박혔다 | 안 된다 |
+| **타입** — 자동완성 · `.d.ts` | 패키지를 구울 때 박혔다 | **`ytstudio types` 로 덧씌운다** |
 
 런타임은 이 순서로 찾는다.
 
@@ -146,32 +146,69 @@ $YTSTUDIO_SCHEMA          → 명시적으로 가리킨 곳
 yt-dlp 이지 당신 것이 아니다.** 그래서 당신 yt-dlp 가 더 새로우면 새 플래그를
 없는 것으로 잡고 **exit 1** 을 낸다 — CI 에 걸어 뒀으면 빌드가 깨진다.
 
-당신 것에 맞추려면 한 번 리플렉션해서 프로젝트 루트에 두면 된다.
+당신 것에 맞추려면 **한 번 뽑아 두면 된다.**
 
 ```
-python3 gen_schema.py > ytstudio.schema.json
+$ npx ytstudio types
+읽음      /usr/local/bin/yt-dlp (yt-dlp 2026.09.01) · --help 파싱
+옵션      194개 · 새로 3 · 사라짐 0 (번들 191 대비)
+씀        ytstudio.schema.json · ytstudio-env.d.ts
+새 옵션   --brand-new  --another  --third
 ```
 
-```
-판정      확인됨 · 옵션 1개를 스키마 192개와 대조
-스키마    /work/ytstudio.schema.json (yt-dlp 2026.09.01)
+**두 층이 같이 움직인다.** 검증기는 새 스키마를 곧바로 집고, 새 옵션은 진짜
+메서드가 된다.
+
+```ts
+ytdlp(u).brandNew('x').build();   // 어제는 없던 메서드다
 ```
 
-그래도 **타입은 안 따라온다.** `.d.ts` 는 이미 구워져서 나온 것이라 새 플래그가
-자동완성에 안 뜬다. 코드에서는 `SCHEMA_SOURCE` 가 그 어긋남을 말해 준다.
+`.d.ts` 를 덮어쓰는 게 아니라 프로젝트 루트에 **확장 선언**을 놓는 방식이라
+`npm ci` 를 견딘다.
+
+```ts
+// ytstudio-env.d.ts — ytstudio types 가 만든다
+import 'ytstudio';
+declare module 'ytstudio' {
+  interface Ytdlp {
+    brandNew(value: Arg): this;
+  }
+}
+```
+
+> **`tsconfig.json` 의 `include` 가 이 파일을 덮어야 한다.** 안 덮으면 파일은
+> 생겼는데 자동완성이 안 늘어난다 — 조용히 무시되는 것이라 `ytstudio types` 가
+> 그 경우를 보고 경고한다.
+
+돌리지 않았거나 돌린 뒤 yt-dlp 를 또 올렸으면, 코드에서 그 어긋남을 볼 수 있다.
 
 ```ts
 import { SCHEMA_SOURCE } from 'ytstudio';
 
 SCHEMA_SOURCE.from;          // 'local' | 'env' | 'bundled'
 SCHEMA_SOURCE.version;       // '2026.09.01'  검증기가 대조하는 것
-SCHEMA_SOURCE.typesVersion;  // '2026.07.04'  자동완성이 나온 것
+SCHEMA_SOURCE.typesVersion;  // '2026.07.04'  패키지에 박힌 것
 SCHEMA_SOURCE.stale;         // true — 둘이 갈렸다
 ```
 
-이 층을 없애는 게 다음 걸음이다 — `npx ytstudio types` 가 설치 쪽에서 리플렉션해
-`.d.ts` 를 덮어쓰면 둘이 다시 하나가 된다. 지금은 갈릴 수 있다는 것을 **숨기지
-않는 것**까지가 이 층의 약속이다.
+### 왜 파이썬이 아니라 `--help` 인가
+
+저장소는 `gen_schema.py` 로 yt-dlp 를 **파이썬 모듈로 불러** optparse 트리를
+읽는다. 더 정확하지만 손님 환경에서는 대체로 못 돈다 — `brew install yt-dlp` 도,
+독립 실행 바이너리도, pipx 도 `import yt_dlp` 가 실패한다.
+
+그래서 손님 쪽은 바이너리에게 도움말을 물어본다. 잃는 게 있는지 재 봤다.
+
+```
+같은 yt-dlp(2026.07.04)를 두 길로 리플렉션해서 대조
+
+  옵션        191 / 191      필드 불일치 0
+```
+
+**아는 옵션은 한 글자도 안 다르다.** 도움말이 못 주는 것(`choices` · 별칭 일부 ·
+`repeatable` 여부)은 번들 스키마에서 물려받기 때문이다. 그래서 손해는 **새로
+생긴 옵션에만** 남는다. 그 판정이 실제로 유지되는지는 붙박이 도움말로 검사한다
+(`tests/unit/help-schema.test.ts`).
 
 ## 구성
 
@@ -186,9 +223,12 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   format-grammar.ts  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
   output-template.ts -o 파서 · 컴파일러 · 필드/변환 어휘
   paths.ts           -P 항목 한 줄 읽기
+  help-schema.ts     yt-dlp --help 파서 — 손님 쪽 리플렉션
+  env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
 src/index.ts         공개 API (빌더 + 검증기) · 스키마를 읽는 유일한 자리
-src/cli.ts           ytstudio lint · explain
-tests/               단위(bun) · 타입(tsc) · CLI(빌드물을 노드로)
+src/cli.ts           ytstudio lint · explain · types
+tests/               단위(bun) · 타입(tsc) · CLI · types(만든 .d.ts 를 tsc 로)
+  fixtures/          진짜 yt-dlp --help 한 판. 파서의 정답지가 스키마다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션한다               ← 유일한 비-TS
 gen_options.ts       그 스키마를 옵션 타입으로
 ytstudio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
@@ -210,6 +250,7 @@ tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전�
 | 타입 검사 | **tsc** | bun 은 타입을 안 본다. 린터 자리도 여기가 대신한다 |
 | 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |
 | CLI 검사 | **node**, `lib/` 를 상대로 | 배포하는 게 `#!/usr/bin/env node` 짜리라서 |
+| `types` 검사 | **node** + **tsc**, 임시 프로젝트에서 | 만든 `.d.ts` 가 진짜인지 보는 방법은 컴파일뿐이다 |
 
 마지막 줄이 중요하다. 단위 테스트가 소스를 보는 대신, CLI 검사가 **컴파일된
 산출물을 진짜 프로세스로** 띄운다 — 소스만 보고 끝나면 `tsc` 가 낸 것이 도는지는
@@ -235,10 +276,11 @@ npm run gen:types                              # 스키마 → src/core/options.
 
 ## 한계
 
-- **타입은 이 저장소에 커밋된 yt-dlp 버전 기준이다.** 검증기는 로컬 스키마를
-  집을 수 있지만 `.d.ts` 는 구워져서 나오므로 못 바꾼다. 온전히 참이 되려면
-  설치 시점에 리플렉션해 타입을 덮어쓰는 단계가 있어야 한다 —
-  [어느 yt-dlp 에 대조하나](#어느-yt-dlp-에-대조하나).
+- **`ytstudio types` 를 안 돌렸으면 이 저장소에 커밋된 yt-dlp 버전 기준이다.**
+  기본값이 그쪽이라 명시적으로 한 번 뽑아야 한다. `SCHEMA_SOURCE.stale` 과
+  `ytstudio lint` 의 `스키마` 줄이 어느 쪽인지 늘 말한다.
+- **확장 선언은 더하기만 된다.** 당신 yt-dlp 에서 **없어진** 옵션은 자동완성에
+  계속 뜬다. `@deprecated` 로 취소선만 긋는다 — 검증기는 제대로 잡는다.
 - **검증기는 "스키마와 문법에 어긋나는 곳이 없다"까지만 말한다.** 문법이 맞아도
   의도와 다를 수 있어서 파일명 미리보기와 토큰별 설명을 같이 낸다.
 - **실제로 돌려 보지는 않는다.** 이 URL 에 그 포맷이 정말 있는지는 yt-dlp 를

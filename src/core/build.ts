@@ -25,6 +25,8 @@ import { FIELDS, emitPiece } from './output-template.js';
 import { lintCommand } from './lint.js';
 import { quote } from './command.js';
 import type { Opt } from './schema.js';
+import { methodName, selMethod } from './env-types.js';
+
 import type { Filter, FormatNode, FormatOp } from './format-grammar.js';
 import type { Piece as OutNode } from './output-template.js';
 import type { Issue } from './lint.js';
@@ -43,12 +45,10 @@ export type { Issue } from './lint.js';
 const SEL_NAMES = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const FIELD_NAMES = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 
-/** `--embed-subs` → `embedSubs`. 짧은 플래그는 안 쓴다 — 코드는 읽으라고 있다. */
-export const methodName = (flag: string): string =>
-  String(flag).replace(/^--?/, '').replace(/-+([a-z0-9])/g, (_, c: string) => c.toUpperCase());
-
-/** `bv*` → `bvStar`. 새 이름을 지어내면 yt-dlp 문서와 대조가 안 된다. */
-export const selMethod = (sel: string): string => sel.replace('*', 'Star');
+// 이름 규칙은 생성기와 **같아야 한다**. 여기서 런타임 메서드 이름을, 저기서
+// 타입 이름을 만드는데 둘이 어긋나면 타입은 있고 메서드는 없는 칸이 생긴다.
+// 그래서 규칙 자체는 env-types.ts 에 한 벌만 두고 여기서는 내보내기만 한다.
+export { methodName, selMethod };
 
 /**
  * 명령어에 실제로 찍히는 형태.
