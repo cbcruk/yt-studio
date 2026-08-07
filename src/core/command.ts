@@ -6,7 +6,7 @@
  *
  * 쓰는 쪽이 쓰는 것은 `quote` 하나다 — 셸에 붙여넣을 한 줄을 만들 때.
  */
-import { BY_FLAG } from './schema.js';
+import type { Schema } from './schema.js';
 import type { Opt } from './schema.js';
 
 /** 셸이 그냥 넘길 수 있는 글자들. 이 밖이 하나라도 섞이면 감싼다. */
@@ -58,7 +58,7 @@ export function tokenize(s: string): string[] {
  *
  * `head` 는 맨 앞의 `yt-dlp` 다. 없어도 읽는다 — 붙여넣기가 늘 온전하지는 않다.
  */
-export function scanCommand(text: string): { head: string | null; items: Item[] } {
+export function scanCommand(schema: Schema, text: string): { head: string | null; items: Item[] } {
   const toks = tokenize((text || '').replace(/\\\n/g, ' '));
   const head = (toks[0] && /yt-dlp|youtube-dl/.test(toks[0])) ? toks.shift()! : null;
 
@@ -72,7 +72,7 @@ export function scanCommand(text: string): { head: string | null; items: Item[] 
       const k = raw0.indexOf('=');
       flag = raw0.slice(0, k); inline = raw0.slice(k + 1);
     }
-    const hit = BY_FLAG[flag];
+    const hit = schema.byFlag[flag];
     if (!hit) { items.push({ kind: 'unknown', raw: raw0, flag, value: null, why: 'no-flag' }); continue; }
 
     const { opt, negated } = hit;

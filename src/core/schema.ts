@@ -1,8 +1,22 @@
 /**
- * yt-dlp 옵션 스키마 파생.
+ * yt-dlp 옵션 스키마.
  *
- * `gen_schema.py` 가 떨군 raw JSON 하나에서 색인들을 만든다.
- * `initSchema` 를 부르기 전에는 어떤 바인딩도 유효하지 않다.
+ * 리플렉션한 raw JSON 하나에서 색인들을 만든다. **결과는 값이다** —
+ * `buildSchema` 는 순수 함수이고 이 모듈에는 가변 상태가 없다.
+ *
+ * 한동안은 반대였다. `export let OPTS/BY_ID/…` 다섯에 `initSchema` 가 값을
+ * 채워 넣는 모양이었는데, 그러면 호출자가 알아야 할 것이 시그니처에 안 적힌다.
+ *
+ *   · `initSchema` 를 먼저 불러야 나머지가 유효하다
+ *   · 두 번 부르면 **프로세스 안 모든 모듈**의 것이 다시 쓰인다
+ *   · 스키마 둘을 동시에 들 방법이 없다
+ *
+ * 마지막이 실제로 물었다. 가짜 스키마를 한 번 더 로드하면 앞서 로드한 쪽의
+ * `lintCommand` 가 조용히 새 스키마를 보는데 `VERSION` 은 안 바뀐다 —
+ * **모듈이 자기 상태에 대해 거짓말을 한다.** 그리고 검사가 그걸 우회하려고
+ * 경우마다 프로세스를 새로 띄워야 했다. 이음매가 프로세스 시작에 있었다는 뜻이다.
+ *
+ * 지금은 값이라 이음매가 인자다. 스키마 둘을 나란히 들 수 있다.
  */
 
 /** 옵션 하나. `gen_schema.py` 가 optparse 트리에서 뽑은 그대로다. */
@@ -68,24 +82,44 @@ export interface RawSchema {
   options: Opt[];
 }
 
-export let OPTS: Opt[] = [];
-export let BY_ID: Record<string, Opt> = {};
-export let STAGE: Record<string, Stage> = {};
-/** 별칭·단축·부정형까지 전부. 검증기가 문자열을 되읽을 때 쓴다. */
-export let BY_FLAG: Record<string, FlagHit> = {};
-export let VERSION = '';
+/**
+ * 색인까지 붙은 스키마 하나. 이 저장소에서 "스키마"는 이 값을 말한다.
+ *
+ * 읽기 전용으로 쓴다 — 만든 뒤에는 아무도 안 고친다. 그래서 여러 곳이 같은
+ * 값을 나눠 가져도 서로를 오염시키지 않는다.
+ */
+export interface Schema {
+  /** 이 스키마가 나온 yt-dlp 버전. */
+  version: string;
+  from: SchemaFrom;
+  opts: readonly Opt[];
+  byId: Readonly<Record<string, Opt>>;
+  stage: Readonly<Record<string, Stage>>;
+  /** 별칭·단축·부정형까지 전부. 검증기가 문자열을 되읽을 때 쓴다. */
+  byFlag: Readonly<Record<string, FlagHit>>;
+  /** 만들 때 받은 원본. `ytstudio types` 가 다시 써야 할 때 쓴다. */
+  raw: RawSchema;
+}
 
-export function initSchema(raw: RawSchema): void {
-  VERSION = raw.ytdlp_version;
-  OPTS = raw.options;
-  BY_ID = Object.fromEntries(OPTS.map(o => [o.id, o]));
-  STAGE = Object.fromEntries(raw.stages.map(s => [s.id, s]));
+/** raw JSON → 색인 붙은 스키마. 순수 함수다. */
+export function buildSchema(raw: RawSchema): Schema {
+  const opts = raw.options;
+  const byFlag: Record<string, FlagHit> = {};
 
-  BY_FLAG = {};
-  for (const o of OPTS) {
-    BY_FLAG[o.flag] = { opt: o, negated: false };
-    if (o.short) BY_FLAG[o.short] = { opt: o, negated: false };
-    for (const a of o.aliases) BY_FLAG[a] = { opt: o, negated: false };
-    if (o.negation) BY_FLAG[o.negation] = { opt: o, negated: true };
+  for (const o of opts) {
+    byFlag[o.flag] = { opt: o, negated: false };
+    if (o.short) byFlag[o.short] = { opt: o, negated: false };
+    for (const a of o.aliases) byFlag[a] = { opt: o, negated: false };
+    if (o.negation) byFlag[o.negation] = { opt: o, negated: true };
   }
+
+  return {
+    version: raw.ytdlp_version,
+    from: raw.source ?? 'optparse',
+    opts,
+    byId: Object.fromEntries(opts.map(o => [o.id, o])),
+    stage: Object.fromEntries(raw.stages.map(s => [s.id, s])),
+    byFlag,
+    raw,
+  };
 }

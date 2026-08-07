@@ -15,12 +15,14 @@ import assert from 'node:assert/strict';
 
 // 공개 입구에서 꺼내는 건 손님이 쓰는 것뿐이다. 나머지 넷은 내부라서 코어에서
 // 직접 가져온다 — 공개 표면에 두면 배포 뒤에 빼는 게 breaking 이 된다.
-const { ytdlp, YTDLP_VERSION } = await import('../../src/index.js');
+const { ytdlp, ytstudio } = await import('../../src/index.js');
 const { formatFactory, outTag, methodName, selMethod } =
   await import('../../src/core/build.js');
 const { parseFormat } = await import('../../src/core/format-grammar.js');
 const { parseTemplate } = await import('../../src/core/output-template.js');
 const { scanCommand } = await import('../../src/core/command.js');
+const yt = ytstudio();
+const { schema } = yt;
 
 const U = 'https://youtu.be/abc';
 
@@ -41,8 +43,8 @@ test('메서드 이름은 긴 플래그에서 나온다', () => {
   assert.equal(selMethod('b'), 'b');
 });
 
-test('설치된 yt-dlp 버전을 그대로 내놓는다', () => {
-  assert.match(YTDLP_VERSION, /^\d{4}\.\d{2}\.\d{2}$/);
+test('손잡이가 자기가 대조하는 버전을 말한다', () => {
+  assert.match(yt.source.version, /^\d{4}\.\d{2}\.\d{2}$/);
 });
 
 test('URL 만 주면 URL 만 나온다', () => {
@@ -237,7 +239,7 @@ test('빌더가 낸 명령어를 스캐너가 그대로 읽는다', () => {
     .output(t => t`${t.title}.${t.ext}`)
     .writeSubs().subLangs('ko,en').mergeOutputFormat('mp4');
 
-  const { items } = scanCommand(c.build());
+  const { items } = scanCommand(schema, c.build());
   assert.equal(items.filter(i => i.kind === 'unknown').length, 0,
     JSON.stringify(items.filter(i => i.kind === 'unknown')));
   assert.deepEqual(items.filter(i => i.kind === 'opt').map(i => i.opt.id),
