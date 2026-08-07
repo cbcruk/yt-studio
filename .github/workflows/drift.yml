@@ -25,11 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ytstudio types 검사가 배포물을 노드로 띄운다.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
+      # 노드는 이미지에 있는 것을 쓴다(test.yml 과 같은 이유).
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile --ignore-scripts
