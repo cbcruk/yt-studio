@@ -14,7 +14,8 @@
     "test": "npm run check:types && npm run build && npm run test:unit && npm run test:cli && npm run test:types",
     "cli": "bun src/cli.ts",
     "prepare": "npm run build",
-    "test:types": "bun tests/types-cmd.ts"
+    "test:types": "bun tests/types-cmd.ts",
+    "test:drift": "bun tests/drift.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",

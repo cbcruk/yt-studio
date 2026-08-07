@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 /**
- * CLI 검사.
+ * CLI 검사 — **프로세스가 있어야만 보이는 것들.**
  *
- * 브라우저 앱이 하던 일 중 라이브러리가 대신 못 하던 것 — **어디선가 주운
- * 명령어를 검사하기** — 이 여기로 옮겨 왔다. 그래서 여기서 볼 것은 화면이
- * 아니라 셋이다.
+ * 여기 남은 것은 함수를 불러서는 볼 수 없는 성질뿐이다. 무엇을 말하는지는
+ * 단위 테스트가 보고(`unit/explain.test.ts` · `unit/lint.test.ts`), 여기서는
+ * 프로세스로서 어떻게 행동하는지만 본다.
  *
  *   · 종료 코드로 말하는가 (스크립트와 CI 가 그걸 본다)
  *   · 표준 입력으로 흘려 넣어도 되는가 (파이프)
  *   · 색을 안 쓸 때 글자만 깨끗이 나오는가 (grep)
  *
- * 실제로 프로세스를 띄운다 — 함수를 부르면 종료 코드도 파이프도 안 보인다.
- * 그리고 **컴파일한 lib/ 를 노드로** 띄운다. 배포하는 물건이 그거라서,
- * 이 검사만은 소스가 아니라 산출물을 상대한다.
+ * 그중 **스키마 해석 순서**가 이 파일을 대체 불가능하게 만든다. `src/index.ts`
+ * 는 모듈 최상단에서 스키마를 정하고 `initSchema` 가 프로세스 전역을 덮어쓰기
+ * 때문에, 한 프로세스에서 두 번 로드하면 앞엣것이 오염된다 — 그것도 버전은
+ * 그대로 두고 동작만 바뀐다. 경우마다 새 프로세스를 띄우는 수밖에 없다.
+ *
+ * (`lib/` 를 노드로 띄우는 것 자체는 `tests/types-cmd.ts` 도 한다. 그건 이
+ * 파일만의 이유가 아니다.)
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -102,11 +106,6 @@ check('오류가 있으면 1 로 끝난다 — 스크립트가 그걸 본다', (
   return '오류 1개';
 });
 
-check('고칠 후보를 같이 준다', () => {
-  const r = run(['lint', 'yt-dlp --write-sub https://youtu.be/abc']);
-  assert(r.out.includes('--write-subs'), r.out);
-});
-
 check('경고만 있으면 0 이다 — 판단이지 틀린 게 아니다', () => {
   const r = run(['lint', 'yt-dlp -x -f bv https://youtu.be/abc']);
   assert(r.code === 0, `종료 코드 ${r.code}\n${r.out}`);
@@ -121,26 +120,18 @@ check('표준 입력으로 흘려 넣어도 된다', () => {
   return 'pbpaste | ytstudio lint';
 });
 
-check('만들 파일명을 보여 준다', () => {
-  const r = run(['lint', 'yt-dlp -P home:/dl -o "%(uploader)s/%(title)s.%(ext)s" https://youtu.be/abc']);
-  assert(r.out.includes('/dl/‹업로더›/‹제목›.‹확장자›'), r.out);
-});
-
-check('-o 가 없으면 yt-dlp 기본값이라고 말한다', () => {
-  const r = run(['lint', 'yt-dlp https://youtu.be/abc']);
-  assert(r.out.includes('-o 없음'), r.out);
-});
-
 check('색을 끄면 이스케이프가 안 남는다 — grep 에 걸리면 곤란하다', () => {
   const r = run(['lint', 'yt-dlp --write-sub https://youtu.be/abc']);
   assert(!/\x1b\[/.test(r.out), '색코드가 남았다');
 });
 
-check('explain 은 토큰마다 무슨 옵션인지 말한다', () => {
+// 무슨 말을 하는지는 tests/unit/explain.test.ts 가 본다. 여기서는 서브명령이
+// 붙어 있고 토큰 수만큼 낸다는 것까지다 — 화면 글자에 단언을 걸면 문구를
+// 다듬을 때마다 검사가 깨진다.
+check('explain 은 토큰마다 한 덩이씩 낸다', () => {
   const r = run(['explain', 'yt-dlp -x --no-part https://youtu.be/abc']);
-  assert(r.out.includes('[후처리]'), r.out);
-  assert(r.out.includes('끄기'), '부정형을 끈 것이라고 안 했다');
-  assert(r.out.includes('받을 대상'), 'URL 설명이 없다');
+  assert(r.code === 0, `종료 코드 ${r.code}\n${r.out}`);
+  assert(r.out.split('\n').filter(l => l.startsWith('  ')).length === 3, r.out);
 });
 
 check('version 은 스키마가 나온 버전을 낸다', () => {
