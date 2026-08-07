@@ -49,9 +49,21 @@ export interface FlagHit {
   negated: boolean;
 }
 
+/**
+ * 스키마가 어떤 리플렉션에서 나왔나.
+ *
+ * `optparse` 는 `gen_schema.py` 가 yt-dlp 를 파이썬 모듈로 불러 옵션 객체를 직접
+ * 읽은 것이고, `help` 는 `yt-dlp --help` 출력을 파싱한 것이다. 뒤엣것이 덜
+ * 충실하다 — 별칭 일부와 `choices` 는 도움말에 글자로 안 나온다. 대신 어떤
+ * 설치 형태에서도 된다.
+ */
+export type SchemaFrom = 'optparse' | 'help';
+
 /** `gen_schema.py` 가 내놓는 JSON 그대로. */
 export interface RawSchema {
   ytdlp_version: string;
+  /** 없으면 `optparse` 다 — 이 필드가 생기기 전 스키마가 그것뿐이었다. */
+  source?: SchemaFrom;
   stages: Stage[];
   options: Opt[];
 }

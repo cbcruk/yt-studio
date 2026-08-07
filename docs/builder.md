@@ -52,8 +52,9 @@ ytdlp('https://youtu.be/abc')
 `gen_options.ts` 가 그걸 `src/core/options.gen.ts` 로 옮긴다. **자동완성에 뜨는
 옵션 = 이 저장소를 구울 때의 yt-dlp 옵션**이다.
 
-패키지로 받아 쓸 때는 여기가 갈릴 수 있다 — 검증기는 로컬 스키마를 집을 수
-있지만 타입은 구워져서 나온다. [어느 yt-dlp 에 대조하나](../README.md#어느-yt-dlp-에-대조하나).
+패키지로 받아 쓸 때는 `npx ytstudio types` 가 손님 yt-dlp 를 리플렉션해 확장
+선언을 얹는다 — 그러면 그 문장이 손님에게도 참이 된다.
+[어느 yt-dlp 에 대조하나](../README.md#어느-yt-dlp-에-대조하나).
 
 그래서 검증기가 런타임에 하던 일의 절반이 컴파일 타임으로 올라간다.
 
