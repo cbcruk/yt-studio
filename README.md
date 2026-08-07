@@ -195,6 +195,7 @@ ytstudio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
 tsconfig.json        빌드용 (src → lib)
 tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전부)
 .github/workflows/   CI — npm test 와 같은 것 + 타입이 스키마와 맞는지
+.claude/skills/      세션마다 로드되는 스킬 넷 (mattpocock/skills 에서 골라 옴)
 ```
 
 `options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
