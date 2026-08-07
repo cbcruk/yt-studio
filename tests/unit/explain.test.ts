@@ -1,14 +1,14 @@
 /**
  * 명령어를 사람 말로 되돌리는 층.
  *
- * 한동안 이 모듈의 유일한 검사가 `tests/cli.ts` 의 출력 문자열 단언이었다.
+ * 한동안 이 모듈의 유일한 검사가 `tests/cli.test.ts` 의 출력 문자열 단언이었다.
  * 즉 로직이 아니라 **CLI 가 그린 화면**을 보고 있었고, 규칙 하나가 틀려도
  * 줄바꿈만 맞으면 통과할 수 있었다. 여기로 옮긴다.
  *
  * 값을 모르는 채로 파일명을 미리 그리는 게 이 층의 어려운 부분이다 —
  * 필드는 자리표시자로 두고 `-P home` 만 앞에 붙인다.
  */
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
 const {

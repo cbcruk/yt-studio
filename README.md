@@ -249,8 +249,11 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
 src/index.ts         공개 API (빌더 + 검증기) · 스키마를 읽는 유일한 자리
 src/cli.ts           ytstudio lint · explain · types
-tests/               단위(bun) · 타입(tsc) · CLI · types(만든 .d.ts 를 tsc 로)
-  drift.ts           실물 yt-dlp 와 대조 — 정기 잡에서만 돈다
+tests/               전부 bun:test. `bun test` 하나로 다 돈다
+  unit/*.test.ts     순수 로직 (92개)
+  cli.test.ts        프로세스로서의 CLI — 종료 코드 · 파이프 · 스키마 해석 순서
+  types.test.ts      ytstudio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
+  drift.test.ts      실물 yt-dlp 와 대조. yt-dlp 가 없으면 건너뛴다
   fixtures/          진짜 yt-dlp --help 한 판. 파서의 정답지가 스키마다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션한다               ← 유일한 비-TS
 gen_options.ts       그 스키마를 옵션 타입으로
@@ -269,12 +272,18 @@ tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전�
 | | 무엇으로 | 왜 |
 |---|---|---|
 | 의존성 설치 | **bun**, `bun.lock` | 캐시가 웜이면 0.04초 |
+| 검사 전부 | **`bun:test`** | 러너가 하나다. `bun test` 하나로 8개 파일이 돈다 |
 | 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 130ms |
 | 옵션 타입 생성 | **bun** | `.ts` 어휘 표를 그대로 읽는다 |
 | 타입 검사 | **tsc** | bun 은 타입을 안 본다. 린터 자리도 여기가 대신한다 |
 | 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |
 | CLI 검사 | **node**, `lib/` 를 상대로 | 배포하는 게 `#!/usr/bin/env node` 짜리라서 |
 | `types` 검사 | **node** + **tsc**, 임시 프로젝트에서 | 만든 `.d.ts` 가 진짜인지 보는 방법은 컴파일뿐이다 |
+
+검사는 `bun:test` 로 통일돼 있고 단언은 `node:assert/strict` 를 쓴다 — 파서
+트리를 `deepEqual` 로 비교하는 자리가 많아서 그쪽이 읽기 낫다. 한동안 러너가
+셋(`node:test` 하나, 손으로 쓴 하네스 둘)이었는데, 하네스 둘이 `check` ·
+`assert` · 통과 세기 · 종료 코드를 각자 다시 쓰고 있었다.
 
 마지막 줄이 중요하다. 단위 테스트가 소스를 보는 대신, CLI 검사가 **컴파일된
 산출물을 진짜 프로세스로** 띄운다 — 소스만 보고 끝나면 `tsc` 가 낸 것이 도는지는
@@ -287,12 +296,12 @@ tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전�
 내 변경이 깬 것이다.
 
 대신 **바깥에서 오는 변화는 그 안에서 안 보인다.** yt-dlp 가 `--help` 서식을
-바꾸면 파서가 조용히 깨지고, 손님이 밟을 때까지 아무도 모른다. 그건 `drift.ts`
-가 맡는다 — 진짜 yt-dlp 를 깔아서 **두 길로 리플렉션한 결과를 필드 단위로**
-대조한다(도움말 파서 ↔ `gen_schema.py`).
+바꾸면 파서가 조용히 깨지고, 손님이 밟을 때까지 아무도 모른다. 그건
+`drift.test.ts` 가 맡는다 — 진짜 yt-dlp 를 깔아서 **두 길로 리플렉션한 결과를
+필드 단위로** 대조한다(도움말 파서 ↔ `gen_schema.py`).
 
 ```
-bun run test:drift     # yt-dlp 가 PATH 에 있어야 한다
+bun run test:drift     # yt-dlp 가 없으면 4개를 건너뛴다
 ```
 
 정기 잡(`.github/workflows/drift.yml`)에서만 돈다. PR 마다 돌리면 yt-dlp

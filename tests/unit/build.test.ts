@@ -10,7 +10,7 @@
  *   · **파서와 같은 트리를 만드는가** — 읽기와 쓰기가 한 문법을 공유해야 한다
  *   · 검증기가 여전히 제 일을 하는가 — 타입이 못 보는 조합이 있다
  */
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
 const { ytdlp, formatFactory, outTag, methodName, selMethod, YTDLP_VERSION } =

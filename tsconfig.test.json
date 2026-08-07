@@ -7,7 +7,16 @@
     "rootDir": ".",
     "declaration": false,
     "declarationMap": false,
-    "sourceMap": false
+    "sourceMap": false,
+
+    // bun 타입은 **여기에만** 넣는다. 검사가 `bun:test` 를 import 하므로
+    // 필요한데, tsconfig.json 쪽(빌드)에 넣으면 배포되는 src/ 에서도 Bun.* 이
+    // 보이게 된다 — 그러면 `Bun.file()` 을 쓴 코드가 손님의 노드에서 터진다.
+    //
+    // 그래서 이 파일은 src/ 에 대해 느슨하고, 조이는 건 tsconfig.json 이다.
+    // `bun run build` 가 types: ["node"] 로 다시 보므로 결국 잡힌다 — 다만
+    // 한 단계 늦게 잡힌다는 걸 알고 있을 것.
+    "types": ["node", "bun"]
   },
   "include": ["src/index.ts", "src/cli.ts", "gen_options.ts", "tests/**/*.ts"]
 }

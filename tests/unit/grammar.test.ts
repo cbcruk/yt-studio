@@ -4,7 +4,7 @@
  * 파서와 컴파일러가 한 쌍이라 왕복으로 검사한다 — 읽은 것을 다시 뱉으면
  * 같아야 하고, 괄호는 필요한 자리에만 붙어야 한다.
  */
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
 import type { FormatNode } from '../../src/core/format-grammar.js';

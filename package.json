@@ -10,14 +10,15 @@
     "build": "tsc",
     "check:types": "tsc -p tsconfig.test.json",
     "test:unit": "bun test tests/unit",
-    "test:cli": "bun tests/cli.ts",
+    "test:cli": "bun test tests/cli.test.ts",
     "test": "bun run check:types && bun run build && bun run test:unit && bun run test:cli && bun run test:types",
     "cli": "bun src/cli.ts",
     "prepare": "npm run build",
-    "test:types": "bun tests/types-cmd.ts",
-    "test:drift": "bun tests/drift.ts"
+    "test:types": "bun test tests/types.test.ts",
+    "test:drift": "bun test tests/drift.test.ts"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.14",
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
   },
