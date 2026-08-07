@@ -9,7 +9,7 @@
  * 기준은 하나다: 아는 옵션에 대해서는 **한 글자도 달라선 안 된다.** 손해는
  * 새로 생긴 옵션에만 남아야 한다.
  */
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

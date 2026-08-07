@@ -1,0 +1,48 @@
+# 실물 yt-dlp 와 벌어졌는지 본다.
+#
+# test.yml 은 커밋된 스냅샷 안에서만 돈다 — 결정적이고, 내 변경이 뭘 깼는지
+# 정확히 말한다. 대신 바깥에서 오는 변화는 못 본다. 이 잡이 그쪽을 맡는다.
+#
+# PR 마다 안 돌린다. yt-dlp 릴리스 때문에 남의 PR 이 빨개지면 그건 알림이 아니라
+# 방해다. 정기로 돌려서 우리에게 알린다.
+name: 실물 대조
+
+on:
+  schedule:
+    # 매일 06:00 KST (21:00 UTC)
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 노드는 이미지에 있는 것을 쓴다(test.yml 과 같은 이유).
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile --ignore-scripts
+
+      # gen_schema.py 가 yt-dlp 를 **파이썬 모듈로** 불러 optparse 트리를 읽는다.
+      # 이 잡의 정답지가 그것이라 pip 로 깔아야 한다 — 독립 실행 바이너리는
+      # import 가 안 된다.
+      - name: 실물 yt-dlp
+        run: |
+          pip install --quiet --upgrade yt-dlp
+          yt-dlp --version
+
+      - name: 빌드
+        run: bun run build
+
+      # 실패는 기계가 고장 났을 때뿐이다 — 도움말 파서가 지금 서식을 못 읽거나,
+      # gen_schema.py 가 안 돌거나, ytstudio types 가 실물에서 끝을 못 볼 때.
+      # 커밋된 스키마가 최신보다 낡은 것 자체는 늘 그런 일이라 알림으로만 낸다.
+      - name: 대조
+        run: bun run test:drift

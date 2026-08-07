@@ -5,7 +5,7 @@
  * yt-dlp 를 리플렉션한 스키마와 진짜 파서를 본다. 그래서 검사도 "모델이
  * 만들 법한 그럴듯한 오답"을 상대로 한다.
  */
-import { test } from 'node:test';
+import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
 // 소스를 직접 본다. bun 이 `./x.js` 를 x.ts 로 풀어 주므로 빌드를 안 거친다.

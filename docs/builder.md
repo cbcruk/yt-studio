@@ -191,9 +191,9 @@ t.field('release_year')          // 카탈로그에 없는 필드
 ## 만드는 법
 
 ```
-bun gen_options.ts              # ytstudio.schema.json → options.gen.ts  (npm run gen:types)
-tsc                             # src/ → lib/                   (npm run build)
-tsc -p tsconfig.test.json       # 타입 검사                      (npm run check:types)
+bun gen_options.ts              # ytstudio.schema.json → options.gen.ts  (bun run gen:types)
+tsc                             # src/ → lib/                   (bun run build)
+tsc -p tsconfig.test.json       # 타입 검사                      (bun run check:types)
 ```
 
 돌리는 건 bun, 타입과 산출물은 tsc 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를

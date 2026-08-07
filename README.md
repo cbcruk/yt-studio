@@ -9,19 +9,41 @@ npm i ytstudio
 npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 ```
 
-저장소에서 손볼 때는 이렇다.
+저장소에서 손볼 때는 **[bun](https://bun.com) 이 있어야 한다.** 버전은
+`packageManager` 필드가 고정하고, CI 의 `setup-bun` 도 그걸 읽는다.
 
 ```
-npm run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
-npm run gen:types # ytstudio.schema.json → src/core/options.gen.ts
-npm run cli       # 빌드 없이 CLI 를 돌려 본다
-npm test          # 타입 + 단위 + CLI
+bun install       # 의존성은 typescript 와 @types/node 둘뿐이다
+bun run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
+bun run gen:types # ytstudio.schema.json → src/core/options.gen.ts
+bun run cli       # 빌드 없이 CLI 를 돌려 본다
+bun run test      # 타입 + 빌드 + 단위 + CLI + types
 ```
+
+> `bun test` 가 아니라 **`bun run test`** 다. 앞엣것은 bun 의 테스트 러너를
+> 직접 부르는 것이라 단위 스위트만 돈다.
+
+**손님에게는 bun 이 필요 없다.** 이 제약은 저장소 안에서만 산다 — 배포물은
+`#!/usr/bin/env node` 짜리이고 `engines` 도 `node >=22` 그대로다.
 
 **저장소에 `.js` 가 없다.** 소스도 테스트도 생성기도 전부 `.ts` 이고, **돌리는 건
 bun, 타입과 산출물은 tsc** 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를 `x.ts` 로
 풀어 주므로 단위 테스트와 생성기는 빌드를 안 거친다. 대신 bun 은 타입 검사를 안
 하고 `.d.ts` 도 못 내므로 그쪽은 tsc 가 맡는다.
+
+한동안 bun 을 devDependency 로 뒀는데, 그러면 CI 가 **매 실행마다 bun 바이너리를
+통째로 설치한다** — `node_modules` 가 380MB 였고 그중 347MB 가 bun 이었다. 지금은
+34MB 다. 손님에게는 아무 영향이 없다(`dependencies` 는 원래 비어 있다).
+
+### `types: ["node"]` 는 일부러 남겨 둔 제약이다
+
+돌리는 게 bun 이니 `bun-types` 로 갈아탈 만해 보이지만 **반대로 가야 한다.**
+`bun-types` 는 노드 타입 위에 `Bun.*` 을 얹는다. 그러면 배포되는 `src/` 안에서
+`Bun.file()` 을 써도 타입이 통과하고, 손님의 노드에서 터진다.
+
+`tsconfig.json` 의 `types: ["node"]` 가 그걸 막는 유일한 장치다 — **배포물이
+노드에서 돈다는 사실을 컴파일러가 강제하게 두는 것.** 개발을 bun 으로 옮기면서도
+이건 안 건드렸다.
 
 린터는 없다. eslint 가 켜 두던 규칙이 둘(`no-undef` · `no-unused-vars`)뿐이었는데
 전부 `.ts` 가 되면서 tsc 와 `noUnusedLocals` 가 그대로 잡는다.
@@ -227,14 +249,18 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
 src/index.ts         공개 API (빌더 + 검증기) · 스키마를 읽는 유일한 자리
 src/cli.ts           ytstudio lint · explain · types
-tests/               단위(bun) · 타입(tsc) · CLI · types(만든 .d.ts 를 tsc 로)
+tests/               전부 bun:test. `bun test` 하나로 다 돈다
+  unit/*.test.ts     순수 로직 (92개)
+  cli.test.ts        프로세스로서의 CLI — 종료 코드 · 파이프 · 스키마 해석 순서
+  types.test.ts      ytstudio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
+  drift.test.ts      실물 yt-dlp 와 대조. yt-dlp 가 없으면 건너뛴다
   fixtures/          진짜 yt-dlp --help 한 판. 파서의 정답지가 스키마다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션한다               ← 유일한 비-TS
 gen_options.ts       그 스키마를 옵션 타입으로
 ytstudio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
 tsconfig.json        빌드용 (src → lib)
 tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전부)
-.github/workflows/   CI — npm test 와 같은 것 + 타입이 스키마와 맞는지
+.github/workflows/   CI — bun run test 와 같은 것 + 타입이 스키마와 맞는지
 .claude/skills/      세션마다 로드되는 스킬 넷 (mattpocock/skills 에서 골라 옴)
 ```
 
@@ -245,16 +271,42 @@ tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전�
 
 | | 무엇으로 | 왜 |
 |---|---|---|
-| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 124ms |
+| 의존성 설치 | **bun**, `bun.lock` | 캐시가 웜이면 0.04초 |
+| 검사 전부 | **`bun:test`** | 러너가 하나다. `bun test` 하나로 8개 파일이 돈다 |
+| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 130ms |
 | 옵션 타입 생성 | **bun** | `.ts` 어휘 표를 그대로 읽는다 |
 | 타입 검사 | **tsc** | bun 은 타입을 안 본다. 린터 자리도 여기가 대신한다 |
 | 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |
 | CLI 검사 | **node**, `lib/` 를 상대로 | 배포하는 게 `#!/usr/bin/env node` 짜리라서 |
 | `types` 검사 | **node** + **tsc**, 임시 프로젝트에서 | 만든 `.d.ts` 가 진짜인지 보는 방법은 컴파일뿐이다 |
 
+검사는 `bun:test` 로 통일돼 있고 단언은 `node:assert/strict` 를 쓴다 — 파서
+트리를 `deepEqual` 로 비교하는 자리가 많아서 그쪽이 읽기 낫다. 한동안 러너가
+셋(`node:test` 하나, 손으로 쓴 하네스 둘)이었는데, 하네스 둘이 `check` ·
+`assert` · 통과 세기 · 종료 코드를 각자 다시 쓰고 있었다.
+
 마지막 줄이 중요하다. 단위 테스트가 소스를 보는 대신, CLI 검사가 **컴파일된
 산출물을 진짜 프로세스로** 띄운다 — 소스만 보고 끝나면 `tsc` 가 낸 것이 도는지는
 아무도 안 본 게 된다.
+
+### 결정성과 실물성을 갈라 둔다
+
+위의 검사는 전부 **커밋된 스냅샷 안에서** 돈다 — 커밋된 스키마, 커밋된 도움말,
+그 도움말을 `cat` 하는 껍데기 yt-dlp. 그래서 PR 마다 돌려도 되고, 실패하면 그건
+내 변경이 깬 것이다.
+
+대신 **바깥에서 오는 변화는 그 안에서 안 보인다.** yt-dlp 가 `--help` 서식을
+바꾸면 파서가 조용히 깨지고, 손님이 밟을 때까지 아무도 모른다. 그건
+`drift.test.ts` 가 맡는다 — 진짜 yt-dlp 를 깔아서 **두 길로 리플렉션한 결과를
+필드 단위로** 대조한다(도움말 파서 ↔ `gen_schema.py`).
+
+```
+bun run test:drift     # yt-dlp 가 없으면 4개를 건너뛴다
+```
+
+정기 잡(`.github/workflows/drift.yml`)에서만 돈다. PR 마다 돌리면 yt-dlp
+릴리스가 남의 PR 을 빨갛게 만드는데, 그건 알림이 아니라 방해다. **실패는 기계가
+고장 났을 때뿐이고**, 커밋된 스키마가 최신보다 낡은 것은 알림으로만 낸다.
 
 ## 스키마 다시 뽑기
 
@@ -263,7 +315,7 @@ yt-dlp 를 올렸으면 둘을 같이 돌린다. CI 가 **스키마만 고치고
 
 ```
 python3 gen_schema.py > ytstudio.schema.json   # 설치된 yt-dlp → 스키마
-npm run gen:types                              # 스키마 → src/core/options.gen.ts
+bun run gen:types                              # 스키마 → src/core/options.gen.ts
 ```
 
 ## 손으로 채우는 층
