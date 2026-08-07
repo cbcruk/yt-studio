@@ -1,7 +1,9 @@
 # npm test 와 같은 것을 돌린다. 단계를 쪼갠 건 실패를 한눈에 가르기 위해서다 —
 # 타입이 깨진 건지, 단위가 깨진 건지, CLI 가 깨진 건지 잡 요약에서 바로 보인다.
 #
-# bun 은 devDependency 라 npm ci 가 같이 깔아 준다 — setup 액션이 따로 없다.
+# 예전에는 bun 을 devDependency 로 두고 npm ci 로 깔았는데, 그러면 매 실행마다
+# bun 바이너리를 통째로 설치한다 — node_modules 가 380MB 였고 그중 347MB 가
+# bun 이었다. setup-bun 이 실행 파일을 자기 캐시에서 꺼내 주므로 그 값을 안 낸다.
 name: 테스트
 
 on:
@@ -21,20 +23,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 단위 테스트는 bun 이 돌린다. 노드가 여기 있는 건 CLI 검사 때문이다 —
-      # 배포하는 물건이 `#!/usr/bin/env node` 짜리라 그걸로 띄워 봐야 한다.
+      # 노드가 여기 있는 건 CLI 검사 때문이다 — 배포하는 물건이
+      # `#!/usr/bin/env node` 짜리라 그걸로 띄워 봐야 한다. engines 가 >=22 이니
+      # 바닥을 상대로 검사한다. npm 캐시는 안 쓴다(의존성은 bun 이 깐다).
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
-      - run: npm ci
+      # 버전은 package.json 의 packageManager 필드가 고정한다.
+      - uses: oven-sh/setup-bun@v2
+
+      # setup-bun 이 캐싱하는 건 bun 실행 파일뿐이라 의존성은 따로 잡아 준다.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      # --ignore-scripts 로 prepare 를 막는다. prepare 는 tsc 를 부르는데
+      # 아래에서 어차피 한 번 짓는다 — 두 번 지을 이유가 없다.
+      - run: bun install --frozen-lockfile --ignore-scripts
 
       # 옵션 타입은 스키마에서 나온다. 스키마만 고치고 다시 안 뽑으면
       # 자동완성이 설치된 yt-dlp 와 어긋난다 — 그게 이 층의 유일한 약속이다.
       - name: 옵션 타입이 스키마와 맞는가
         run: |
-          npm run gen:types
+          bun run gen:types
           if ! git diff --quiet -- src/core/options.gen.ts; then
             echo "::error::options.gen.ts 가 ytstudio.schema.json 과 다르다 — 'npm run gen:types' 를 돌리고 같이 커밋할 것"
             git diff --stat -- src/core/options.gen.ts
@@ -45,19 +59,23 @@ jobs:
       # 죽은 지역 변수)도 여기 들어왔다. 그리고 tests/types/reject.ts 의
       # @ts-expect-error 가 양쪽으로 문다 — 막을 건 막고 통과시킬 건 통과시킨다.
       - name: 타입
-        run: npm run check:types
+        run: bun run check:types
+
+      # 아래 검사 둘이 컴파일한 lib/ 를 상대한다. 여기서 한 번만 짓는다.
+      - name: 빌드
+        run: bun run build
 
       # bun 이 소스를 그대로 읽는다 — 빌드를 안 거친다.
       - name: 단위
-        run: npm run test:unit
+        run: bun run test:unit
 
       # 이쪽은 반대로 컴파일한 lib/ 를 노드로 띄운다. 배포하는 물건이 그거다.
       - name: CLI
-        run: npm run test:cli
+        run: bun run test:cli
 
       # ytstudio types 는 손님 프로젝트에 파일을 쓴다. 그래서 임시 프로젝트를
       # 세우고, 만들어진 .d.ts 를 진짜 tsc 로 컴파일해 본다. yt-dlp 는 안
       # 깔아도 된다 — 이 명령이 보는 건 --version 과 --help 출력뿐이라
       # 붙박이 도움말을 뱉는 껍데기가 곧 실물이다.
       - name: types 명령
-        run: npm run test:types
+        run: bun run test:types

@@ -9,19 +9,25 @@ npm i ytstudio
 npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 ```
 
-저장소에서 손볼 때는 이렇다.
+저장소에서 손볼 때는 **[bun](https://bun.com) 이 있어야 한다** (버전은
+`packageManager` 필드가 고정한다).
 
 ```
-npm run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
-npm run gen:types # ytstudio.schema.json → src/core/options.gen.ts
-npm run cli       # 빌드 없이 CLI 를 돌려 본다
-npm test          # 타입 + 단위 + CLI
+bun install       # 의존성은 typescript 와 @types/node 둘뿐이다
+bun run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
+bun run gen:types # ytstudio.schema.json → src/core/options.gen.ts
+bun run cli       # 빌드 없이 CLI 를 돌려 본다
+npm test          # 타입 + 빌드 + 단위 + CLI + types
 ```
 
 **저장소에 `.js` 가 없다.** 소스도 테스트도 생성기도 전부 `.ts` 이고, **돌리는 건
 bun, 타입과 산출물은 tsc** 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를 `x.ts` 로
 풀어 주므로 단위 테스트와 생성기는 빌드를 안 거친다. 대신 bun 은 타입 검사를 안
 하고 `.d.ts` 도 못 내므로 그쪽은 tsc 가 맡는다.
+
+한동안 bun 을 devDependency 로 뒀는데, 그러면 CI 가 **매 실행마다 bun 바이너리를
+통째로 설치한다** — `node_modules` 가 380MB 였고 그중 347MB 가 bun 이었다. 지금은
+34MB 다. 손님에게는 아무 영향이 없다(`dependencies` 는 원래 비어 있다).
 
 린터는 없다. eslint 가 켜 두던 규칙이 둘(`no-undef` · `no-unused-vars`)뿐이었는데
 전부 `.ts` 가 되면서 tsc 와 `noUnusedLocals` 가 그대로 잡는다.
@@ -245,7 +251,8 @@ tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전�
 
 | | 무엇으로 | 왜 |
 |---|---|---|
-| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 124ms |
+| 의존성 설치 | **bun**, `bun.lock` | 캐시가 웜이면 0.04초 |
+| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 130ms |
 | 옵션 타입 생성 | **bun** | `.ts` 어휘 표를 그대로 읽는다 |
 | 타입 검사 | **tsc** | bun 은 타입을 안 본다. 린터 자리도 여기가 대신한다 |
 | 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |

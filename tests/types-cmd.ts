@@ -13,7 +13,7 @@
  * 만든다.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,6 +23,12 @@ const CLI = path.join(ROOT, 'lib', 'cli.js');
 const TSC = path.join(ROOT, 'node_modules', '.bin', 'tsc');
 const HELP = readFileSync(path.join(ROOT, 'tests/fixtures/yt-dlp-2026.07.04.help.txt'), 'utf8');
 const BASE = JSON.parse(readFileSync(path.join(ROOT, 'ytstudio.schema.json'), 'utf8'));
+
+// 이 검사도 컴파일한 산출물을 노드로 띄운다. 없으면 왜 없는지 말해 준다.
+if (!existsSync(CLI)) {
+  console.error(`${CLI} 가 없다 — 'npm run build' 를 먼저 돌릴 것 (npm test 는 같이 한다).`);
+  process.exit(2);
+}
 
 interface Run { code: number; out: string }
 
