@@ -1,10 +1,8 @@
 {
-  // 빌더만 TypeScript 다. 그래프·UI 는 그대로 JS 로 둔다 — 타입이 값을 하는
-  // 곳은 "설치된 yt-dlp 의 옵션 188개"이지 캔버스가 아니다.
-  //
-  // core/ 의 JS 모듈(schema · 파서 · 검증기)은 allowJs 로 같이 컴파일해서
-  // lib/ 에 넣는다. 그쪽은 추론에 맡긴다 — noImplicitAny 를 끈 이유다.
-  // 손님에게 나가는 타입(options.gen.ts · build.ts)은 strict 로 짠다.
+  // 저장소에 .js 가 없다. 소스도 테스트도 생성기도 전부 .ts 이고, bun 이 그걸
+  // 그대로 돌린다. 그래서 예전에 eslint 가 보던 둘(no-undef · no-unused-vars)을
+  // 여기서 본다 — tsc 가 선언 안 된 이름을 잡고, noUnusedLocals 가 죽은 지역
+  // 변수를 잡는다. 인자는 안 본다(옛 eslint 설정의 args:'none' 과 같게).
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -12,10 +10,8 @@
     "lib": ["ES2022"],
     "types": ["node"],
 
-    "allowJs": true,
-    "checkJs": false,
-    "noImplicitAny": false,
     "strict": true,
+    "noUnusedLocals": true,
     "skipLibCheck": true,
 
     "declaration": true,

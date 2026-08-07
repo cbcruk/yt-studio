@@ -1,43 +1,50 @@
 /**
- * schema.json → src/core/options.gen.ts
+ * ytstudio.schema.json → src/core/options.gen.ts
  *
- * gen_schema.py 가 설치된 yt-dlp 를 리플렉션해서 schema.json 을 떨구고, 이
- * 파일이 그걸 **타입**으로 옮긴다. 그래서 자동완성에 뜨는 옵션 = 당신이 깐
- * yt-dlp 의 옵션이다. 모델의 기억에서 나온 게 아니다.
+ * gen_schema.py 가 설치된 yt-dlp 를 리플렉션해서 ytstudio.schema.json 을
+ * 떨구고, 이 파일이 그걸 **타입**으로 옮긴다. 그래서 자동완성에 뜨는 옵션 =
+ * 이 저장소를 구울 때의 yt-dlp 옵션이다. 모델의 기억에서 나온 게 아니다.
+ *
+ * 검증기는 런타임에 로컬 스키마를 집을 수 있지만(src/index.ts) 타입은 못
+ * 바꾼다 — 여기서 나온 파일이 그대로 .d.ts 가 되어 배포된다.
  *
  * 검증기가 런타임에 하던 일의 절반이 여기서 컴파일 타임으로 올라간다 —
  * 없는 플래그는 없는 메서드가 되고, choices 는 유니온이 된다.
  *
  * 내는 것은 타입뿐이다. 런타임 메서드는 build.ts 가 같은 스키마에서 기른다.
- * 한 곳(schema.json)에서 둘이 같이 나오므로 어긋날 수가 없다.
+ * 한 곳(ytstudio.schema.json)에서 둘이 같이 나오므로 어긋날 수가 없다.
  *
- *   node gen_options.mjs
+ *   bun gen_options.ts
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { FKEYS, SELECTORS, SEL_HELP } from './src/core/format-grammar.js';
 import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-template.js';
+import type { Opt, RawSchema } from './src/core/schema.js';
 
-const SCHEMA = JSON.parse(readFileSync(new URL('./schema.json', import.meta.url), 'utf8'));
+const SCHEMA: RawSchema = JSON.parse(
+  readFileSync(new URL('./ytstudio.schema.json', import.meta.url), 'utf8'),
+);
 
 // 이름 규칙은 build.ts 와 **같아야 한다**. 여기서 타입 이름을, 저기서 런타임
 // 메서드 이름을 만드는데 둘이 어긋나면 타입은 있고 메서드는 없는 칸이 생긴다.
-const methodName = flag =>
-  String(flag).replace(/^--?/, '').replace(/-+([a-z0-9])/g, (_, c) => c.toUpperCase());
-const selMethod = sel => sel.replace('*', 'Star');
+const methodName = (flag: string): string =>
+  String(flag).replace(/^--?/, '').replace(/-+([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+const selMethod = (sel: string): string => sel.replace('*', 'Star');
 
 // 도움말을 JSDoc 안에 안전하게 넣는다. 닫는 기호가 그대로 들어오면 주석이
 // 거기서 끝나 버린다 — 방금 이 파일이 그것 때문에 한 번 깨졌다.
-const doc = s => String(s || '').replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
-const union = xs => xs.map(x => `'${x}'`).join(' | ');
+const doc = (s: string): string =>
+  String(s || '').replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
+const union = (xs: readonly string[]): string => xs.map(x => `'${x}'`).join(' | ');
 
-// 어휘 표들은 손으로 적는 층이다(format-grammar.js · output-template.js).
+// 어휘 표들은 손으로 적는 층이다(format-grammar.ts · output-template.ts).
 // 자동완성에 뜨는 한국어 설명이 전부 거기서 나온다.
 const SELS = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const OUT_FIELDS = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 const TYPES = OUT_TYPES.map(([v]) => v).filter(Boolean);
 
-const fkeyDoc = k => doc((FKEYS.find(([n]) => n === k) || [])[1]);
+const fkeyDoc = (k: string): string => doc((FKEYS.find(([n]) => n === k) || ['', ''])[1]);
 const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
 ).join('\n');
@@ -45,7 +52,7 @@ const filterProps = FKEYS.map(([k, , t]) =>
 // -f · -o · -P 는 값 자체가 구조라 build.ts 가 손으로 쓴 시그니처를 갖는다.
 const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
 
-function optionMethod(o) {
+function optionMethod(o: Opt): string {
   const name = methodName(o.flag);
   const alias = [o.short, ...(o.aliases || [])].filter(Boolean);
   const lines = [
@@ -58,7 +65,7 @@ function optionMethod(o) {
   lines.push('   */');
 
   const sig = o.kind === 'flag' ? 'on?: boolean'
-    : o.kind === 'choice' ? `value: ${union(o.choices)}`
+    : o.kind === 'choice' ? `value: ${union(o.choices ?? [])}`
       : o.kind === 'repeatable' ? '...values: Arg[]'
         : `value: Arg`;
   lines.push(`  ${name}(${sig}): this;`);
@@ -69,10 +76,10 @@ const optionMethods = SCHEMA.options
   .filter(o => !HAND_WRITTEN.has(o.id))
   .map(optionMethod).join('\n\n');
 
-const out = `// 이 파일은 gen_options.mjs 가 schema.json 에서 만든다. 손으로 고치지 말 것.
+const out = `// 이 파일은 gen_options.ts 가 ytstudio.schema.json 에서 만든다. 손으로 고치지 말 것.
 //
 //   yt-dlp ${SCHEMA.ytdlp_version} · 옵션 ${SCHEMA.options.length}개
-//   node gen_options.mjs
+//   bun gen_options.ts
 
 /** 이 타입들이 나온 yt-dlp 버전. */
 export type Version = '${SCHEMA.ytdlp_version}';
@@ -153,7 +160,7 @@ ${TYPES.map(t => `  ${t}?: string;`).join('\n')}
  * 설치된 yt-dlp 의 옵션 전부.
  *
  * \`Ytdlp\` 클래스와 선언 병합된다 — 런타임 메서드는 build.ts 가 같은
- * schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
+ * ytstudio.schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
  */
 export interface Options {
 ${optionMethods}

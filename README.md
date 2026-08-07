@@ -5,10 +5,26 @@
 **설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.**
 
 ```
-npm run build     # → lib/                            (tsc)
-npm run gen:types # schema.json → src/core/options.gen.ts
-npm test          # 린트 + 타입 + 단위 + CLI
+npm i ytstudio
+npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 ```
+
+저장소에서 손볼 때는 이렇다.
+
+```
+npm run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
+npm run gen:types # ytstudio.schema.json → src/core/options.gen.ts
+npm run cli       # 빌드 없이 CLI 를 돌려 본다
+npm test          # 타입 + 단위 + CLI
+```
+
+**저장소에 `.js` 가 없다.** 소스도 테스트도 생성기도 전부 `.ts` 이고, **돌리는 건
+bun, 타입과 산출물은 tsc** 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를 `x.ts` 로
+풀어 주므로 단위 테스트와 생성기는 빌드를 안 거친다. 대신 bun 은 타입 검사를 안
+하고 `.d.ts` 도 못 내므로 그쪽은 tsc 가 맡는다.
+
+린터는 없다. eslint 가 켜 두던 규칙이 둘(`no-undef` · `no-unused-vars`)뿐이었는데
+전부 `.ts` 가 되면서 tsc 와 `noUnusedLocals` 가 그대로 잡는다.
 
 ## 왜 만드나
 
@@ -41,8 +57,8 @@ ytdlp('https://youtu.be/abc')
 ```
 
 메서드 188개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은 곳에서
-나오므로 **자동완성에 뜨는 옵션 = 당신이 깐 yt-dlp 의 옵션**이다. 그래서 검증기가
-하던 일의 절반이 컴파일 타임으로 올라간다.
+나오므로 **자동완성에 뜨는 옵션 = 리플렉션한 yt-dlp 의 옵션**이다. 모델의 기억에서
+나온 게 아니다. 그래서 검증기가 하던 일의 절반이 컴파일 타임으로 올라간다.
 
 ```
 ytdlp(u).writeSub()      → Property 'writeSub' does not exist. Did you mean 'writeSubs'?
@@ -70,7 +86,11 @@ $ ytstudio lint 'yt-dlp -f "bv+ba/" --write-sub -o "%(title)s" https://youtu.be/
 
 만들 파일  ‹제목›
 판정      오류 2개 · 옵션 2개를 스키마 191개와 대조
+스키마    패키지 내장 (yt-dlp 2026.07.04)
 ```
+
+마지막 줄이 **판정의 근거**다. 무엇에 대조했는지 모르면 판정도 모르는 것이라
+늘 같이 낸다 — 아래 [어느 yt-dlp 에 대조하나](#어느-yt-dlp-에-대조하나).
 
 **오류가 있으면 1 로 끝난다** — 스크립트와 CI 에 그대로 걸린다. 파이프도 된다
 (`pbpaste | ytstudio lint`). 무슨 뜻인지 읽으려면 `ytstudio explain`.
@@ -87,46 +107,112 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 
 ## 검증기가 보는 것
 
-`src/core/lint.js` — 로컬에서, 결정적으로, 네트워크 없이 돈다.
+`src/core/lint.ts` — 로컬에서, 결정적으로, 네트워크 없이 돈다.
 
 | 보는 것 | 근거 |
 |---|---|
-| 이 yt-dlp 버전에 있는 플래그인가 | 리플렉션한 `schema.json` (별칭·단축·부정형까지) |
+| 이 yt-dlp 버전에 있는 플래그인가 | 리플렉션한 `ytstudio.schema.json` (별칭·단축·부정형까지) |
 | 오타라면 무엇을 쓰려던 건가 | 편집거리 + 접두어 가중치로 후보 세 개 |
 | 값이 필요한 자리에 값이 있는가 | `kind` · `metavar` |
 | 고를 수 있는 값 중 하나인가 | `choices` |
-| `-f` 가 포맷 셀렉터 문법에 맞는가 | `core/format-grammar.js` 파서 |
-| `-o` 가 출력 템플릿 문법에 맞는가 · 확장자가 붙는가 | `core/output-template.js` 파서 |
-| `-P` 에 같은 종류가 두 번 오지 않는가 | `core/paths.js` |
+| `-f` 가 포맷 셀렉터 문법에 맞는가 | `core/format-grammar.ts` 파서 |
+| `-o` 가 출력 템플릿 문법에 맞는가 · 확장자가 붙는가 | `core/output-template.ts` 파서 |
+| `-P` 에 같은 종류가 두 번 오지 않는가 | `core/paths.ts` |
 | 서로 어긋나는 조합인가 | `-x` 인데 `-f` 가 영상 전용, `--embed-subs` 인데 자막을 안 받음 … |
 
 마지막 줄이 빌더가 있어도 검증기가 안 없어지는 이유다. **조합은 타입이 못 본다** —
 `-x` 와 `-f bv` 는 둘 다 실재하는 옵션이라 컴파일러가 통과시킨다. 빌더에서도
 `.lint()` 로 같은 검사를 돌릴 수 있다.
 
+## 어느 yt-dlp 에 대조하나
+
+패키지에는 층이 둘이고 **둘의 출처가 다를 수 있다.** 이게 이 도구를 쓸 때 알아야
+할 유일한 함정이라 앞에 꺼내 둔다.
+
+| | 무엇을 보나 | 바꿀 수 있나 |
+|---|---|---|
+| **런타임** — `lintCommand` · `ytdlp()` 메서드 | 파일을 읽는다 | **된다.** 당신이 깐 것을 볼 수 있다 |
+| **타입** — 자동완성 · `.d.ts` | 패키지를 구울 때 박혔다 | 안 된다 |
+
+런타임은 이 순서로 찾는다.
+
+```
+$YTSTUDIO_SCHEMA          → 명시적으로 가리킨 곳
+./ytstudio.schema.json    → 작업 디렉터리
+패키지 내장                → 아무것도 없으면 (기본)
+```
+
+기본값이 마지막이라는 게 중요하다. **패키지 내장 스키마는 이 저장소를 구울 때의
+yt-dlp 이지 당신 것이 아니다.** 그래서 당신 yt-dlp 가 더 새로우면 새 플래그를
+없는 것으로 잡고 **exit 1** 을 낸다 — CI 에 걸어 뒀으면 빌드가 깨진다.
+
+당신 것에 맞추려면 한 번 리플렉션해서 프로젝트 루트에 두면 된다.
+
+```
+python3 gen_schema.py > ytstudio.schema.json
+```
+
+```
+판정      확인됨 · 옵션 1개를 스키마 192개와 대조
+스키마    /work/ytstudio.schema.json (yt-dlp 2026.09.01)
+```
+
+그래도 **타입은 안 따라온다.** `.d.ts` 는 이미 구워져서 나온 것이라 새 플래그가
+자동완성에 안 뜬다. 코드에서는 `SCHEMA_SOURCE` 가 그 어긋남을 말해 준다.
+
+```ts
+import { SCHEMA_SOURCE } from 'ytstudio';
+
+SCHEMA_SOURCE.from;          // 'local' | 'env' | 'bundled'
+SCHEMA_SOURCE.version;       // '2026.09.01'  검증기가 대조하는 것
+SCHEMA_SOURCE.typesVersion;  // '2026.07.04'  자동완성이 나온 것
+SCHEMA_SOURCE.stale;         // true — 둘이 갈렸다
+```
+
+이 층을 없애는 게 다음 걸음이다 — `npx ytstudio types` 가 설치 쪽에서 리플렉션해
+`.d.ts` 를 덮어쓰면 둘이 다시 하나가 된다. 지금은 갈릴 수 있다는 것을 **숨기지
+않는 것**까지가 이 층의 약속이다.
+
 ## 구성
 
 ```
-src/core/            DOM 도 파일 시스템도 모른다. node 로 단위 테스트가 된다
-  schema.js          리플렉션한 JSON → 색인
+src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript 다
+  schema.ts          리플렉션한 JSON → 색인 (Opt · Stage 타입이 여기서 난다)
   build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
-  options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.mjs 가 만든다)
-  lint.js            명령어 진단 — 이 도구의 중심
-  explain.js         토큰별 설명 · 파일명 미리보기 · 다음 걸음
-  command.js         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
-  format-grammar.js  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
-  output-template.js -o 파서 · 컴파일러 · 필드/변환 어휘
-  paths.js           -P 항목 한 줄 읽기
-src/index.ts         공개 API (빌더 + 검증기)
+  options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.ts 가 만든다)
+  lint.ts            명령어 진단 — 이 도구의 중심
+  explain.ts         토큰별 설명 · 파일명 미리보기 · 다음 걸음
+  command.ts         명령어 문자열 ↔ 항목 수열 (읽는 길은 scanCommand 하나뿐)
+  format-grammar.ts  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
+  output-template.ts -o 파서 · 컴파일러 · 필드/변환 어휘
+  paths.ts           -P 항목 한 줄 읽기
+src/index.ts         공개 API (빌더 + 검증기) · 스키마를 읽는 유일한 자리
 src/cli.ts           ytstudio lint · explain
-gen_schema.py        yt-dlp optparse 트리를 리플렉션해 schema.json 으로
-gen_options.mjs      schema.json 을 옵션 타입으로
-tsconfig*.json       빌드용 · 타입 검사 전용
+tests/               단위(bun) · 타입(tsc) · CLI(빌드물을 노드로)
+gen_schema.py        yt-dlp optparse 트리를 리플렉션한다               ← 유일한 비-TS
+gen_options.ts       그 스키마를 옵션 타입으로
+ytstudio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
+tsconfig.json        빌드용 (src → lib)
+tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전부)
 .github/workflows/   CI — npm test 와 같은 것 + 타입이 스키마와 맞는지
 ```
 
 `options.gen.ts` 는 커밋한다 — 에디터가 클론 직후부터 자동완성을 줘야 한다.
 `lib/` 는 커밋하지 않는다(`prepare` 가 굽는다).
+
+## 무엇을 무엇으로 돌리는가
+
+| | 무엇으로 | 왜 |
+|---|---|---|
+| 단위 테스트 | **bun**, `src/` 를 직접 | 빌드를 안 거친다. 124ms |
+| 옵션 타입 생성 | **bun** | `.ts` 어휘 표를 그대로 읽는다 |
+| 타입 검사 | **tsc** | bun 은 타입을 안 본다. 린터 자리도 여기가 대신한다 |
+| 배포물 `lib/` | **tsc** | bun 은 `.d.ts` 를 못 낸다 |
+| CLI 검사 | **node**, `lib/` 를 상대로 | 배포하는 게 `#!/usr/bin/env node` 짜리라서 |
+
+마지막 줄이 중요하다. 단위 테스트가 소스를 보는 대신, CLI 검사가 **컴파일된
+산출물을 진짜 프로세스로** 띄운다 — 소스만 보고 끝나면 `tsc` 가 낸 것이 도는지는
+아무도 안 본 게 된다.
 
 ## 스키마 다시 뽑기
 
@@ -134,23 +220,24 @@ yt-dlp 를 올렸으면 둘을 같이 돌린다. CI 가 **스키마만 고치고
 뽑은 경우**를 잡는다.
 
 ```
-python3 gen_schema.py      # 설치된 yt-dlp → schema.json
-npm run gen:types          # schema.json → src/core/options.gen.ts
+python3 gen_schema.py > ytstudio.schema.json   # 설치된 yt-dlp → 스키마
+npm run gen:types                              # 스키마 → src/core/options.gen.ts
 ```
 
 ## 손으로 채우는 층
 
 리플렉션이 절대 못 주는 것이 둘 있고, 이 도구의 실제 부가가치가 거기 있다.
 
-1. `core/lint.js` 의 **어긋나는 조합** 규칙 (`crossChecks`)
-2. `core/format-grammar.js` · `core/output-template.js` 의 **어휘와 설명** — 필터
+1. `core/lint.ts` 의 **어긋나는 조합** 규칙 (`crossChecks`)
+2. `core/format-grammar.ts` · `core/output-template.ts` 의 **어휘와 설명** — 필터
    필드, 출력 필드, 변환 글자. 자동완성에 뜨는 한국어 설명이 여기서 나온다
 
 ## 한계
 
-- **타입은 이 저장소에 커밋된 yt-dlp 버전 기준이다.** "당신이 깐 버전"이 온전히
-  참이 되려면 설치 시점에 로컬 yt-dlp 를 리플렉션하는 단계가 있어야 한다. 지금은
-  `gen_schema.py` 를 직접 돌려야 한다.
+- **타입은 이 저장소에 커밋된 yt-dlp 버전 기준이다.** 검증기는 로컬 스키마를
+  집을 수 있지만 `.d.ts` 는 구워져서 나오므로 못 바꾼다. 온전히 참이 되려면
+  설치 시점에 리플렉션해 타입을 덮어쓰는 단계가 있어야 한다 —
+  [어느 yt-dlp 에 대조하나](#어느-yt-dlp-에-대조하나).
 - **검증기는 "스키마와 문법에 어긋나는 곳이 없다"까지만 말한다.** 문법이 맞아도
   의도와 다를 수 있어서 파일명 미리보기와 토큰별 설명을 같이 낸다.
 - **실제로 돌려 보지는 않는다.** 이 URL 에 그 포맷이 정말 있는지는 yt-dlp 를

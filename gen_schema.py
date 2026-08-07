@@ -6,7 +6,7 @@ yt-dlp의 optparse 트리를 그대로 리플렉션해서 JSON으로 떨군다.
 help 텍스트를 긁는 게 아니라 옵션 객체를 읽으므로, yt-dlp를 올리면
 스키마도 같이 따라온다. CI에서 릴리스마다 재실행할 것.
 
-    python gen_schema.py > schema.json
+    python gen_schema.py > ytstudio.schema.json
 """
 
 import json

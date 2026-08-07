@@ -9,5 +9,5 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["src/index.ts", "tests/types/**/*.ts"]
+  "include": ["src/index.ts", "src/cli.ts", "gen_options.ts", "tests/**/*.ts"]
 }

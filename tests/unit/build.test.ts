@@ -1,8 +1,9 @@
 /**
  * 코드로 쓰는 명령어.
  *
- * 컴파일한 것(`lib/`)을 검사한다 — 손님이 실제로 받는 물건이 그거다. 타입이
- * 막는 것들은 여기 없다. 그건 `tests/types/reject.ts` 가 `tsc` 로 검사한다.
+ * 소스를 직접 검사한다 — bun 이 .ts 를 그대로 읽으므로 빌드를 안 거친다.
+ * 컴파일 결과(`lib/`)는 CLI 검사가 진짜 프로세스로 exercise 한다.
+ * 타입이 막는 것들은 여기 없다 — `tests/types/reject.ts` 가 `tsc` 로 검사한다.
  *
  * 여기서 보는 건 셋이다.
  *   · 문자열이 맞게 나오는가
@@ -13,12 +14,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const { ytdlp, formatFactory, outTag, methodName, selMethod, YTDLP_VERSION } =
-  await import('../../lib/index.js');
-const { parseFormat } = await import('../../lib/core/format-grammar.js');
-const { parseTemplate } = await import('../../lib/core/output-template.js');
-const { scanCommand } = await import('../../lib/core/command.js');
+  await import('../../src/index.js');
+const { parseFormat } = await import('../../src/core/format-grammar.js');
+const { parseTemplate } = await import('../../src/core/output-template.js');
+const { scanCommand } = await import('../../src/core/command.js');
 
 const U = 'https://youtu.be/abc';
+
+/**
+ * 타입을 벗기고 런타임 표면만 본다.
+ *
+ * 메서드는 스키마에서 **자라므로** 타입에 있다고 런타임에도 있는 건 아니다.
+ * 그 둘이 짝이 맞는지가 이 파일이 볼 것이라, 여기서만 의도적으로 벗긴다.
+ * 타입이 무엇을 막는지는 tests/types/reject.ts 가 따로 본다.
+ */
+const raw = (c: unknown): Record<string, unknown> => c as Record<string, unknown>;
 
 test('메서드 이름은 긴 플래그에서 나온다', () => {
   assert.equal(methodName('--embed-subs'), 'embedSubs');
@@ -52,7 +62,7 @@ test('짧은 플래그가 있으면 짧은 것을 쓴다 — 검사 결과와 �
 });
 
 test('스키마에서 자란다 — 손으로 적은 목록이 없다', () => {
-  const c = ytdlp(U);
+  const c = raw(ytdlp(U));
   for (const m of ['embedSubs', 'writeSubs', 'subLangs', 'fixup', 'matchFilters', 'part']) {
     assert.equal(typeof c[m], 'function', `${m} 가 없다`);
   }
@@ -126,6 +136,9 @@ test('필터 — 그냥 준 값은 =, 참/거짓은 있음/없음, loose 는 ?',
 
 test('모르는 비교를 주면 거기서 멈춘다', () => {
   const f = formatFactory();
+  // 타입은 이미 막는다(reject.ts). 여기서 보는 건 타입을 우회해서 들어왔을 때
+  // 런타임이 조용히 넘기지 않고 멈추는가다 — 라이브러리는 JS 에서도 불린다.
+  // @ts-expect-error 없는 비교를 일부러 준다
   assert.throws(() => f.bv({ height: { roughly: 1080 } }), /모르는 비교/);
 });
 

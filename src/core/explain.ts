@@ -12,6 +12,36 @@
 import { BY_ID, STAGE } from './schema.js';
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
+import type { Opt } from './schema.js';
+import type { Item } from './command.js';
+import type { Values } from './lint.js';
+
+/** 이 명령어가 만들 파일명. `-o` 를 못 읽었으면 `ok` 가 거짓이고 원문이 그대로 온다. */
+export interface FilePreview {
+  ok: boolean;
+  /** `-o` 앞에 붙은 종류 접두어(`thumbnail:` 의 `thumbnail`). */
+  type: string;
+  text: string;
+  /** `-o` 가 없어서 yt-dlp 기본 템플릿을 쓴 경우. */
+  dflt?: boolean;
+}
+
+/** 토큰 하나를 한 줄로 읽은 것. */
+export interface Explained {
+  kind: Item['kind'];
+  text: string;
+  ko: string;
+  id?: string;
+  stage?: string;
+  stageLabel?: string;
+  value?: string | null;
+}
+
+/** 이어서 줄 만한 옵션 하나와 그 이유. */
+export interface Suggestion {
+  opt: Opt;
+  why: string;
+}
 
 /** -o 를 안 주면 yt-dlp 가 쓰는 기본 출력 템플릿. */
 export const DEFAULT_OUTTMPL = '%(title)s [%(id)s].%(ext)s';
@@ -22,16 +52,16 @@ export const DEFAULT_OUTTMPL = '%(title)s [%(id)s].%(ext)s';
  * 값을 모르므로 필드는 ‹제목› 처럼 자리표시자로 둔다. -P home 이 있으면
  * 앞에 붙인다 — "어디에 무엇이 놓이는가"가 한 줄로 보여야 한다.
  */
-export function previewFilename(values) {
-  const rawOut = Array.isArray(values.output) ? values.output[0] : values.output;
+export function previewFilename(values: Values): FilePreview {
+  const rawOut = (Array.isArray(values.output) ? values.output[0] : values.output) as string | null;
   const { type, template } = splitType(rawOut || DEFAULT_OUTTMPL);
-  let body;
+  let body: string;
   try { body = previewTemplate(parseTemplate(template)); }
   catch { return { ok: false, text: rawOut || DEFAULT_OUTTMPL, type }; }
 
   let home = '';
   if (values.paths) {
-    for (const line of [].concat(values.paths)) {
+    for (const line of ([] as string[]).concat(values.paths as string | string[])) {
       const e = splitEntry(line);
       if (!e.type || e.type === 'home') home = e.path;
     }
@@ -41,7 +71,7 @@ export function previewFilename(values) {
 }
 
 /** 토큰 하나를 한 줄로 설명한다. */
-export function explainItem(it) {
+export function explainItem(it: Item): Explained {
   if (it.kind === 'url') return { kind: 'url', text: it.raw, ko: '받을 대상' };
   if (it.kind === 'unknown') return { kind: 'unknown', text: it.raw, ko: '읽지 못한 토큰' };
   const { opt, negated, value } = it;
@@ -51,13 +81,13 @@ export function explainItem(it) {
     id: opt.id,
     text: it.raw,
     stage: opt.stage,
-    stageLabel: (STAGE[opt.stage] || {}).label || opt.stage,
+    stageLabel: STAGE[opt.stage]?.label || opt.stage,
     value,
     ko: negated ? `${help} — 끄기` : help,
   };
 }
 
-export const explainCommand = items => items.map(explainItem);
+export const explainCommand = (items: Item[]): Explained[] => items.map(explainItem);
 
 /**
  * 지금 조합에서 자연스럽게 따라오는 옵션들.
@@ -66,7 +96,7 @@ export const explainCommand = items => items.map(explainItem);
  * 훑게 하는 대신 다음 한 걸음을 놓아 주는 쪽이 옵션이 많을 때 유일하게
  * 통한다. 규칙은 손으로 정한다 — 스키마에는 이런 이웃 관계가 없다.
  */
-const RULES = [
+const RULES: { when: (v: Values) => unknown; ids: string[]; why: string }[] = [
   { when: v => v['extract-audio'], ids: ['audio-format', 'audio-quality', 'embed-thumbnail', 'embed-metadata'],
     why: '음원만 뽑을 때 대개 같이 준다' },
   { when: v => v['write-subs'] || v['write-auto-subs'], ids: ['sub-langs', 'embed-subs', 'sub-format'],
@@ -86,9 +116,9 @@ const RULES = [
 /** 아무 규칙도 안 걸릴 때. 처음 만든 명령어에도 다음 걸음이 있어야 한다. */
 const STARTERS = ['format', 'output', 'paths', 'download-archive', 'embed-metadata'];
 
-export function suggestNext(values, limit = 6) {
-  const out = [];
-  const push = (id, why) => {
+export function suggestNext(values: Values, limit = 6): Suggestion[] {
+  const out: Suggestion[] = [];
+  const push = (id: string, why: string): void => {
     const o = BY_ID[id];
     if (!o || id in values || out.some(x => x.opt.id === id)) return;
     out.push({ opt: o, why });

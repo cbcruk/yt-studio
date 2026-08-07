@@ -24,6 +24,10 @@ import { SELECTORS, emitTree } from './format-grammar.js';
 import { FIELDS, emitPiece } from './output-template.js';
 import { lintCommand } from './lint.js';
 import { quote } from './command.js';
+import type { Opt } from './schema.js';
+import type { Filter, FormatNode, FormatOp } from './format-grammar.js';
+import type { Piece as OutNode } from './output-template.js';
+import type { Issue } from './lint.js';
 
 import type {
   Arg, Conversion, Filters, FormatFactory as GenFactory, NumCond,
@@ -33,9 +37,11 @@ import type {
 export type {
   Arg, Conversion, Filters, NumCond, OutField, OutType, PathMap, Selector, StrCond, Version,
 } from './options.gen.js';
+export type { Filter, FormatNode } from './format-grammar.js';
+export type { Issue } from './lint.js';
 
-const SEL_NAMES: string[] = SELECTORS.flatMap(([, items]: any) => items.map(([k]: any) => k));
-const FIELD_NAMES: string[] = FIELDS.flatMap(([, items]: any) => items.map(([k]: any) => k));
+const SEL_NAMES = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
+const FIELD_NAMES = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 
 /** `--embed-subs` → `embedSubs`. 짧은 플래그는 안 쓴다 — 코드는 읽으라고 있다. */
 export const methodName = (flag: string): string =>
@@ -51,31 +57,9 @@ export const selMethod = (sel: string): string => sel.replace('*', 'Star');
  * 결과에 뜨는 플래그와도 같아야 눈으로 대조가 된다. 메서드 **이름**은 긴 쪽에서
  * 나온다(`-f` 가 아니라 `.format()`) — 코드는 읽으라고 있다.
  */
-const flagOf = (opt: SchemaOpt): string => opt.short || opt.flag;
+const flagOf = (opt: Opt): string => opt.short || opt.flag;
 
-/**
- * 스키마 항목 중 빌더가 쓰는 칸만.
- *
- * `schema.js` 는 JS 라 타입이 `{}` 로 잡힌다. 전부를 다시 적는 대신 여기서
- * 쓰는 칸만 좁혀 둔다 — 설정을 조여도 이 파일은 안 깨진다.
- */
-interface SchemaOpt {
-  id: string;
-  flag: string;
-  short?: string | null;
-  kind: 'flag' | 'value' | 'choice' | 'repeatable';
-  negation?: string | null;
-}
-
-const optOf = (id: string): SchemaOpt => (BY_ID as Record<string, SchemaOpt>)[id];
-
-/** `[height<=?1080]` 한 칸. `loose` 가 참이면 `?` 가 붙는다. */
-export interface Filter { key: string; op: string; loose?: boolean; value: string }
-
-/** 트리 노드. `parseFormat` 이 내놓는 것과 **같은 모양**이다. */
-export type FormatNode =
-  | { t: 'sel'; name: string; filters: Filter[] }
-  | { t: 'merge' | 'fallback' | 'multi'; kids: FormatNode[]; filters?: Filter[] };
+const optOf = (id: string): Opt => BY_ID[id];
 
 const COND_OPS: Record<string, string> = {
   lt: '<', lte: '<=', gt: '>', gte: '>=', eq: '=', ne: '!=',
@@ -119,7 +103,7 @@ export function toFilters(spec?: Filters): Filter[] {
 export class Expr {
   constructor(readonly node: FormatNode) {}
 
-  private op(t: 'merge' | 'fallback' | 'multi', rest: Expr[]): Expr {
+  private op(t: FormatOp, rest: Expr[]): Expr {
     const kids = [this.node, ...rest.map(r => r.node)];
     // 같은 연산자가 이어지면 한 노드로 눕힌다 — a.plus(b).plus(c) 는
     // ((a+b)+c) 가 아니라 a+b+c 로 나와야 손으로 쓴 것과 같아진다.
@@ -161,12 +145,9 @@ export function formatFactory(): FormatFactory {
   return f as unknown as FormatFactory;
 }
 
-/** `%(upload_date>%Y-%m-%d|Unknown)s` 한 칸을 풀어 놓은 것. */
-export interface FieldPiece {
-  t: 'field'; name: string; strf: string; fallback: string | null; fmt: string; conv: string;
-}
-export type TextPiece = { t: 'text'; text: string };
-export type OutNode = FieldPiece | TextPiece;
+/** `%(upload_date>%Y-%m-%d|Unknown)s` 한 칸. `output-template.ts` 의 필드 조각이다. */
+export type FieldPiece = Extract<OutNode, { t: 'field' }>;
+export type { OutNode };
 
 export class Piece {
   constructor(readonly p: FieldPiece) {}
@@ -220,20 +201,6 @@ export function outTag(): OutTag {
   return tag as unknown as OutTag;
 }
 
-/**
- * 검증기가 잡은 것 하나.
- *
- * `error` 는 그대로 돌리면 안 되는 것, `warn` 은 의도와 다를 수 있는 것,
- * `info` 는 참고다. `fixes` 는 없는 플래그일 때 가까운 후보 셋.
- */
-export interface Issue {
-  level: 'error' | 'warn' | 'info';
-  msg: string;
-  flag?: string;
-  opt?: string;
-  fixes?: string[];
-}
-
 interface Part { id: string; flag: string; value?: string }
 
 // -f · -o · -P 는 값 자체가 구조라 손으로 쓴 메서드가 맡는다.
@@ -243,7 +210,7 @@ const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
  * 스키마에서 자란 188개 메서드가 여기 합쳐진다.
  *
  * 클래스와 인터페이스 선언 병합 — 런타임은 `grow()` 가 프로토타입에 심고,
- * 타입은 생성기가 낸다. 둘 다 schema.json 한 곳에서 나오므로 어긋날 수 없다.
+ * 타입은 생성기가 낸다. 둘 다 스키마 한 곳에서 나오므로 어긋날 수 없다.
  */
 export interface Ytdlp extends Options {}
 
@@ -359,7 +326,7 @@ export class Ytdlp {
    */
   lint(): { ok: boolean; issues: Issue[] } {
     const { ok, issues } = lintCommand(this.build());
-    return { ok, issues: issues as Issue[] };
+    return { ok, issues };
   }
 
   toString(): string { return this.build(); }
@@ -381,7 +348,7 @@ export function grow(): void {
   if (grown === OPTS.length) return;
   const proto = Ytdlp.prototype as unknown as Record<string, unknown>;
 
-  for (const opt of OPTS as SchemaOpt[]) {
+  for (const opt of OPTS) {
     if (HAND_WRITTEN.has(opt.id)) continue;
 
     proto[methodName(opt.flag)] =
