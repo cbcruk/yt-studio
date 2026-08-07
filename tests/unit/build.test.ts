@@ -13,8 +13,11 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
-const { ytdlp, formatFactory, outTag, methodName, selMethod, YTDLP_VERSION } =
-  await import('../../src/index.js');
+// 공개 입구에서 꺼내는 건 손님이 쓰는 것뿐이다. 나머지 넷은 내부라서 코어에서
+// 직접 가져온다 — 공개 표면에 두면 배포 뒤에 빼는 게 breaking 이 된다.
+const { ytdlp, YTDLP_VERSION } = await import('../../src/index.js');
+const { formatFactory, outTag, methodName, selMethod } =
+  await import('../../src/core/build.js');
 const { parseFormat } = await import('../../src/core/format-grammar.js');
 const { parseTemplate } = await import('../../src/core/output-template.js');
 const { scanCommand } = await import('../../src/core/command.js');

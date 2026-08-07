@@ -15,7 +15,8 @@
     "cli": "bun src/cli.ts",
     "prepare": "npm run build",
     "test:types": "bun test tests/types.test.ts",
-    "test:drift": "bun test tests/drift.test.ts"
+    "test:drift": "bun test tests/drift.test.ts",
+    "prepublishOnly": "bun run test"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

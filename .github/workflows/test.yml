@@ -85,3 +85,10 @@ jobs:
       # 붙박이 도움말을 뱉는 껍데기가 곧 실물이다.
       - name: types 명령
         run: bun run test:types
+
+      # 손님에게 나가는 tarball 을 본다. files 나 exports 를 잘못 건드리면
+      # 저장소 안에서는 멀쩡한데 설치하면 깨진다 — 그건 검사가 못 잡는다.
+      - name: 패키지
+        run: |
+          npm pack --pack-destination /tmp
+          npx --yes publint /tmp/ytstudio-*.tgz
