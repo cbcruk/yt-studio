@@ -9,16 +9,22 @@ npm i ytstudio
 npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 ```
 
-저장소에서 손볼 때는 **[bun](https://bun.com) 이 있어야 한다** (버전은
-`packageManager` 필드가 고정한다).
+저장소에서 손볼 때는 **[bun](https://bun.com) 이 있어야 한다.** 버전은
+`packageManager` 필드가 고정하고, CI 의 `setup-bun` 도 그걸 읽는다.
 
 ```
 bun install       # 의존성은 typescript 와 @types/node 둘뿐이다
 bun run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
 bun run gen:types # ytstudio.schema.json → src/core/options.gen.ts
 bun run cli       # 빌드 없이 CLI 를 돌려 본다
-npm test          # 타입 + 빌드 + 단위 + CLI + types
+bun run test      # 타입 + 빌드 + 단위 + CLI + types
 ```
+
+> `bun test` 가 아니라 **`bun run test`** 다. 앞엣것은 bun 의 테스트 러너를
+> 직접 부르는 것이라 단위 스위트만 돈다.
+
+**손님에게는 bun 이 필요 없다.** 이 제약은 저장소 안에서만 산다 — 배포물은
+`#!/usr/bin/env node` 짜리이고 `engines` 도 `node >=22` 그대로다.
 
 **저장소에 `.js` 가 없다.** 소스도 테스트도 생성기도 전부 `.ts` 이고, **돌리는 건
 bun, 타입과 산출물은 tsc** 다. bun 이 `.ts` 를 그대로 읽고 `./x.js` 를 `x.ts` 로
@@ -28,6 +34,16 @@ bun, 타입과 산출물은 tsc** 다. bun 이 `.ts` 를 그대로 읽고 `./x.j
 한동안 bun 을 devDependency 로 뒀는데, 그러면 CI 가 **매 실행마다 bun 바이너리를
 통째로 설치한다** — `node_modules` 가 380MB 였고 그중 347MB 가 bun 이었다. 지금은
 34MB 다. 손님에게는 아무 영향이 없다(`dependencies` 는 원래 비어 있다).
+
+### `types: ["node"]` 는 일부러 남겨 둔 제약이다
+
+돌리는 게 bun 이니 `bun-types` 로 갈아탈 만해 보이지만 **반대로 가야 한다.**
+`bun-types` 는 노드 타입 위에 `Bun.*` 을 얹는다. 그러면 배포되는 `src/` 안에서
+`Bun.file()` 을 써도 타입이 통과하고, 손님의 노드에서 터진다.
+
+`tsconfig.json` 의 `types: ["node"]` 가 그걸 막는 유일한 장치다 — **배포물이
+노드에서 돈다는 사실을 컴파일러가 강제하게 두는 것.** 개발을 bun 으로 옮기면서도
+이건 안 건드렸다.
 
 린터는 없다. eslint 가 켜 두던 규칙이 둘(`no-undef` · `no-unused-vars`)뿐이었는데
 전부 `.ts` 가 되면서 tsc 와 `noUnusedLocals` 가 그대로 잡는다.
@@ -241,7 +257,7 @@ gen_options.ts       그 스키마를 옵션 타입으로
 ytstudio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
 tsconfig.json        빌드용 (src → lib)
 tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전부)
-.github/workflows/   CI — npm test 와 같은 것 + 타입이 스키마와 맞는지
+.github/workflows/   CI — bun run test 와 같은 것 + 타입이 스키마와 맞는지
 .claude/skills/      세션마다 로드되는 스킬 넷 (mattpocock/skills 에서 골라 옴)
 ```
 
@@ -276,7 +292,7 @@ tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전�
 대조한다(도움말 파서 ↔ `gen_schema.py`).
 
 ```
-npm run test:drift     # yt-dlp 가 PATH 에 있어야 한다
+bun run test:drift     # yt-dlp 가 PATH 에 있어야 한다
 ```
 
 정기 잡(`.github/workflows/drift.yml`)에서만 돈다. PR 마다 돌리면 yt-dlp
@@ -290,7 +306,7 @@ yt-dlp 를 올렸으면 둘을 같이 돌린다. CI 가 **스키마만 고치고
 
 ```
 python3 gen_schema.py > ytstudio.schema.json   # 설치된 yt-dlp → 스키마
-npm run gen:types                              # 스키마 → src/core/options.gen.ts
+bun run gen:types                              # 스키마 → src/core/options.gen.ts
 ```
 
 ## 손으로 채우는 층

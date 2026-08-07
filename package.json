@@ -11,7 +11,7 @@
     "check:types": "tsc -p tsconfig.test.json",
     "test:unit": "bun test tests/unit",
     "test:cli": "bun tests/cli.ts",
-    "test": "npm run check:types && npm run build && npm run test:unit && npm run test:cli && npm run test:types",
+    "test": "bun run check:types && bun run build && bun run test:unit && bun run test:cli && bun run test:types",
     "cli": "bun src/cli.ts",
     "prepare": "npm run build",
     "test:types": "bun tests/types-cmd.ts",

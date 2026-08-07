@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * CLI 검사 — **프로세스가 있어야만 보이는 것들.**
  *
@@ -31,7 +30,7 @@ const SCHEMA_FILE = 'ytstudio.schema.json';
 // 이 검사는 소스가 아니라 **컴파일한 산출물**을 상대한다. 없으면 검사가
 // 통째로 실패하는데, 그 이유가 "빌드를 안 했다"임을 여기서 말해 준다.
 if (!existsSync(CLI)) {
-  console.error(`${CLI} 가 없다 — 'npm run build' 를 먼저 돌릴 것 (npm test 는 같이 한다).`);
+  console.error(`${CLI} 가 없다 — 'bun run build' 를 먼저 돌릴 것 (bun run test 는 같이 한다).`);
   process.exit(2);
 }
 

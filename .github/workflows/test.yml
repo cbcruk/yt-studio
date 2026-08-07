@@ -1,9 +1,11 @@
-# npm test 와 같은 것을 돌린다. 단계를 쪼갠 건 실패를 한눈에 가르기 위해서다 —
-# 타입이 깨진 건지, 단위가 깨진 건지, CLI 가 깨진 건지 잡 요약에서 바로 보인다.
+# `bun run test` 와 같은 것을 돌린다. 단계를 쪼갠 건 실패를 한눈에 가르기
+# 위해서다 — 타입이 깨진 건지, 단위가 깨진 건지, CLI 가 깨진 건지 잡 요약에서
+# 바로 보인다.
 #
-# 예전에는 bun 을 devDependency 로 두고 npm ci 로 깔았는데, 그러면 매 실행마다
-# bun 바이너리를 통째로 설치한다 — node_modules 가 380MB 였고 그중 347MB 가
-# bun 이었다. setup-bun 이 실행 파일을 자기 캐시에서 꺼내 주므로 그 값을 안 낸다.
+# 이 저장소는 bun 없이는 아무것도 못 돌린다. 예전에는 bun 을 devDependency 로
+# 두고 설치했는데, 그러면 매 실행마다 bun 바이너리를 통째로 깐다 —
+# node_modules 가 380MB 였고 그중 347MB 가 bun 이었다. setup-bun 이 실행 파일을
+# 자기 캐시에서 꺼내 주므로 그 값을 안 낸다.
 name: 테스트
 
 on:
@@ -54,7 +56,7 @@ jobs:
         run: |
           bun run gen:types
           if ! git diff --quiet -- src/core/options.gen.ts; then
-            echo "::error::options.gen.ts 가 ytstudio.schema.json 과 다르다 — 'npm run gen:types' 를 돌리고 같이 커밋할 것"
+            echo "::error::options.gen.ts 가 ytstudio.schema.json 과 다르다 — 'bun run gen:types' 를 돌리고 같이 커밋할 것"
             git diff --stat -- src/core/options.gen.ts
             exit 1
           fi

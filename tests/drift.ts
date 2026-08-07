@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * 실물 yt-dlp 와 벌어졌는지 본다.
  *
@@ -126,7 +125,7 @@ if (BASE.ytdlp_version === version && !added.length && !removed.length) {
   note(`커밋된 스키마 ${BASE.ytdlp_version} · 실물 ${version} — 새로 ${added.length} · 사라짐 ${removed.length}`);
   if (added.length) note(`  새 옵션: ${added.join(' ')}`);
   if (removed.length) note(`  사라진 옵션: ${removed.join(' ')}`);
-  note('  다시 뽑으려면: python3 gen_schema.py > ytstudio.schema.json && npm run gen:types');
+  note('  다시 뽑으려면: python3 gen_schema.py > ytstudio.schema.json && bun run gen:types');
 }
 
 console.log(`\n  ${fail ? '\x1b[31m✗' : '\x1b[32m✓'}\x1b[0m 실물 대조: ${fail ? `${fail}건 실패` : '이상 없음'}\n`);

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * `ytstudio types` 검사.
  *
@@ -26,7 +25,7 @@ const BASE = JSON.parse(readFileSync(path.join(ROOT, 'ytstudio.schema.json'), 'u
 
 // 이 검사도 컴파일한 산출물을 노드로 띄운다. 없으면 왜 없는지 말해 준다.
 if (!existsSync(CLI)) {
-  console.error(`${CLI} 가 없다 — 'npm run build' 를 먼저 돌릴 것 (npm test 는 같이 한다).`);
+  console.error(`${CLI} 가 없다 — 'bun run build' 를 먼저 돌릴 것 (bun run test 는 같이 한다).`);
   process.exit(2);
 }
 
