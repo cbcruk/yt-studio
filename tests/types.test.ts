@@ -178,6 +178,26 @@ test('덮으면 경고하지 않는다', () => {
   assert.doesNotMatch(r.out, /include 가/, '멀쩡한 설정에 경고를 냈다');
 });
 
+// 인자를 손으로 훑던 때(indexOf('--yt-dlp'))는 이 형태를 못 찾아서 **손님이
+// 지정한 경로를 조용히 버리고** PATH 를 봤다. 이 저장소가 계속 잡아 온 종류의
+// 실패라 여기 못 박는다.
+test('--yt-dlp=경로 형태도 읽는다 — 조용히 안 버린다', () => {
+  const dir = project(HELP);
+  const bin = path.join(dir, 'fake-yt-dlp');
+  const r = spawn(dir, ['types', `--yt-dlp=${bin}`]);
+  assert.equal(r.code, 0, r.out);
+  assert.ok(r.out.includes(bin), `가리킨 경로를 안 썼다\n${r.out}`);
+});
+
+// strict 라서 모르는 플래그가 조용히 통과하지 않는다.
+test('모르는 옵션은 2 로 끝난다', () => {
+  const dir = project(HELP);
+  const r = spawn(dir, ['types', '--nonsense']);
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /모르는 옵션이다: --nonsense/);
+  assert.ok(!wrote(dir, 'ytstudio-env.d.ts'), '인자가 틀렸는데 파일을 썼다');
+});
+
 // 2 는 "네가 나를 잘못 불렀다", 1 은 "시키신 걸 하려는데 대상이 문제다".
 // 스크립트가 둘을 갈라 봐야 한다.
 test('--yt-dlp 뒤가 비면 2 로 끝난다 — 잘못 부른 것이다', () => {

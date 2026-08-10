@@ -15,6 +15,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 import { basename, resolve } from 'node:path';
 
 import { BUNDLED, previewFilename, ytstudio } from './index.js';
@@ -117,6 +118,23 @@ function explain(r: LintResult): void {
 }
 
 /**
+ * `parseArgs` 가 던진 것을 한국어로.
+ *
+ * 이 CLI 는 전부 한국어인데 노드가 던지는 문구만 영어로 새어 나온다. 코드로
+ * 갈라 적고, 모르는 것은 원문을 그대로 낸다 — 지어내는 것보다 낫다.
+ */
+function argError(e: unknown): string {
+  const code = (e as { code?: string }).code;
+  const msg = (e as Error).message;
+  if (code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION') {
+    return `모르는 옵션이다: ${/'([^']+)'/.exec(msg)?.[1] ?? msg}`;
+  }
+  if (code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') return '--yt-dlp 뒤에 경로가 없다.';
+  if (code === 'ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL') return 'types 는 인자를 안 받는다.';
+  return msg;
+}
+
+/**
  * 손님이 깐 yt-dlp 를 리플렉션해 스키마와 타입을 다시 뽑는다.
  *
  * 패키지에 실려 나가는 스키마는 **이 저장소를 구울 때의** yt-dlp 다. 손님 것이
@@ -127,12 +145,22 @@ function explain(r: LintResult): void {
  * 돌기 때문이다. `brew` 도 독립 바이너리도 pipx 도 `import yt_dlp` 가 실패한다.
  */
 function types(args: string[]): number {
-  const i = args.indexOf('--yt-dlp');
-  if (i >= 0 && !args[i + 1]) {
-    console.error('--yt-dlp 뒤에 경로가 없다.');
+  let bin: string;
+  try {
+    // 인자를 손으로 훑던 것을 여기서만 그만뒀다. `indexOf('--yt-dlp')` 는
+    // `--yt-dlp=/경로` 를 못 찾아서 **손님이 지정한 경로를 조용히 버리고**
+    // PATH 를 봤다 — 이 저장소가 계속 잡아 온 바로 그 종류의 실패다.
+    // strict 라서 모르는 플래그도 여기서 걸린다.
+    const { values } = parseArgs({
+      args, strict: true, allowPositionals: false,
+      options: { 'yt-dlp': { type: 'string' } },
+    });
+    bin = values['yt-dlp'] ?? 'yt-dlp';
+  } catch (e) {
+    console.error(`${red('✗')} ${argError(e)}`);
+    console.error(dim('  쓰는 법: ytstudio types [--yt-dlp <경로>]'));
     return 2;
   }
-  const bin = i >= 0 ? args[i + 1]! : 'yt-dlp';
 
   const ask = (flag: string): string =>
     execFileSync(bin, [flag], { encoding: 'utf8', maxBuffer: 8 << 20 });
