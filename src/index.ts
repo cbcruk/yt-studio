@@ -1,15 +1,6 @@
 /**
  * 공개 API.
  *
- * `core/` 는 파일 시스템을 모른다는 규칙이 있어서, 스키마를 읽어 넣는 일은
- * 여기서 한다. **로컬 우선**이다 — 작업 디렉터리에 `ytstudio.schema.json` 이
- * 있으면 그걸 보고, 없으면 패키지에 실려 온 것을 본다. 자세한 것은
- * `SchemaSource`.
- *
- * 스키마는 **값**이라 손잡이(`ytstudio()`)가 들고 다닌다. 평평한 함수들
- * (`lintCommand` 등)은 게으르게 만든 기본 손잡이에 얹혀 있다 — 편의일 뿐
- * 특별한 것이 아니라서, 손잡이를 직접 만들면 스키마 둘을 나란히 들 수 있다.
- *
  * 내보내는 것이 둘이다.
  *
  *   **빌더** — 코드로 명령어를 만든다. 타입이 옵션 카탈로그다.
@@ -28,21 +19,31 @@
  *
  *     lintCommand('yt-dlp --write-sub https://youtu.be/abc').issues;
  *     // [{ level: 'error', msg: '--write-sub 는 이 yt-dlp 버전에 없는 …' }]
+ *
+ * **이 파일이 얹는 것은 스키마를 어디서 집을까 한 겹뿐이다.** 알맹이는
+ * `browser.ts` 에 있고 여기서 전부 다시 내보낸다 — 그쪽은 파일 시스템을 모르므로
+ * 브라우저에서도 돈다(`ytstudio/browser`).
+ *
+ * **로컬 우선**이다 — 작업 디렉터리에 `ytstudio.schema.json` 이 있으면 그걸 보고,
+ * 없으면 패키지에 실려 온 것을 본다. 자세한 것은 `SchemaSource`.
+ *
+ * 스키마는 **값**이라 손잡이(`ytstudio()`)가 들고 다닌다. 평평한 함수들
+ * (`lintCommand` 등)은 게으르게 만든 기본 손잡이에 얹혀 있다 — 편의일 뿐
+ * 특별한 것이 아니라서, 손잡이를 직접 만들면 스키마 둘을 나란히 들 수 있다.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildSchema } from './core/schema.js';
-import { lintCommand as lintWith, nearestFlags as nearestWith } from './core/lint.js';
-import { explainCommand as explainWith, suggestNext as suggestWith } from './core/explain.js';
-import { scanCommand as scanWith } from './core/command.js';
-import { makeYtdlp } from './core/build.js';
-import type { RawSchema, Schema } from './core/schema.js';
+import { studio, TYPES_VERSION } from './browser.js';
+import type { SchemaOrigin, SchemaSource, Ytstudio } from './browser.js';
+import type { RawSchema } from './core/schema.js';
 import type { Ytdlp } from './core/build.js';
 import type { Item } from './core/command.js';
 import type { Explained, Suggestion } from './core/explain.js';
 import type { LintResult, Values } from './core/lint.js';
+
+export * from './browser.js';
 
 /**
  * 로컬 스키마 파일 이름.
@@ -52,39 +53,6 @@ import type { LintResult, Values } from './core/lint.js';
  * 적혀 있다.
  */
 const SCHEMA_FILE = 'ytstudio.schema.json';
-
-/** 스키마를 어디서 읽었나. */
-export type SchemaOrigin =
-  /** `YTSTUDIO_SCHEMA` 가 가리킨 곳 */
-  | 'env'
-  /** 작업 디렉터리의 `ytstudio.schema.json` */
-  | 'local'
-  /** 패키지에 같이 실려 온 것 */
-  | 'bundled';
-
-/**
- * 지금 검증기가 무엇에 대조하고 있는지.
- *
- * 이 패키지에는 층이 둘인데 **둘의 출처가 다를 수 있다.**
- *
- *   · **런타임** (`lintCommand` · `ytdlp()` 메서드) 은 파일을 읽으므로
- *     당신이 깐 yt-dlp 를 볼 수 있다.
- *   · **타입** (`.d.ts` · 자동완성) 은 패키지를 구울 때 이미 박혔다. 바꿀 수 없다.
- *
- * `stale` 이 참이면 그 둘이 갈렸다는 뜻이다 — 검사 결과는 당신의 yt-dlp 기준으로
- * 맞지만, 에디터가 주는 목록은 `typesVersion` 기준이라 어긋난다.
- */
-export interface SchemaSource {
-  from: SchemaOrigin;
-  /** 실제로 읽은 파일의 절대 경로. */
-  path: string;
-  /** 검증기가 대조하는 yt-dlp 버전. */
-  version: string;
-  /** 타입과 자동완성이 나온 yt-dlp 버전. 패키지에 박혀 있다. */
-  typesVersion: string;
-  /** 둘이 다른가. 참이면 자동완성을 믿을 수 없다. */
-  stale: boolean;
-}
 
 /**
  * 그럴듯한 JSON 이 전부 우리 스키마는 아니다.
@@ -119,6 +87,14 @@ function readBundled(): RawSchema {
  */
 export const BUNDLED: RawSchema = readBundled();
 
+/** 스키마를 어디서 찾을지. 안 주면 프로세스의 것을 쓴다. */
+export interface Where {
+  /** `ytstudio.schema.json` 을 찾을 디렉터리. */
+  cwd?: string;
+  /** `YTSTUDIO_SCHEMA` 대신 쓸 경로. */
+  env?: string;
+}
+
 /**
  * 로컬 우선, 없으면 패키지에 실린 것.
  *
@@ -130,13 +106,12 @@ export const BUNDLED: RawSchema = readBundled();
  * 수 있어야 `process.chdir` 로 프로세스 전체를 흔들지 않는다.
  */
 export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawSchema } {
-  const typesVersion = BUNDLED.ytdlp_version;
   const found = (from: SchemaOrigin, path: string, raw: RawSchema) => ({
     source: {
       from, path,
       version: raw.ytdlp_version,
-      typesVersion,
-      stale: raw.ytdlp_version !== typesVersion,
+      typesVersion: TYPES_VERSION,
+      stale: raw.ytdlp_version !== TYPES_VERSION,
     },
     raw,
   });
@@ -159,70 +134,15 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
 }
 
 /**
- * 스키마 하나에 묶인 손잡이. 이 패키지의 입구다.
- *
- * 여기 있는 것 전부가 **같은 스키마**를 본다. 손잡이를 둘 만들면 스키마 둘을
- * 나란히 들 수 있고, 서로를 안 건드린다.
- */
-/** 스키마를 어디서 찾을지. 안 주면 프로세스의 것을 쓴다. */
-export interface Where {
-  /** `ytstudio.schema.json` 을 찾을 디렉터리. */
-  cwd?: string;
-  /** `YTSTUDIO_SCHEMA` 대신 쓸 경로. */
-  env?: string;
-}
-
-export interface Ytstudio {
-  /** 어디서 왔든 명령어 문자열을 검사한다. */
-  lint(text: string): LintResult;
-  /** 코드로 명령어를 만든다. */
-  ytdlp(...urls: string[]): Ytdlp;
-  /** 명령어 문자열 → 항목 수열. */
-  scan(text: string): { head: string | null; items: Item[] };
-  /** 토큰마다 무슨 옵션인지. */
-  explain(items: Item[]): Explained[];
-  /** 지금 조합에서 이어서 줄 만한 것. */
-  suggest(values: Values, limit?: number): Suggestion[];
-  /** 오타라면 무엇을 쓰려던 건가. */
-  nearest(flag: string, limit?: number): string[];
-  /** 이 손잡이가 무엇에 대조하는지. */
-  readonly source: SchemaSource;
-  /** 색인까지 붙은 스키마. 직접 뒤져야 할 때만. */
-  readonly schema: Schema;
-}
-
-/**
  * 손잡이를 만든다.
  *
  * 인자가 없으면 `resolveSchema()` 로 찾는다(환경변수 → 작업 디렉터리 → 내장).
  * 스키마를 직접 주면 그걸 쓴다 — 검사가 그 길로 프로세스를 안 갈라도 된다.
  */
 export function ytstudio(opts: Where & { raw?: RawSchema } = {}): Ytstudio {
-  const { source, raw } = opts.raw
-    ? {
-      raw: opts.raw,
-      source: {
-        from: 'env' as SchemaOrigin, path: '(직접 준 것)',
-        version: opts.raw.ytdlp_version,
-        typesVersion: BUNDLED.ytdlp_version,
-        stale: opts.raw.ytdlp_version !== BUNDLED.ytdlp_version,
-      },
-    }
-    : resolveSchema(opts);
-
-  const schema = buildSchema(raw);
-  const ytdlpOf = makeYtdlp(schema);
-
-  return {
-    lint: text => lintWith(schema, text),
-    ytdlp: (...urls) => ytdlpOf(...urls),
-    scan: text => scanWith(schema, text),
-    explain: items => explainWith(schema, items),
-    suggest: (values, limit) => suggestWith(schema, values, limit),
-    nearest: (flag, limit) => nearestWith(schema, flag, limit),
-    source,
-    schema,
-  };
+  if (opts.raw) return studio(opts.raw);
+  const { source, raw } = resolveSchema(opts);
+  return studio(raw, source);
 }
 
 /**
@@ -268,25 +188,3 @@ export const schemaSource = (): SchemaSource => def().source;
 
 /** 토큰 하나만 읽어 준다. 여럿이면 `explainCommand`. */
 export const explainItem = (item: Item): Explained => def().explain([item])[0]!;
-
-/** 스키마를 안 보는 것들 — 문자열만 다룬다. */
-export { tokenize, quote } from './core/command.js';
-export { distance, LEVELS } from './core/lint.js';
-export { previewFilename, DEFAULT_OUTTMPL } from './core/explain.js';
-
-export type { Issue, Level, LintResult, Values } from './core/lint.js';
-export type { FilePreview, Explained, Suggestion } from './core/explain.js';
-export type { Item, UnknownWhy } from './core/command.js';
-export type { Opt, OptKind, RawSchema, Schema, SchemaFrom, Stage } from './core/schema.js';
-
-/**
- * 식과 조각의 타입.
- *
- * 값으로는 안 내보낸다 — `f.bv()` 와 `t.title` 이 이미 만들어서 주므로 손님이
- * `new` 할 일이 없다. 대신 헬퍼 함수 시그니처에 적을 일은 있어서 타입은 낸다.
- */
-export type { Expr, FormatFactory, OutTag, Piece, Template, Ytdlp } from './core/build.js';
-export type {
-  Arg, Conversion, FieldPiece, Filter, Filters, FormatNode, NumCond, OutField,
-  OutNode, OutType, PathMap, Selector, StrCond, Version,
-} from './core/build.js';

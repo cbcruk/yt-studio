@@ -28,7 +28,12 @@
     ".": {
       "types": "./lib/index.d.ts",
       "import": "./lib/index.js"
-    }
+    },
+    "./browser": {
+      "types": "./lib/browser.d.ts",
+      "import": "./lib/browser.js"
+    },
+    "./ytstudio.schema.json": "./ytstudio.schema.json"
   },
   "files": [
     "lib",

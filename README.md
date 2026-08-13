@@ -10,6 +10,10 @@ npm i ytstudio
 npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 ```
 
+**설치하기 전에 만져 보고 싶다면 → [플레이그라운드](https://cbcruk.github.io/yt-studio/)**
+자동완성이 되는 에디터에서 코드를 쓰면 명령어가 그 자리에서 만들어지고 검사까지
+간다. 페이지가 먹는 것은 이 패키지가 배포하는 `.d.ts` 와 스키마 그대로다.
+
 <details>
 <summary><b>In English</b></summary>
 
@@ -274,6 +278,19 @@ mine.lint(cmd);          theirs.lint(cmd);      // 서로를 안 건드린다
 mine.ytdlp(url);         theirs.ytdlp(url);     // 메서드 목록도 각자다
 ```
 
+그래서 **파일 시스템이 없는 곳에서도 돈다.** 노드가 필요한 부분은 "스키마를
+어디서 집을까" 한 겹뿐이라, 그 겹을 걷어낸 입구를 따로 낸다.
+
+```ts
+import { studio } from 'ytstudio/browser';
+
+const yt = studio(await (await fetch('/ytstudio.schema.json')).json());
+yt.ytdlp('https://youtu.be/abc').extractAudio().build();
+```
+
+[플레이그라운드](https://cbcruk.github.io/yt-studio/)가 그걸로 돈다 — 브라우저
+안에서 도는 것이 배포하는 모듈 그 자체다.
+
 한동안은 반대였다 — `core/schema.ts` 가 `export let OPTS/BY_ID/…` 를 들고
 `initSchema` 가 채우는 모양이라, 스키마를 두 번 로드하면 앞엣것이 오염됐다.
 그것도 `VERSION` 은 그대로 두고 동작만 바뀌어서 **모듈이 자기 상태에 대해
@@ -314,10 +331,12 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   paths.ts           -P 항목 한 줄 읽기
   help-schema.ts     yt-dlp --help 파서 — 손님 쪽 리플렉션
   env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
-src/index.ts         공개 API — ytstudio() 손잡이 · 스키마를 읽는 유일한 자리
+src/browser.ts       파일 시스템을 모르는 입구 — studio(raw) 가 손잡이를 준다
+src/index.ts         공개 API — browser.ts + 스키마를 어디서 집을까 한 겹
 src/cli.ts           ytstudio lint · explain · types
+demo/                플레이그라운드 — lib/ 와 스키마를 그대로 먹는다 (vite · monaco)
 tests/               전부 bun:test. `bun test` 하나로 다 돈다
-  unit/*.test.ts     순수 로직 (101개 — 스키마 해석 순서도 여기다)
+  unit/*.test.ts     순수 로직 (106개 — 스키마 해석 순서도 여기다)
   cli.test.ts        프로세스로서의 CLI — 종료 코드 · 파이프 · 스키마 해석 순서
   types.test.ts      ytstudio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
   drift.test.ts      실물 yt-dlp 와 대조. yt-dlp 가 없으면 건너뛴다
