@@ -24,8 +24,21 @@ const TYPE: Record<string, string> = {
   '.json': 'application/json', '.ttf': 'font/ttf',
 };
 
+/**
+ * 페이지가 놓일 자리.
+ *
+ * GitHub Pages 는 `/<repo>/` 아래다. 빌드가 그걸 자산 경로에 박으므로, 여기서
+ * 루트에 놓고 보면 **자산이 전부 404 인 페이지**를 검사하게 된다. 그러면 아홉
+ * 가지가 한꺼번에 깨지는데 원인은 자산 하나다.
+ *
+ * 그래서 빌드가 쓴 것과 같은 자리에 놓는다. 이 값이 곧 검사 대상이다 —
+ * 하위 경로 배포가 깨져 있으면 여기서 걸린다.
+ */
+const BASE = (process.env.DEMO_BASE ?? '/').replace(/\/*$/, '/');
+
 const server = createServer(async (req, res) => {
-  const rel = decodeURIComponent((req.url ?? '/').split('?')[0]!);
+  const url = decodeURIComponent((req.url ?? '/').split('?')[0]!);
+  const rel = url.startsWith(BASE) ? url.slice(BASE.length - 1) : url;
   const file = path.join(DIST, rel === '/' ? 'index.html' : rel);
   try {
     const body = await readFile(file);
@@ -54,7 +67,7 @@ const check = (name: string, fn: () => void | Promise<void>) =>
     .then(() => console.log(`  ✓ ${name}`))
     .catch((e: Error) => { failed++; console.log(`  ✗ ${name}\n    ${e.message}`); });
 
-await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'networkidle' });
+await page.goto(`http://127.0.0.1:${port}${BASE}`, { waitUntil: 'networkidle' });
 
 await check('첫 예제가 명령어가 된다', async () => {
   await page.waitForFunction(() => document.querySelector('#command code')?.textContent?.length, null, { timeout: 20_000 });
