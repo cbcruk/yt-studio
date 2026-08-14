@@ -25,6 +25,55 @@ ytdlp(u).fixup('nope');
 
 ytdlp(u).fixup('never');                    // 통과해야 한다
 
+// 목록이 optparse 의 choices= 에만 있는 게 아니다. yt-dlp 는 파싱한 뒤에
+// validate_in 으로 보기도 하고(--convert-subs · --ap-mso), 콜백의
+// allowed_values 로 보기도 한다(--compat-options · --sponsorblock-*).
+// gen_schema.py 가 그 셋을 다 리플렉션하므로 여기서도 다 막힌다.
+
+// @ts-expect-error --convert-subs 는 자막 포맷만 받는다
+ytdlp(u).convertSubs('mp4');
+
+ytdlp(u).convertSubs('srt');
+ytdlp(u).convertSubs('none');               // 끄는 값도 목록에 있다
+
+// @ts-expect-error TV 사업자 식별자 오타 (Comcast_SSO 다)
+ytdlp(u).apMso('Comcast');
+
+ytdlp(u).apMso('Comcast_SSO');
+
+// @ts-expect-error 별칭 오타 (youtube-dl 이다)
+ytdlp(u).compatOptions('youtube-dll');
+
+// 여러 개를 주고, `-` 로 빼고, 별칭과 all 을 쓰는 것 전부 yt-dlp 가 받는 형태다
+ytdlp(u).compatOptions('all', '-multistreams');
+ytdlp(u).compatOptions('youtube-dl');
+ytdlp(u).sponsorblockRemove('sponsor', 'intro');
+ytdlp(u).sponsorblockMark('default');
+
+// @ts-expect-error 빼기는 되지만 없는 값은 여전히 못 쓴다
+ytdlp(u).sponsorblockRemove('-intr');
+
+// 어휘 위의 문법인 값(`--audio-format` 등)은 **일부러 안 닫는다** —
+// `aac>mp3/best` 가 멀쩡한 값이라 유니온으로 막으면 거짓 오류가 된다.
+// 대신 어휘가 자동완성에 뜨고, 문법은 검증기(`core/lint.js`)가 본다.
+ytdlp(u).audioFormat('mp3');
+ytdlp(u).audioFormat('aac>mp3/best');
+ytdlp(u).remuxVideo('mkv/mp4');
+ytdlp(u).mergeOutputFormat('mp4');
+
+// 프리셋은 닫혀 있다 — 콜백이 쓰는 표가 yt-dlp 모듈에 그대로 있다
+ytdlp(u).presetAlias('mp3');
+
+// @ts-expect-error 없는 프리셋
+ytdlp(u).presetAlias('mp5');
+
+// -o 의 종류도 목록이다. 예전에 이 표가 yt-dlp 와 갈려 있었다 —
+// `annotation` 이 빠져 있었고, yt-dlp 가 종류로 안 읽는 `default` 가 있었다.
+ytdlp(u).output('annotation', t => t`${t.id}.${t.ext}`);
+
+// @ts-expect-error yt-dlp 는 default: 를 종류로 안 읽는다 (파일 이름이 된다)
+ytdlp(u).output('default', t => t`${t.id}.${t.ext}`);
+
 // 포맷 필터
 // @ts-expect-error 필터 키 오타
 ytdlp(u).format(f => f.bv({ heigth: { lte: 1080 } }));

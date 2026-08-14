@@ -88,8 +88,9 @@ export function mount(el: HTMLElement, code: string): Editor {
     padding: { top: 14, bottom: 14 },
     renderLineHighlight: 'none',
     tabSize: 2,
-    // 자동완성이 이 데모의 주인공이라 곧바로 뜨게 둔다.
-    quickSuggestions: { other: true, comments: false, strings: false },
+    // 자동완성이 이 데모의 주인공이라 곧바로 뜨게 둔다. 문자열 안에서도 켠다 —
+    // 옵션 **값**의 목록(`convertSubs('srt')`)이 거기서 뜬다.
+    quickSuggestions: { other: true, comments: false, strings: true },
     suggestOnTriggerCharacters: true,
   });
 

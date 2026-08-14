@@ -43,6 +43,19 @@ export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
 `,
   },
   {
+    name: '값 목록',
+    note: '옵션 이름만이 아니라 값도 목록이 있다. 따옴표 안에서 Ctrl+Space — yt-dlp 가 정한 것이라 오타가 안 난다.',
+    code: `import { ytdlp } from 'ytstudio';
+
+export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
+  // 자막 포맷은 네 가지뿐이다 (+ 끄는 값 'none')
+  .convertSubs('srt')
+  // 여러 개를 주고, '-' 로 뺄 수도 있다
+  .sponsorblockRemove('sponsor', 'intro', 'selfpromo')
+  .compatOptions('all', '-multistreams');
+`,
+  },
+  {
     name: '검사',
     note: '빌더로 안 쓴 명령어도 본다 — 블로그·동료·LLM 이 준 문자열이 이 모양으로 온다.',
     code: `// 남이 준 명령어를 그대로 붙여 넣는다. 아래 '검사' 칸이 대신 읽어 준다.

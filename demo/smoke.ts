@@ -120,15 +120,33 @@ await check('없는 옵션은 타입 오류가 된다', async () => {
     null, { timeout: 20_000 });
 });
 
+// 옵션 이름만이 아니라 **값**도 목록이 있다. 그 목록은 파이썬 상수에서
+// 나와서 스키마 · `.d.ts` 를 거쳐 여기까지 온 것이라, 사슬 중 한 칸이라도
+// 끊기면 이 칸이 빈다.
+await check('값의 자동완성도 뜬다 — yt-dlp 가 정한 목록', async () => {
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type("\nytdlp().convertSubs('");
+  // 따옴표는 타입스크립트의 트리거 문자가 아니다 — 값 목록은 불러야 뜬다.
+  // 페이지 머리에 Ctrl+Space 라고 적어 둔 것이 이 때문이다.
+  await page.keyboard.press('Control+Space');
+  await page.waitForSelector('.suggest-widget.visible', { timeout: 20_000 });
+  const rows = (await page.locator('.suggest-widget .monaco-list-row').allTextContents()).join(' ');
+  for (const v of ['srt', 'vtt', 'ass', 'lrc', 'none']) {
+    assert.ok(rows.includes(v), `값 목록에 ${v} 가 없다 — 뜬 것: ${rows.slice(0, 200)}`);
+  }
+});
+
+// 탭은 이름으로 고른다 — 자리로 고르면 예제를 하나 끼워 넣을 때마다 깨진다.
 await check('예제 탭을 누르면 그 명령어로 바뀐다', async () => {
-  await page.click('.tabs button:nth-child(2)');
+  await page.click(`.tabs button:text-is("포맷 식")`);
   await page.waitForFunction(
     () => document.querySelector('#command code')?.textContent?.includes('bv[height<=1080]'),
     null, { timeout: 20_000 });
 });
 
 await check('검사 예제는 오류 1 · 경고 2 를 잡는다', async () => {
-  await page.click('.tabs button:nth-child(4)');
+  await page.click(`.tabs button:text-is("검사")`);
   await page.waitForFunction(
     () => document.querySelector('#verdict')?.textContent?.includes('오류'),
     null, { timeout: 20_000 });

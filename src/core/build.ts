@@ -307,24 +307,37 @@ export class Ytdlp {
     return c;
   }
 
-  /** `spawn` 에 넘길 argv. 따옴표를 안 붙인다 — 셸을 안 거치므로 붙이면 값에 남는다. */
-  toArray(): string[] {
+  /**
+   * 플래그와 값을 토큰으로.
+   *
+   * 값이 `-` 로 시작하면 **붙여서** 낸다(`--compat-options=-multistreams`).
+   * 떼어 놓으면 optparse 는 받지만 — 다음 토큰을 그냥 값으로 삼는다 — 읽는
+   * 쪽에서는 플래그와 구분이 안 된다. 실제로 이 저장소의 검증기가 그걸
+   * "없는 플래그"로 잡았다. **빌더가 낸 것을 제 검증기가 거부하면** 그건
+   * 검증기가 아니라 빌더가 틀린 것이다.
+   *
+   * `-` 로 빼는 형태는 `--compat-options all,-multistreams` 처럼 목록에서
+   * 빼는 옵션들에서 나온다.
+   */
+  private tokens(esc: (v: string) => string): string[] {
     const out: string[] = [];
     for (const p of this.parts) {
-      out.push(p.flag);
-      if (p.value !== undefined) out.push(String(p.value));
+      if (p.value === undefined) { out.push(p.flag); continue; }
+      const v = String(p.value);
+      if (v.startsWith('-')) out.push(`${p.flag}=${esc(v)}`);
+      else { out.push(p.flag); out.push(esc(v)); }
     }
-    return [...out, ...this.urls];
+    return out;
+  }
+
+  /** `spawn` 에 넘길 argv. 따옴표를 안 붙인다 — 셸을 안 거치므로 붙이면 값에 남는다. */
+  toArray(): string[] {
+    return [...this.tokens(v => v), ...this.urls];
   }
 
   /** 셸에 붙여넣을 한 줄. 공백이 든 값은 따옴표로 감싼다. */
   build(): string {
-    const toks: string[] = [];
-    for (const p of this.parts) {
-      toks.push(p.flag);
-      if (p.value !== undefined) toks.push(quote(String(p.value)));
-    }
-    return ['yt-dlp', ...toks, ...this.urls].join(' ');
+    return ['yt-dlp', ...this.tokens(quote), ...this.urls].join(' ');
   }
 
   /**

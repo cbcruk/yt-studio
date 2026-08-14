@@ -130,7 +130,7 @@ export interface Filters {
 
 /** `-o` 템플릿에 자주 쓰는 필드. 나머지는 `t.field('이름')` 으로. */
 export type OutField = 'title' | 'fulltitle' | 'id' | 'ext' | 'upload_date' | 'timestamp' | 'duration' | 'duration_string' | 'view_count' | 'like_count' | 'webpage_url' | 'uploader' | 'uploader_id' | 'channel' | 'channel_id' | 'artist' | 'album' | 'track' | 'playlist' | 'playlist_title' | 'playlist_id' | 'playlist_index' | 'playlist_count' | 'n_entries' | 'autonumber' | 'format' | 'format_id' | 'format_note' | 'resolution' | 'height' | 'width' | 'fps' | 'vcodec' | 'acodec' | 'filesize' | 'chapter' | 'chapter_number' | 'section_title' | 'section_number' | 'section_start' | 'section_end' | 'extractor' | 'extractor_key' | 'epoch';
-export type OutType = 'default' | 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
+export type OutType = 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'annotation' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
 export type Conversion = 's' | 'd' | 'f' | 'B' | 'j' | 'l' | 'q' | 'D' | 'S' | 'U' | 'h';
 
 /**
@@ -236,11 +236,11 @@ export interface PathMap {
   home?: string;
   /** 받는 동안 쓰는 임시 자리. */
   temp?: string;
-  default?: string;
   chapter?: string;
   subtitle?: string;
   thumbnail?: string;
   description?: string;
+  annotation?: string;
   infojson?: string;
   link?: string;
   pl_video?: string;
@@ -283,7 +283,7 @@ export interface Options {
    *
    * @stage run · General Options
    */
-  compatOptions(value: Arg): this;
+  compatOptions(...values: ('abort-on-error' | 'allow-unsafe-exec-expansion' | 'allow-unsafe-ext' | 'embed-metadata' | 'embed-thumbnail-atomicparsley' | 'filename' | 'filename-sanitization' | 'format-sort' | 'format-spec' | 'list-formats' | 'manifest-filesize-approx' | 'mtime-by-default' | 'multistreams' | 'no-attach-info-json' | 'no-certifi' | 'no-clean-infojson' | 'no-direct-merge' | 'no-external-downloader-progress' | 'no-keep-subs' | 'no-live-chat' | 'no-playlist-metafiles' | 'no-youtube-channel-redirect' | 'no-youtube-prefer-utc-upload-date' | 'no-youtube-unavailable-videos' | 'playlist-index' | 'playlist-match-filter' | 'prefer-legacy-http-handler' | 'prefer-vp9-sort' | 'seperate-video-versions' | '2021' | '2022' | '2023' | '2024' | '2025' | 'youtube-dl' | 'youtube-dlc' | 'all' | `-${'abort-on-error' | 'allow-unsafe-exec-expansion' | 'allow-unsafe-ext' | 'embed-metadata' | 'embed-thumbnail-atomicparsley' | 'filename' | 'filename-sanitization' | 'format-sort' | 'format-spec' | 'list-formats' | 'manifest-filesize-approx' | 'mtime-by-default' | 'multistreams' | 'no-attach-info-json' | 'no-certifi' | 'no-clean-infojson' | 'no-direct-merge' | 'no-external-downloader-progress' | 'no-keep-subs' | 'no-live-chat' | 'no-playlist-metafiles' | 'no-youtube-channel-redirect' | 'no-youtube-prefer-utc-upload-date' | 'no-youtube-unavailable-videos' | 'playlist-index' | 'playlist-match-filter' | 'prefer-legacy-http-handler' | 'prefer-vp9-sort' | 'seperate-video-versions' | '2021' | '2022' | '2023' | '2024' | '2025' | 'youtube-dl' | 'youtube-dlc' | 'all'}`)[]): this;
 
   /**
    * `--config-locations` — Location of the main configuration file; either the path to the config or its containing directory ("-" for stdin). Can be used multiple times and inside other configuration files
@@ -380,7 +380,7 @@ export interface Options {
    *
    * @stage run · General Options
    */
-  presetAlias(value: Arg): this;
+  presetAlias(value: 'mp3' | 'aac' | 'mp4' | 'mkv' | 'sleep'): this;
 
   /**
    * `--remote-components` — Remote components to allow yt-dlp to fetch when required. This option is currently not needed if you are using an official executable or have the requisite version of the yt-dlp-ejs package installed. You can use this option multiple times to allow multiple components. Supported values: ejs:npm (external JavaScript components from npm), ejs:github (external JavaScript components from yt-dlp-ejs GitHub). By default, no remote components are allowed
@@ -446,7 +446,7 @@ export interface Options {
    *
    * @stage connect · Authentication Options
    */
-  apMso(value: Arg): this;
+  apMso(value: 'ATT' | 'ATTOTT' | 'AlticeOne' | 'Brighthouse' | 'Cablevision' | 'Charter_Direct' | 'Comcast_SSO' | 'DTV' | 'Fubo' | 'Philo' | 'RCN' | 'Rogers' | 'Spectrum' | 'Suddenlink' | 'TWC' | 'Verizon' | 'acecommunications' | 'acm010' | 'ada020' | 'alb020' | 'algona' | 'all025' | 'all070' | 'allwest' | 'alpine' | 'ani030' | 'annearundel' | 'ara010' | 'arkwest' | 'art030' | 'arvig' | 'astound' | 'bal040' | 'baldwin' | 'bay030' | 'bci010-02' | 'bea020' | 'bee010' | 'bel020' | 'bev010' | 'big020' | 'ble020' | 'bra010' | 'bra020' | 'bra050' | 'btc010' | 'btc040' | 'bte010' | 'bul010' | 'but010' | 'bvt010' | 'cab038' | 'cab060' | 'cab140' | 'cab180' | 'cableamerica' | 'cam010' | 'canbytel' | 'car030' | 'car040' | 'car050' | 'car100' | 'carolinata' | 'cas' | 'casscomm' | 'cat020' | 'cccomm' | 'cccsmc010' | 'cci010' | 'cci020' | 'ced010' | 'cen100' | 'cfunet' | 'cha035' | 'cha050' | 'cha060' | 'che050' | 'cic010' | 'cimtel' | 'cit025' | 'cit040' | 'cit180' | 'cit210' | 'cit220' | 'cit230' | 'cit250' | 'cla010' | 'cla050' | 'clr010' | 'cml010' | 'cns' | 'coa020' | 'coa030' | 'col070' | 'col080' | 'com020' | 'com025' | 'com050' | 'com065' | 'com071' | 'com130-01' | 'com130-02' | 'com140' | 'com150' | 'com160' | 'consolidatedcable' | 'conwaycorp' | 'coo050' | 'coo080' | 'cou060' | 'coy010' | 'cpt010' | 'cra010' | 'crestview' | 'cro030' | 'cross' | 'crt020' | 'csicable' | 'ctc040' | 'cun010' | 'dak030' | 'daltonutilities' | 'dem010-01' | 'dem010-02' | 'dem010-03' | 'dem010-04' | 'dem010-05' | 'dem010-06' | 'dic010' | 'dix030' | 'doy010' | 'dpc010' | 'dtc010' | 'dtc020' | 'dum010' | 'dun010' | 'dur010' | 'eagle' | 'eatel' | 'ell010' | 'emerytelcom' | 'endeavor' | 'epb020' | 'ete010' | 'fal010' | 'fam010' | 'far020' | 'far030' | 'far035' | 'fay010' | 'fbc-tele' | 'fbcomm' | 'fib010' | 'fid010' | 'fli020' | 'foo010' | 'for030' | 'for080' | 'fullchannel' | 'gar040' | 'gbt010' | 'gla010' | 'gle010' | 'goldenwest' | 'gpcom' | 'gra060' | 'gri010' | 'hae010' | 'har005' | 'har020' | 'hbc010' | 'hea040' | 'hig030' | 'hin020' | 'hin020-02' | 'hometel' | 'hoodcanal' | 'hor040' | 'horizoncable' | 'htc010' | 'htc020' | 'htc030' | 'htccomm' | 'hun015' | 'icc010' | 'imon' | 'ind040' | 'ind060-dc' | 'ind060-ssc' | 'int050' | 'int100' | 'irv010' | 'jam030' | 'jea010' | 'k2c010' | 'kal010' | 'kal030' | 'kmt010' | 'kpu010' | 'kuh010' | 'lak130' | 'lan010' | 'lau020' | 'leh010' | 'lit020' | 'lns010' | 'loc010' | 'loc020' | 'lon030' | 'lumos' | 'mad030' | 'madison' | 'man060' | 'mar010' | 'mcc040' | 'mck010' | 'mctv' | 'med040' | 'merrimac' | 'metronet' | 'mhtc' | 'mid030' | 'mid045' | 'mid050' | 'mid055' | 'mid140' | 'mid180-01' | 'mid180-02' | 'midhudson' | 'midrivers' | 'mil080' | 'min030' | 'mlg010' | 'mol010' | 'mon060' | 'mou050' | 'mou110' | 'mpw' | 'mtacomm' | 'mtc010' | 'mtc030' | 'mul050' | 'mur010' | 'musfiber' | 'nctc' | 'nel020' | 'nem010' | 'net010' | 'net010-02' | 'new045' | 'new075' | 'nktelco' | 'nor030' | 'nor075' | 'nor100' | 'nor105' | 'nor115' | 'nor125' | 'nor140' | 'nor200' | 'nor240' | 'nor260' | 'nortex' | 'nts010' | 'nttcash010' | 'nttccde010' | 'nttcche010' | 'nttccst010' | 'nttcdel010' | 'nttcftc010' | 'nttchig010' | 'nttclpc010' | 'nttcmah010' | 'nttcmin010' | 'nttcsli010' | 'nttcsmi010' | 'nttcvtx010' | 'nttcwhi010' | 'nulink' | 'nwc010' | 'onesource' | 'ote010' | 'otter' | 'pan010' | 'pan020' | 'par010' | 'paulbunyan' | 'pem020' | 'phe030' | 'phi010' | 'phonoscope' | 'pie010' | 'pin060' | 'pin070' | 'pio060' | 'pioncomm' | 'pioneer' | 'pla020' | 'pottawatomie' | 'premiercomm' | 'pro035' | 'psc010' | 'pul010' | 'qco010' | 'qua010' | 'rad010' | 'rai030' | 'ral010' | 'rct010' | 'red040' | 'ree010' | 'res020' | 'res040' | 'riv030' | 'rld010' | 'rockportcable' | 'rrc010' | 'rsf010' | 'rtc' | 'rte010' | 'sal040' | 'sal060' | 'san020' | 'san040-01' | 'san040-02' | 'sav010' | 'sco020' | 'sco050' | 'scr010' | 'selco' | 'ser060' | 'she005' | 'she010' | 'she030' | 'she030-02' | 'sjoberg' | 'sky050' | 'slingtv' | 'sou025' | 'sou035' | 'sou065' | 'sou075' | 'spa020' | 'spc010' | 'spe010' | 'spi005' | 'spl010' | 'srt010' | 'sta025' | 'stc010' | 'stc020' | 'sul015' | 'sum010' | 'sun045' | 'swa010' | 'sweetwater' | 'tac020' | 'tcc' | 'tct' | 'tec010' | 'tel050' | 'tel095' | 'tel140' | 'tel160-csp' | 'tel160-del' | 'tel160-fra' | 'thr020' | 'thr030' | 'tom020' | 'tra010' | 'tre010' | 'tri025' | 'tri110' | 'tro010' | 'tsc' | 'tvc015' | 'tvc020' | 'tvc030' | 'tvtinc' | 'twi040' | 'uin010' | 'uis010' | 'uni110' | 'uni120' | 'uss020' | 'val025' | 'val030' | 'val040' | 'ver025' | 'ver070' | 'vik011' | 'vis030' | 'vis070' | 'vol040-01' | 'vol040-02' | 'volcanotel' | 'wab020' | 'wadsworth' | 'waitsfield' | 'wal005' | 'wal010' | 'war020' | 'war040' | 'wat025' | 'wav030' | 'wavebroadband' | 'wbi010' | 'wct010' | 'wcta' | 'web020' | 'weh010-camtel' | 'weh010-east' | 'weh010-hope' | 'weh010-longview' | 'weh010-pine' | 'weh010-resort' | 'weh010-talequah' | 'weh010-vicksburg' | 'weh010-white' | 'wes005' | 'wes110' | 'wes130' | 'westianet' | 'wik010' | 'wil015' | 'wil040' | 'wil070' | 'win010' | 'win090' | 'wir030' | 'woo010' | 'wtc010' | 'wya010' | 'xit010' | 'yel010'): this;
 
   /**
    * `--ap-password` — Multiple-system operator account password. If this option is left out, yt-dlp will ask interactively
@@ -899,7 +899,7 @@ export interface Options {
    *
    * @stage format · Video Format Options
    */
-  mergeOutputFormat(value: Arg): this;
+  mergeOutputFormat(value: 'avi' | 'flv' | 'mkv' | 'mov' | 'mp4' | 'webm' | (string & {})): this;
 
   /**
    * `--prefer-free-formats` — Prefer video formats with free containers over non-free ones of the same quality. Use with "-S ext" to strictly prefer free containers irrespective of quality
@@ -1104,7 +1104,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  audioFormat(value: Arg): this;
+  audioFormat(value: 'best' | 'mp3' | 'aac' | 'm4a' | 'opus' | 'vorbis' | 'flac' | 'alac' | 'wav' | (string & {})): this;
 
   /**
    * `--audio-quality` — Specify ffmpeg audio quality to use when converting the audio with -x. Insert a value between 0 (best) and 10 (worst) for VBR or a specific bitrate like 128K (default 5)
@@ -1125,14 +1125,14 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  convertSubs(value: Arg): this;
+  convertSubs(value: 'srt' | 'vtt' | 'ass' | 'lrc' | 'none'): this;
 
   /**
    * `--convert-thumbnails` — Convert the thumbnails to another format (currently supported: jpg, png, webp). You can specify multiple rules using similar syntax as "--remux-video". Use "--convert-thumbnails none" to disable conversion (default)
    *
    * @stage process · Post-Processing Options
    */
-  convertThumbnails(value: Arg): this;
+  convertThumbnails(value: 'jpg' | 'png' | 'webp' | 'none' | (string & {})): this;
 
   /**
    * `--embed-chapters` (--add-chapters) — Add chapter markers to the video file (Alias: --add-chapters)
@@ -1253,7 +1253,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  recodeVideo(value: Arg): this;
+  recodeVideo(value: 'avi' | 'flv' | 'gif' | 'mkv' | 'mov' | 'mp4' | 'webm' | 'aac' | 'aiff' | 'alac' | 'flac' | 'm4a' | 'mka' | 'mp3' | 'ogg' | 'opus' | 'vorbis' | 'wav' | (string & {})): this;
 
   /**
    * `--remove-chapters` — Remove chapters whose title matches the given regular expression. The syntax is the same as --download-sections. This option can be used multiple times
@@ -1268,7 +1268,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  remuxVideo(value: Arg): this;
+  remuxVideo(value: 'avi' | 'flv' | 'gif' | 'mkv' | 'mov' | 'mp4' | 'webm' | 'aac' | 'aiff' | 'alac' | 'flac' | 'm4a' | 'mka' | 'mp3' | 'ogg' | 'opus' | 'vorbis' | 'wav' | (string & {})): this;
 
   /**
    * `--replace-in-metadata` — Replace text in a metadata field using the given regex. This option can be used multiple times. Supported values of "WHEN" are the same as that of --use-postprocessor (default: pre_process)
@@ -1304,14 +1304,14 @@ export interface Options {
    *
    * @stage process · SponsorBlock Options
    */
-  sponsorblockMark(value: Arg): this;
+  sponsorblockMark(...values: ('chapter' | 'filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'poi_highlight' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all' | `-${'chapter' | 'filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'poi_highlight' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all'}`)[]): this;
 
   /**
    * `--sponsorblock-remove` — SponsorBlock categories to be removed from the video file, separated by commas. If a category is present in both mark and remove, remove takes precedence. The syntax and available categories are the same as for --sponsorblock-mark except that "default" refers to "all,-filler" and poi_highlight, chapter are not available
    *
    * @stage process · SponsorBlock Options
    */
-  sponsorblockRemove(value: Arg): this;
+  sponsorblockRemove(...values: ('filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all' | `-${'filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all'}`)[]): this;
 
   /**
    * `--use-postprocessor` — The (case-sensitive) name of plugin postprocessors to be enabled, and (optionally) arguments to be passed to it, separated by a colon ":". ARGS are a semicolon ";" delimited list of NAME=VALUE. The "when" argument determines when the postprocessor is invoked. It can be one of "pre_process" (after video extraction), "after_filter" (after video passes filter), "video" (after --format; before --print/--output), "before_dl" (before each video download), "post_process" (after each video download; default), "after_move" (after moving the video file to its final location), "after_video" (after downloading and processing all formats of a video), or "playlist" (at end of playlist). This option can be used multiple times to add different postprocessors

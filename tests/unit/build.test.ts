@@ -246,3 +246,56 @@ test('빌더가 낸 명령어를 스캐너가 그대로 읽는다', () => {
     ['format', 'output', 'write-subs', 'sub-langs', 'merge-output-format']);
   assert.deepEqual(items.filter(i => i.kind === 'url').map(i => i.raw), [U]);
 });
+
+// 이 저장소가 스스로에게 물어야 하는 질문 — **내가 낸 것을 내가 읽는가.**
+// `-` 로 시작하는 값을 떼어 놓으면 optparse 는 받지만(다음 토큰을 그냥
+// 값으로 삼는다) 읽는 쪽에서는 플래그와 구분이 안 된다. 실제로 검증기가
+// `-multistreams` 를 "없는 플래그"로 잡았다.
+test('- 로 시작하는 값은 붙여서 낸다 — 빌더가 낸 것을 검증기가 거부하면 안 된다', () => {
+  const c = ytdlp(U).compatOptions('all', '-multistreams').sponsorblockRemove('sponsor', '-intro');
+
+  assert.match(c.build(), /--compat-options=-multistreams/);
+  assert.match(c.build(), /--sponsorblock-remove=-intro/);
+  // 안 빼는 쪽은 그대로 떼어 놓는다 — 붙이면 읽기 나빠진다
+  assert.match(c.build(), /--compat-options all\b/);
+
+  const r = c.lint();
+  assert.deepEqual(r.issues.filter(i => i.level !== 'info'), []);
+
+  // argv 쪽도 같아야 한다. 셸을 안 거치므로 따옴표만 안 붙을 뿐이다.
+  assert.ok(c.toArray().includes('--compat-options=-multistreams'), c.toArray().join(' '));
+});
+
+test('yt-dlp 가 정한 값 목록이 실려 있다', () => {
+  const has = (id: string, ...vals: string[]): void => {
+    const o = schema.byId[id]!;
+    assert.ok(o.choices?.length, `${id} 에 목록이 없다 — gen_schema.py 의 리플렉션이 빈 것 아닌가`);
+    for (const v of vals) assert.ok(o.choices!.includes(v), `${id} 목록에 ${v} 가 없다`);
+  };
+  has('convert-subs', 'srt', 'none');
+  has('ap-mso', 'Comcast_SSO');
+  has('compat-options', 'multistreams', 'youtube-dl', 'all');
+  has('sponsorblock-remove', 'sponsor', 'default', 'all');
+  has('sponsorblock-mark', 'poi_highlight');
+  // 목록이 있으면 종류가 그걸 따라간다 — 여러 개면 repeatable
+  assert.equal(schema.byId['compat-options']!.kind, 'repeatable');
+  assert.equal(schema.byId['convert-subs']!.kind, 'choice');
+});
+
+// 손으로 적은 어휘 층(output-template.ts)과 리플렉션한 스키마가 갈리면
+// **멀쩡한 값이 타입 오류가 되거나, 안 되는 값이 통과한다.** 실제로 둘 다
+// 있었다 — `annotation` 이 빠져 있었고, yt-dlp 가 종류로 안 읽는 `default` 가
+// 들어 있었다(`-o default:%(id)s` 는 `default:` 로 시작하는 파일을 만든다).
+test('손으로 적은 -o 종류가 스키마와 같다', async () => {
+  const { OUT_TYPES } = await import('../../src/core/output-template.js');
+  const ours = OUT_TYPES.map(([v]) => v).filter(Boolean);
+  const theirs = schema.byId['output']!.keys!;
+  assert.ok(theirs?.length, '스키마에 --output 의 종류가 없다');
+  assert.deepEqual([...ours].sort(), [...theirs].sort());
+});
+
+test('-P 종류는 -o 것에 home·temp 를 더한 것이다', async () => {
+  const { OUT_TYPES } = await import('../../src/core/output-template.js');
+  const ours = new Set([...OUT_TYPES.map(([v]) => v).filter(Boolean), 'home', 'temp']);
+  assert.deepEqual([...ours].sort(), [...schema.byId['paths']!.keys!].sort());
+});

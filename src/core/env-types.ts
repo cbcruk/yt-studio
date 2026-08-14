@@ -49,12 +49,32 @@ export function optionMethod(o: Opt, extra?: string): string {
   if (extra) lines.push(`   * ${extra}`);
   lines.push('   */');
 
-  const sig = o.kind === 'flag' ? 'on?: boolean'
-    : o.kind === 'choice' ? `value: ${union(o.choices ?? [])}`
-      : o.kind === 'repeatable' ? '...values: Arg[]'
-        : `value: Arg`;
-  lines.push(`  ${name}(${sig}): this;`);
+  lines.push(`  ${name}(${signature(o)}): this;`);
   return lines.join('\n');
+}
+
+/**
+ * 받는 값의 타입.
+ *
+ * 고를 수 있는 값이 정해져 있으면 `Arg` 대신 그 유니온이다 — 목록은 yt-dlp 를
+ * 리플렉션한 것이라(`gen_schema.py`) 지어낸 것이 아니다.
+ *
+ * `repeatable` 이면서 목록이 있는 것들(`--compat-options` · `--sponsorblock-*`)은
+ * **앞에 `-` 를 붙여 뺄 수 있다** — `all` 로 다 켠 다음 몇 개를 빼는 게 흔한
+ * 쓰임이라서다. 그래서 유니온에 뺀 형태를 같이 낸다.
+ */
+function signature(o: Opt): string {
+  if (o.kind === 'flag') return 'on?: boolean';
+
+  // 어휘 위의 문법(`aac>mp3/best`)은 유니온으로 닫으면 안 된다 — 멀쩡한 값이
+  // 타입 오류가 된다. `| (string & {})` 는 아무 문자열이나 받으면서도 **어휘는
+  // 자동완성에 띄운다**. 문법 자체는 검증기가 본다.
+  if (o.rule) return `value: ${union(o.rule.vocab)} | (string & {})`;
+
+  const one = o.choices?.length ? union(o.choices) : 'Arg';
+  if (o.kind !== 'repeatable') return `value: ${one}`;
+  if (!o.choices?.length) return '...values: Arg[]';
+  return `...values: (${one} | \`-\${${one}}\`)[]`;
 }
 
 export interface EnvTypes {

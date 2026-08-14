@@ -139,6 +139,50 @@ ytdlp(u).fixup('nope')   → 'nope' is not assignable to '"never" | "ignore" | �
 편집거리로 후보를 뽑던 코드를 컴파일러가 공짜로 대신한다. `.toArray()` 는 `spawn`
 에 넘길 argv 를 준다.
 
+### 이름만이 아니라 **값**도 목록이 있다
+
+```ts
+ytdlp(u).convertSubs('srt')                      // 'srt'|'vtt'|'ass'|'lrc'|'none'
+ytdlp(u).apMso('Comcast_SSO')                    // TV 사업자 435개
+ytdlp(u).sponsorblockRemove('sponsor', 'intro')  // 여러 개
+ytdlp(u).compatOptions('all', '-multistreams')   // '-' 로 빼기
+```
+
+이것도 지어낸 목록이 아니다. yt-dlp 는 값이 정해진 옵션을 **다섯 군데**서 거르는데,
+`gen_schema.py` 가 다섯 다 리플렉션한다.
+
+| 어디서 | 어떻게 | 예 |
+|---|---|---|
+| optparse | `choices=` | `--fixup` · `--concat-playlist` |
+| 콜백 | `callback_kwargs['allowed_values']` | `--compat-options` · `--sponsorblock-*` |
+| 콜백 | `callback_kwargs['allowed_keys']` | `-o` · `-P` · `--exec` 의 앞머리 |
+| 파싱 뒤 | `validate_in(…)` | `--convert-subs` · `--ap-mso` |
+| 후처리기 | `FFmpeg*PP.SUPPORTED_EXTS` | `--audio-format` · `--remux-video` |
+
+앞의 셋은 옵션 객체에 그대로 붙어 있어서 손으로 적을 것이 없다. 나머지 둘만
+**어디서 읽을지**를 적는데(값은 아니다), 상수가 사라지면 생성기가 그 자리에서
+죽는다 — 조용히 빈 목록이 되는 것보다 낫다.
+
+### 목록이 아니라 문법일 때
+
+```ts
+ytdlp(u).audioFormat('mp3')          // 자동완성: best · mp3 · aac · m4a · …
+ytdlp(u).audioFormat('aac>mp3/best') // 그래도 막지 않는다
+```
+
+`--audio-format` 은 `[원본>]대상` 을 `/` 로 이어 선호 순서를 준다
+(`FFmpegExtractAudioPP.FORMAT_RE`). 유니온으로 닫으면 **멀쩡한 값이 타입 오류**가
+되므로 일부러 열어 두고(`| (string & {})`) 어휘만 자동완성에 띄운다. 닫는 일은
+검증기가 한다 — 문법을 실제로 읽어서 대상 확장자만 대조한다.
+
+`-o thumbnail:%(id)s` 의 앞머리도 목록인데, 여기는 **경고**다. yt-dlp 가 모르는
+앞머리를 거절하지 않고 값에 그대로 남기기 때문이다 — `-o nope:%(title)s.%(ext)s`
+는 오류 없이 `nope:` 로 시작하는 파일을 만든다.
+
+목록이 닫혀 있다고 **멀쩡한 명령어를 오류로 잡으면 안 된다.** `--compat-options`
+같은 것들은 쉼표로 여러 개를 받고, `all` 과 별칭(`youtube-dl`)이 있고, `-` 를
+붙여 뺄 수도 있다. 검증기가 그 넷을 다 안다.
+
 > 빌더 전체는 **[docs/builder.md](docs/builder.md)** 에 있다. 왜 노드 그래프가
 > 아니라 이것이 맞는지도 거기 적어 뒀다.
 
