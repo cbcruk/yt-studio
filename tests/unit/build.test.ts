@@ -299,3 +299,31 @@ test('-P 종류는 -o 것에 home·temp 를 더한 것이다', async () => {
   const ours = new Set([...OUT_TYPES.map(([v]) => v).filter(Boolean), 'home', 'temp']);
   assert.deepEqual([...ours].sort(), [...schema.byId['paths']!.keys!].sort());
 });
+
+// 손으로 적은 층이 실물보다 오래 살아남는 것 — 이 저장소가 오늘 두 번 밟았다
+// (`-o` 종류에 `default` 가 남아 있었고 `annotation` 이 빠져 있었다).
+// `arg-types.ts` 는 metavar 로 값을 좁히므로 같은 길이 열려 있다.
+test('값 타입 표가 스키마에 없는 metavar 를 가리키지 않는다', async () => {
+  const { KNOWN_METAVARS } = await import('../../src/core/arg-types.js');
+  const live = new Set(schema.opts.map(o => o.metavar).filter(Boolean));
+  const stale = KNOWN_METAVARS.filter(m => !live.has(m));
+  assert.deepEqual(stale, [], `이 metavar 는 이제 yt-dlp 에 없다 — arg-types.ts 에서 뺄 것`);
+});
+
+// 좁히기가 오탐을 내면 못 잡는 것보다 나쁘다. yt-dlp 의 parse_bytes 로 대조한
+// 값들이 그대로 나가는지 본다 — 타입은 tests/types/reject.ts 가 따로 본다.
+test('좁힌 값이 명령어로는 그대로 나간다', () => {
+  assert.match(ytdlp(U).maxFilesize('44.6M').build(), /--max-filesize 44\.6M/);
+  assert.match(ytdlp(U).maxFilesize(1024).build(), /--max-filesize 1024/);
+  // 짧은 플래그가 있으면 그걸 쓴다 — --retries 는 -R 이다
+  assert.match(ytdlp(U).retries('infinite').build(), /-R infinite/);
+  assert.match(ytdlp(U).socketTimeout(5.5).build(), /--socket-timeout 5\.5/);
+});
+
+// optparse 가 값을 무엇으로 읽는지가 스키마에 실려 있어야 타입이 좁혀진다.
+test('optparse 의 값 종류가 실려 있다', () => {
+  assert.equal(schema.byId['socket-timeout']!.valueType, 'float');
+  assert.equal(schema.byId['max-downloads']!.valueType, 'int');
+  assert.equal(schema.byId['cookies']!.valueType, 'string');
+  assert.equal(schema.byId['embed-subs']!.valueType, null, '값을 안 받는 옵션이다');
+});

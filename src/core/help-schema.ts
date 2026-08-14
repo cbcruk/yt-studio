@@ -234,6 +234,9 @@ export function parseHelp(help: string, version: string, base: RawSchema): HelpR
       keys: prev && richer !== 'flag' ? prev.keys : null,
       rule: prev && richer !== 'flag' ? prev.rule : null,
       vocabs: prev && richer !== 'flag' ? prev.vocabs : null,
+      // 도움말에는 optparse 의 type 이 안 나온다. 값을 받는다는 것까지만
+      // 맞으면 번들 것을 쓰고, 새 옵션은 문자열로 본다.
+      valueType: prev && richer !== 'flag' ? prev.valueType : (richer === 'flag' ? null : 'string'),
       default: prev?.default ?? null,
       help: p.help,
       negation: p.negation,

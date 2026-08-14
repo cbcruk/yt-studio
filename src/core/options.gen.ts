@@ -19,6 +19,18 @@ export const TYPES_VERSION: Version = '2026.07.04';
 /** 값을 받는 옵션에 줄 수 있는 것. */
 export type Arg = string | number;
 
+/**
+ * 바이트 수. `50K` · `44.6M` 처럼 단위를 붙여도 되고 그냥 수여도 된다.
+ *
+ * yt-dlp 의 `parse_bytes` 를 그대로 옮긴 것이라 `50KB` 는 **안 된다** —
+ * 표에 없는 단위다. 대소문자는 안 가린다.
+ */
+export type Size = number | `${number}${'K' | 'M' | 'G' | 'T' | 'P' | 'E' | 'Z' | 'Y'
+  | 'k' | 'm' | 'g' | 't' | 'p' | 'e' | 'z' | 'y'}`;
+
+/** 다시 시도할 횟수. 수 아니면 `infinite`. */
+export type Retries = number | 'infinite';
+
 /** `--cookies-from-browser` 가 쿠키를 읽을 수 있는 브라우저. */
 export type Browser = 'brave' | 'chrome' | 'chromium' | 'edge' | 'firefox' | 'opera' | 'safari' | 'vivaldi' | 'whale';
 
@@ -297,7 +309,7 @@ export interface Options {
    * @stage run · General Options
    * @remarks `.configLocations(false)` → `--no-config-locations`
    */
-  configLocations(...values: Arg[]): this;
+  configLocations(...values: string[]): this;
 
   /**
    * `--default-search` — Use this prefix for unqualified URLs. E.g. "gvsearch2:python" downloads two videos from google videos for the search term "python". Use the value "auto" to let yt-dlp guess ("auto_warning" to emit a warning when guessing). "error" just throws an error. The default value "fixup_error" repairs broken URLs, but emits an error if this is not possible instead of searching
@@ -379,7 +391,7 @@ export interface Options {
    * @stage run · General Options
    * @remarks `.pluginDirs(false)` → `--no-plugin-dirs`
    */
-  pluginDirs(value: Arg): this;
+  pluginDirs(value: string): this;
 
   /**
    * `--preset-alias` (-t) — Applies a predefined set of options. e.g. --preset-alias mp3. The following presets are available: mp3, aac, mp4, mkv, sleep. See the "Preset Aliases" section at the end for more info. This option can be used multiple times
@@ -459,14 +471,14 @@ export interface Options {
    *
    * @stage connect · Authentication Options
    */
-  apPassword(value: Arg): this;
+  apPassword(value: string): this;
 
   /**
    * `--ap-username` — Multiple-system operator account login
    *
    * @stage connect · Authentication Options
    */
-  apUsername(value: Arg): this;
+  apUsername(value: string): this;
 
   /**
    * `--bidi-workaround` — Work around terminals that lack bidirectional text support. Requires bidiv or fribidi executable in PATH
@@ -480,21 +492,21 @@ export interface Options {
    *
    * @stage connect · Authentication Options
    */
-  clientCertificate(value: Arg): this;
+  clientCertificate(value: string): this;
 
   /**
    * `--client-certificate-key` — Path to private key file for client certificate
    *
    * @stage connect · Authentication Options
    */
-  clientCertificateKey(value: Arg): this;
+  clientCertificateKey(value: string): this;
 
   /**
    * `--client-certificate-password` — Password for client certificate private key, if encrypted. If not provided, and the key is encrypted, yt-dlp will ask interactively
    *
    * @stage connect · Authentication Options
    */
-  clientCertificatePassword(value: Arg): this;
+  clientCertificatePassword(value: string): this;
 
   /**
    * `--cookies` — Netscape formatted file to read cookies from and dump cookie jar in
@@ -502,7 +514,7 @@ export interface Options {
    * @stage connect · Filesystem Options
    * @remarks `.cookies(false)` → `--no-cookies`
    */
-  cookies(value: Arg): this;
+  cookies(value: string): this;
 
   /**
    * `--enable-file-urls` — Enable file:// URLs. This is disabled by default for security reasons.
@@ -537,7 +549,7 @@ export interface Options {
    *
    * @stage connect · Geo-restriction
    */
-  geoVerificationProxy(value: Arg): this;
+  geoVerificationProxy(value: string): this;
 
   /**
    * `--impersonate` — Client to impersonate for requests. E.g. chrome, chrome-110, chrome:windows-10. Pass --impersonate="" to impersonate any client. Note that forcing impersonation for all requests may have a detrimental impact on download speed and stability
@@ -565,7 +577,7 @@ export interface Options {
    *
    * @stage connect · Workarounds
    */
-  maxSleepInterval(value: Arg): this;
+  maxSleepInterval(value: number): this;
 
   /**
    * `--netrc` (-n) — Use .netrc authentication data
@@ -579,14 +591,14 @@ export interface Options {
    *
    * @stage connect · Authentication Options
    */
-  netrcCmd(value: Arg): this;
+  netrcCmd(value: string): this;
 
   /**
    * `--netrc-location` — Location of .netrc authentication data; either the path or its containing directory. Defaults to ~/.netrc
    *
    * @stage connect · Authentication Options
    */
-  netrcLocation(value: Arg): this;
+  netrcLocation(value: string): this;
 
   /**
    * `--no-check-certificates` — Suppress HTTPS certificate validation
@@ -600,7 +612,7 @@ export interface Options {
    *
    * @stage connect · Authentication Options
    */
-  password(value: Arg): this;
+  password(value: string): this;
 
   /**
    * `--prefer-insecure` (--prefer-unsecure) — Use an unencrypted connection to retrieve information about the video
@@ -614,63 +626,63 @@ export interface Options {
    *
    * @stage connect · Network Options
    */
-  proxy(value: Arg): this;
+  proxy(value: string): this;
 
   /**
    * `--sleep-interval` (--min-sleep-interval) — Number of seconds to sleep before each download. This is the minimum time to sleep when used along with --max-sleep-interval (Alias: --min-sleep-interval)
    *
    * @stage connect · Workarounds
    */
-  sleepInterval(value: Arg): this;
+  sleepInterval(value: number): this;
 
   /**
    * `--sleep-requests` — Number of seconds to sleep between requests during data extraction
    *
    * @stage connect · Workarounds
    */
-  sleepRequests(value: Arg): this;
+  sleepRequests(value: number): this;
 
   /**
    * `--sleep-subtitles` — Number of seconds to sleep before each subtitle download
    *
    * @stage connect · Workarounds
    */
-  sleepSubtitles(value: Arg): this;
+  sleepSubtitles(value: number): this;
 
   /**
    * `--socket-timeout` — Time to wait before giving up, in seconds
    *
    * @stage connect · Network Options
    */
-  socketTimeout(value: Arg): this;
+  socketTimeout(value: number): this;
 
   /**
    * `--source-address` — Client-side IP address to bind to
    *
    * @stage connect · Network Options
    */
-  sourceAddress(value: Arg): this;
+  sourceAddress(value: string): this;
 
   /**
    * `--twofactor` (-2) — Two-factor authentication code
    *
    * @stage connect · Authentication Options
    */
-  twofactor(value: Arg): this;
+  twofactor(value: string): this;
 
   /**
    * `--username` (-u) — Login with this account ID
    *
    * @stage connect · Authentication Options
    */
-  username(value: Arg): this;
+  username(value: string): this;
 
   /**
    * `--video-password` — Video-specific password
    *
    * @stage connect · Authentication Options
    */
-  videoPassword(value: Arg): this;
+  videoPassword(value: string): this;
 
   /**
    * `--xff` — How to fake X-Forwarded-For HTTP header to try bypassing geographic restriction. One of "default" (only when known to be useful), "never", an IP block in CIDR notation, or a two-letter ISO 3166-2 country code
@@ -698,7 +710,7 @@ export interface Options {
    *
    * @stage extract · Extractor Options
    */
-  extractorRetries(value: Arg): this;
+  extractorRetries(value: Retries): this;
 
   /**
    * `--hls-split-discontinuity` — Split HLS playlists to different formats at discontinuities such as ad breaks
@@ -720,7 +732,7 @@ export interface Options {
    *
    * @stage select · Video Selection
    */
-  ageLimit(value: Arg): this;
+  ageLimit(value: number): this;
 
   /**
    * `--break-match-filters` — Same as "--match-filters" but stops the download process when a video is rejected
@@ -773,7 +785,7 @@ export interface Options {
    * @stage select · Video Selection
    * @remarks `.downloadArchive(false)` → `--no-download-archive`
    */
-  downloadArchive(value: Arg): this;
+  downloadArchive(value: string): this;
 
   /**
    * `--match-filters` — Generic video filter. Any "OUTPUT TEMPLATE" field can be compared with a number or a string using the operators defined in "Filtering Formats". You can also simply specify a field to match if the field is present, use "!field" to check if the field is not present, and "&" to check multiple conditions. Use a "\" to escape "&" or quotes if needed. If used multiple times, the filter matches if at least one of the conditions is met. E.g. --match-filters !is_live --match-filters "like_count>?100 & description~='(?i)\bcats \& dogs\b'" matches only videos that are not live OR those that have a like count more than 100 (or the like field is not available) and also has a description that contains the phrase "cats & dogs" (caseless). Use "--match-filters -" to interactively ask whether to download each video
@@ -788,21 +800,21 @@ export interface Options {
    *
    * @stage select · Video Selection
    */
-  maxDownloads(value: Arg): this;
+  maxDownloads(value: number): this;
 
   /**
    * `--max-filesize` — Abort download if filesize is larger than SIZE, e.g. 50k or 44.6M
    *
    * @stage select · Video Selection
    */
-  maxFilesize(value: Arg): this;
+  maxFilesize(value: Size): this;
 
   /**
    * `--min-filesize` — Abort download if filesize is smaller than SIZE, e.g. 50k or 44.6M
    *
    * @stage select · Video Selection
    */
-  minFilesize(value: Arg): this;
+  minFilesize(value: Size): this;
 
   /**
    * `--no-playlist` — Download only the video, if the URL refers to a video and a playlist
@@ -824,7 +836,7 @@ export interface Options {
    *
    * @stage select · Video Selection
    */
-  skipPlaylistAfterErrors(value: Arg): this;
+  skipPlaylistAfterErrors(value: number): this;
 
   /**
    * `--audio-multistreams` — Allow multiple audio streams to be merged into a single file
@@ -972,14 +984,14 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  bufferSize(value: Arg): this;
+  bufferSize(value: Size): this;
 
   /**
    * `--concurrent-fragments` (-N) — Number of fragments of a dash/hlsnative video that should be downloaded concurrently (default is 1)
    *
    * @stage download · Download Options
    */
-  concurrentFragments(value: Arg): this;
+  concurrentFragments(value: number): this;
 
   /**
    * `--download-sections` — Download only chapters that match the regular expression. A "*" prefix denotes time-range instead of chapter. Negative timestamps are calculated from the end. "*from-url" can be used to download between the "start_time" and "end_time" extracted from the URL. Needs ffmpeg. This option can be used multiple times to download multiple sections, e.g. --download-sections "*10:15-inf" --download-sections "intro"
@@ -1007,14 +1019,14 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  fileAccessRetries(value: Arg): this;
+  fileAccessRetries(value: Retries): this;
 
   /**
    * `--fragment-retries` — Number of retries for a fragment (default is 10), or "infinite" (DASH, hlsnative and ISM)
    *
    * @stage download · Download Options
    */
-  fragmentRetries(value: Arg): this;
+  fragmentRetries(value: Retries): this;
 
   /**
    * `--hls-use-mpegts` — Use the mpegts container for HLS videos; allowing some players to play the video while downloading, and reducing the chance of file corruption if download is interrupted. This is enabled by default for live streams
@@ -1029,7 +1041,7 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  httpChunkSize(value: Arg): this;
+  httpChunkSize(value: Size): this;
 
   /**
    * `--keep-fragments` — Keep downloaded fragments on disk after downloading is finished
@@ -1052,7 +1064,7 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  limitRate(value: Arg): this;
+  limitRate(value: Size): this;
 
   /**
    * `--playlist-random` — Download playlist videos in random order
@@ -1074,7 +1086,7 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  retries(value: Arg): this;
+  retries(value: Retries): this;
 
   /**
    * `--retry-sleep` — Time to sleep between retries in seconds (optionally) prefixed by the type of retry (http (default), fragment, file_access, extractor) to apply the sleep to. EXPR can be a number, linear=START[:END[:STEP=1]] or exp=START[:END[:BASE=2]]. This option can be used multiple times to set the sleep for the different retry types, e.g. --retry-sleep linear=1::2 --retry-sleep fragment:exp=1:20
@@ -1095,7 +1107,7 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  throttledRate(value: Arg): this;
+  throttledRate(value: Size): this;
 
   /**
    * `--audio-format` — Format to convert the audio to when -x is used. (currently supported: best (default), aac, alac, flac, m4a, mp3, opus, vorbis, wav). You can specify multiple rules using similar syntax as --remux-video
@@ -1192,7 +1204,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  ffmpegLocation(value: Arg): this;
+  ffmpegLocation(value: string): this;
 
   /**
    * `--fixup` — Automatically correct known faults of the file. One of never (do nothing), warn (only emit a warning), detect_or_warn (the default; fix the file if we can, warn otherwise), force (try fixing even if the file already exists)
@@ -1288,7 +1300,7 @@ export interface Options {
    *
    * @stage process · SponsorBlock Options
    */
-  sponsorblockApi(value: Arg): this;
+  sponsorblockApi(value: string): this;
 
   /**
    * `--sponsorblock-chapter-title` — An output template for the title of the SponsorBlock chapters created by --sponsorblock-mark. The only available fields are start_time, end_time, category, categories, name, category_names. Defaults to "[SponsorBlock]: %(category_names)l"
@@ -1331,7 +1343,7 @@ export interface Options {
    * @stage store · Filesystem Options
    * @remarks `.batchFile(false)` → `--no-batch-file`
    */
-  batchFile(value: Arg): this;
+  batchFile(value: string): this;
 
   /**
    * `--cache-dir` — Location in the filesystem where yt-dlp can store some downloaded information (such as client ids and signatures) permanently. By default ${XDG_CACHE_HOME}/yt-dlp
@@ -1339,7 +1351,7 @@ export interface Options {
    * @stage store · Filesystem Options
    * @remarks `.cacheDir(false)` → `--no-cache-dir`
    */
-  cacheDir(value: Arg): this;
+  cacheDir(value: string): this;
 
   /**
    * `--clean-info-json` (--clean-infojson) — Remove some internal metadata such as filenames from the infojson (default)
@@ -1370,7 +1382,7 @@ export interface Options {
    *
    * @stage store · Filesystem Options
    */
-  loadInfoJson(value: Arg): this;
+  loadInfoJson(value: string): this;
 
   /**
    * `--mtime` — Use the Last-modified header to set the file modification time
@@ -1422,7 +1434,7 @@ export interface Options {
    *
    * @stage store · Filesystem Options
    */
-  trimFilenames(value: Arg): this;
+  trimFilenames(value: number): this;
 
   /**
    * `--windows-filenames` — Force filenames to be Windows-compatible
@@ -1583,7 +1595,7 @@ export interface Options {
    *
    * @stage report · Verbosity and Simulation Options
    */
-  progressDelta(value: Arg): this;
+  progressDelta(value: number): this;
 
   /**
    * `--progress-template` — Template for progress outputs, optionally prefixed with one of "download:" (default), "download-title:" (the console title), "postprocess:", or "postprocess-title:". The video's fields are accessible under the "info" key and the progress attributes are accessible under "progress" key. E.g. --console-title --progress-template "download-title:%(info.id)s-%(progress.eta)s"

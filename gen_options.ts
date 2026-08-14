@@ -75,6 +75,18 @@ export const TYPES_VERSION: Version = '${SCHEMA.ytdlp_version}';
 /** 값을 받는 옵션에 줄 수 있는 것. */
 export type Arg = string | number;
 
+/**
+ * 바이트 수. \`50K\` · \`44.6M\` 처럼 단위를 붙여도 되고 그냥 수여도 된다.
+ *
+ * yt-dlp 의 \`parse_bytes\` 를 그대로 옮긴 것이라 \`50KB\` 는 **안 된다** —
+ * 표에 없는 단위다. 대소문자는 안 가린다.
+ */
+export type Size = number | \`\${number}\${'K' | 'M' | 'G' | 'T' | 'P' | 'E' | 'Z' | 'Y'
+  | 'k' | 'm' | 'g' | 't' | 'p' | 'e' | 'z' | 'y'}\`;
+
+/** 다시 시도할 횟수. 수 아니면 \`infinite\`. */
+export type Retries = number | 'infinite';
+
 /** \`--cookies-from-browser\` 가 쿠키를 읽을 수 있는 브라우저. */
 export type Browser = ${union(vocabOf('cookies-from-browser', 'browser'))};
 

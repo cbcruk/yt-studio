@@ -57,6 +57,14 @@ export interface Opt {
    * 문법은 `core/cookies.ts` 가 갖고 여기는 어휘만 온다.
    */
   vocabs: Record<string, string[]> | null;
+  /**
+   * optparse 가 값을 무엇으로 읽나 — `'string'` · `'int'` · `'float'` · `'choice'`.
+   *
+   * 값을 안 받는 옵션은 `null`. `int`·`float` 는 진짜 수라서 타입도 `number` 가
+   * 된다. `string` 은 명령줄이 원래 다 문자열이라 별 뜻이 없다 —
+   * `--audio-quality 0` 도 `string` 이다.
+   */
+  valueType: 'string' | 'int' | 'float' | 'choice' | null;
   default: unknown;
   help: string;
   /** `--no-part` 처럼 끄는 형태가 따로 있으면 그 플래그. */
