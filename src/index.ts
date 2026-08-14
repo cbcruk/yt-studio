@@ -162,7 +162,7 @@ const def = (): Ytstudio => (fallback ??= ytstudio());
  */
 export const lintCommand = (text: string): LintResult => def().lint(text);
 
-/** 새 명령어를 시작한다. 메서드 187개는 스키마에서 자란다. */
+/** 새 명령어를 시작한다. 메서드 184개는 스키마에서 자란다. */
 export const ytdlp = (...urls: string[]): Ytdlp => def().ytdlp(...urls);
 
 /** 명령어를 사람 말로 — 토큰별 설명 · 다음 걸음. */

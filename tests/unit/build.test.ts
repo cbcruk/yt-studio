@@ -327,3 +327,61 @@ test('optparse 의 값 종류가 실려 있다', () => {
   assert.equal(schema.byId['cookies']!.valueType, 'string');
   assert.equal(schema.byId['embed-subs']!.valueType, null, '값을 안 받는 옵션이다');
 });
+
+// 설명이 옵션보다 오래 살아남으면 그때부터 거짓말이다. 그리고 손으로 쓴
+// 시그니처(-f · -o · -P · --cookies-from-browser)에 적으면 **아무 데도 안 뜬다** —
+// 생성기를 안 거치므로 조용히 죽는다.
+test('설명 오버레이가 갈 곳 없는 옵션을 가리키지 않는다', async () => {
+  const { ANNOTATED } = await import('../../src/core/option-notes.js');
+  const { HAND_WRITTEN } = await import('../../src/core/env-types.js');
+
+  const missing = ANNOTATED.filter(id => !schema.byId[id]);
+  assert.deepEqual(missing, [], 'yt-dlp 에 없는 옵션이다 — option-notes.ts 에서 뺄 것');
+
+  const dead = ANNOTATED.filter(id => HAND_WRITTEN.has(id));
+  assert.deepEqual(dead, [], '손으로 쓴 시그니처라 안 뜬다 — build.ts 의 JSDoc 에 적을 것');
+});
+
+test('설명을 단 옵션은 한국어가 먼저 뜬다', async () => {
+  const { optionMethod } = await import('../../src/core/env-types.js');
+  const out = optionMethod(schema.byId['extract-audio']!);
+  const lines = out.split('\n').map(l => l.trim());
+  assert.match(lines[1]!, /영상을 버리고 음성만 남긴다/);
+  assert.ok(lines.some(l => /Convert video files to audio-only/.test(l)), '원문도 남아야 한다');
+
+  // 안 적은 것은 지금까지처럼 원문만
+  const plain = optionMethod(schema.byId['no-warnings']!);
+  assert.match(plain.split('\n')[1]!, /Ignore warnings/);
+});
+
+// --match-filters 는 **연산자가 -f 필터와 같고 필드가 -o 템플릿과 같다** —
+// yt-dlp 가 그렇게 정의한다. 그래서 toFilters 를 그대로 쓴다. 아래 문자열들은
+// 진짜 yt-dlp 의 match_str 과 parse_options 에 넣어 통과를 확인한 것이다.
+test('--match-filters 를 필터 객체로 쓴다', () => {
+  const c = (x: { build(): string }): string =>
+    x.build().replace('yt-dlp ', '').replace(` ${U}`, '');
+
+  assert.equal(c(ytdlp(U).matchFilters({ duration: { gt: 120 }, is_live: false })),
+    '--match-filters "duration>120 & !is_live"');
+  assert.equal(c(ytdlp(U).matchFilters({ title: { includes: 'live' }, view_count: { gte: 1000 } })),
+    '--match-filters "title*=live & view_count>=1000"');
+
+  // 문자열로 여러 개를 주면 OR 이다 — repeatable 이라 각각 한 번씩 나간다
+  assert.equal((c(ytdlp(U).matchFilters('duration > 60', 'view_count > 100'))
+    .match(/--match-filters/g) || []).length, 2);
+
+  assert.equal(c(ytdlp(U).breakMatchFilters({ availability: 'public' })),
+    '--break-match-filters availability=public');
+});
+
+// 객체는 시간 구간, 문자열은 챕터 정규식 — 뜻이 완전히 달라서 별표를 손으로
+// 붙이게 두지 않았다. `*` 를 빼먹으면 yt-dlp 는 그걸 정규식으로 읽는다.
+test('--download-sections 는 구간과 챕터를 갈라 받는다', () => {
+  const c = (x: { build(): string }): string =>
+    x.build().replace('yt-dlp ', '').replace(` ${U}`, '');
+
+  assert.equal(c(ytdlp(U).downloadSections({ from: 60, to: '2:30' })), '--download-sections "*60-2:30"');
+  assert.equal(c(ytdlp(U).downloadSections({ from: 60 })), '--download-sections "*60-inf"');
+  assert.equal(c(ytdlp(U).downloadSections({ to: 90 })), '--download-sections "*0-90"');
+  assert.equal(c(ytdlp(U).downloadSections('intro')), '--download-sections intro');
+});

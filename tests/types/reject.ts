@@ -154,6 +154,22 @@ ytdlp(u).output(t => t`${t.upload_date.date('%Y-%m-%d')}/${t.title.trunc(40)}.${
 ytdlp(u).output('thumbnail', t => t`${t.id}.${t.ext}`);
 ytdlp(u).output('%(title)s.%(ext)s');       // 문자열 직접
 
+// 값이 구조인 것들은 손으로 쓴 시그니처를 갖는다 — 목록이 아니라 **모양**이라서다
+ytdlp(u).matchFilters({ duration: { gt: 120 }, is_live: false });
+ytdlp(u).matchFilters('some_plugin_field > 1');   // 카탈로그 밖은 문자열로
+ytdlp(u).downloadSections({ from: 60, to: '2:30' });
+ytdlp(u).downloadSections('인트로');
+
+// 필드 이름은 **안 닫았다** — yt-dlp 가 info dict 의 아무 키나 받으므로
+// 닫으면 추출기마다 다른 필드가 전부 타입 오류가 된다. 그 대가로 오타는 못 잡는다.
+ytdlp(u).matchFilters({ some_extractor_field: { gt: 1 } });
+
+// @ts-expect-error 비교 이름은 닫혀 있다
+ytdlp(u).matchFilters({ duration: { roughly: 120 } });
+
+// @ts-expect-error 구간 자리 이름 오타
+ytdlp(u).downloadSections({ form: 60 });
+
 // 저장 경로
 // @ts-expect-error 없는 경로 종류
 ytdlp(u).paths({ hom: '/dl' });

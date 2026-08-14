@@ -13,7 +13,7 @@
  * 구조를 갖는 셋(`-f` 식 · `-o` 수열 · `-P` 집합)만 따로 문법을 준다.
  * 그 판단의 근거는 docs/builder.md 에 있다.
  *
- * 옵션 187개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은
+ * 옵션 184개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은
  * 곳에서 나온다(gen_options.ts). 그래서 사용자가 깐 yt-dlp 에 없는 옵션은
  * 자동완성에 뜨지 않고, 런타임과 타입이 어긋날 수도 없다.
  *
@@ -33,14 +33,39 @@ import type { Piece as OutNode } from './output-template.js';
 import type { Issue } from './lint.js';
 
 import type {
-  Arg, Browser, Conversion, Filters, FormatFactory as GenFactory, Keyring, NumCond,
-  OutFields, OutType, Options, PathMap, StrCond,
+  Arg, Browser, Conversion, Filters, FormatFactory as GenFactory, Keyring, MatchFields,
+  NumCond, OutFields, OutType, Options, PathMap, StrCond,
 } from './options.gen.js';
 
 export type {
-  Arg, Browser, Conversion, Filters, Keyring, NumCond, OutField, OutType, PathMap,
-  Selector, StrCond, Version,
+  Arg, Browser, Conversion, Filters, Keyring, MatchFields, NumCond, OutField, OutType,
+  PathMap, Selector, StrCond, Version,
 } from './options.gen.js';
+
+/**
+ * `--download-sections` 의 시간 구간.
+ *
+ * 초(`90`) 또는 `분:초`(`1:30`) 또는 `시:분:초`. 안 주면 처음부터/끝까지다.
+ */
+export interface Section {
+  from?: number | string;
+  to?: number | string;
+}
+
+/**
+ * 필터 객체 → `--match-filters` 한 줄.
+ *
+ * `-f` 는 `[key=v][k2=v2]` 로 붙이고 이쪽은 ` & ` 로 잇는다. 있음/없음은
+ * 대괄호 없이 `key` · `!key` 다.
+ */
+function matchExpr(arg: MatchFields | string): string {
+  if (typeof arg === 'string') return arg;
+  return toFilters(arg as Filters).map(f => {
+    if (f.op === 'has') return f.key;
+    if (f.op === 'hasnot') return `!${f.key}`;
+    return `${f.key}${f.op}${f.loose ? '?' : ''}${f.value}`;
+  }).join(' & ');
+}
 
 /** `--cookies-from-browser` 의 브라우저 뒤 세 자리. 전부 안 줘도 된다. */
 export interface CookieFrom {
@@ -215,10 +240,11 @@ export function outTag(): OutTag {
 interface Part { id: string; flag: string; value?: string }
 
 // -f · -o · -P · --cookies-from-browser 는 값 자체가 구조라 손으로 쓴 메서드가 맡는다.
-const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser']);
+const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser',
+  'match-filters', 'break-match-filters', 'download-sections']);
 
 /**
- * 스키마에서 자란 187개 메서드가 여기 합쳐진다.
+ * 스키마에서 자란 184개 메서드가 여기 합쳐진다.
  *
  * 클래스와 인터페이스 선언 병합 — 런타임은 `grow()` 가 프로토타입에 심고,
  * 타입은 생성기가 낸다. 둘 다 스키마 한 곳에서 나오므로 어긋날 수 없다.
@@ -330,6 +356,55 @@ export class Ytdlp {
     return this.place(id, flagOf(this.opt(id)), value);
   }
 
+  /**
+   * `--match-filters` — 조건에 맞는 영상만 받는다.
+   *
+   *     .matchFilters({ duration: { gt: 120 }, is_live: false })
+   *     → --match-filters "duration>120 & !is_live"
+   *
+   * **연산자는 `-f` 필터와 같고 필드는 `-o` 템플릿과 같다** — yt-dlp 가 그렇게
+   * 정의한다. 그래서 `toFilters` 를 그대로 쓴다. 여러 번 주면 OR 이다.
+   */
+  matchFilters(spec: MatchFields): this;
+  /** 카탈로그 밖의 필드를 쓸 때. 여러 개를 주면 OR 이다 — yt-dlp 가 그렇게 읽는다. */
+  matchFilters(...exprs: string[]): this;
+  matchFilters(...args: [MatchFields] | string[]): this {
+    return this.pushAll('match-filters', args);
+  }
+
+  /** `--break-match-filters` — 위와 같은데, 걸리면 **거기서 멈춘다.** */
+  breakMatchFilters(spec: MatchFields): this;
+  breakMatchFilters(...exprs: string[]): this;
+  breakMatchFilters(...args: [MatchFields] | string[]): this {
+    return this.pushAll('break-match-filters', args);
+  }
+
+  /** 필터 인자들을 하나씩 쌓는다. repeatable 이라 `place` 가 밀어 넣는다. */
+  private pushAll(id: string, args: [MatchFields] | string[]): this {
+    const flag = flagOf(this.opt(id));
+    for (const a of args) this.place(id, flag, matchExpr(a as MatchFields | string));
+    return this;
+  }
+
+  /**
+   * `--download-sections` — 영상의 일부만 받는다.
+   *
+   *     .downloadSections({ from: 60, to: '2:30' })   → --download-sections "*60-2:30"
+   *     .downloadSections({ from: 60 })                → --download-sections "*60-inf"
+   *     .downloadSections('인트로')                     → --download-sections 인트로
+   *
+   * 객체를 주면 시간 구간(`*시작-끝`)이고, 문자열을 주면 **챕터 제목 정규식**이다.
+   * 둘이 완전히 다른 뜻이라 별표를 손으로 붙이게 두지 않았다.
+   */
+  downloadSections(range: Section): this;
+  downloadSections(chapter: string): this;
+  downloadSections(arg: Section | string): this {
+    const id = 'download-sections';
+    const v = typeof arg === 'string' ? arg
+      : `*${arg.from ?? 0}-${arg.to ?? 'inf'}`;
+    return this.place(id, flagOf(this.opt(id)), v);
+  }
+
   /** 지금까지 쌓은 것을 그대로 복사한다. */
   clone(): this {
     // new Ytdlp() 로 만들면 자란 메서드가 없는 껍데기가 된다 — 옵션 메서드는
@@ -390,7 +465,7 @@ export class Ytdlp {
 }
 
 /**
- * 187개 메서드를 스키마에서 길러 프로토타입에 심는다.
+ * 184개 메서드를 스키마에서 길러 프로토타입에 심는다.
  *
  * 손으로 적은 목록이 없다는 게 요점이다 — yt-dlp 가 옵션을 더하면
  * `gen_schema.py` 와 `gen_options.ts` 를 다시 돌리는 것만으로 메서드와 타입이
