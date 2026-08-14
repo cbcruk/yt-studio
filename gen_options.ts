@@ -32,6 +32,14 @@ const SCHEMA: RawSchema = JSON.parse(
 
 // 어휘 표들은 손으로 적는 층이다(format-grammar.ts · output-template.ts).
 // 자동완성에 뜨는 한국어 설명이 전부 거기서 나온다.
+/** 스키마가 들고 온 자리별 어휘. 없으면 그 자리에서 죽는다 — 조용히 빈 유니온이
+ * 되면 `Browser` 가 `never` 가 되고, 멀쩡한 코드가 전부 타입 오류가 된다. */
+const vocabOf = (id: string, slot: string): string[] => {
+  const v = SCHEMA.options.find(o => o.id === id)?.vocabs?.[slot];
+  if (!v?.length) throw new Error(`스키마에 ${id} 의 ${slot} 어휘가 없다`);
+  return v;
+};
+
 const SELS = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const OUT_FIELDS = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 const TYPES = OUT_TYPES.map(([v]) => v).filter(Boolean);
@@ -66,6 +74,12 @@ export const TYPES_VERSION: Version = '${SCHEMA.ytdlp_version}';
 
 /** 값을 받는 옵션에 줄 수 있는 것. */
 export type Arg = string | number;
+
+/** \`--cookies-from-browser\` 가 쿠키를 읽을 수 있는 브라우저. */
+export type Browser = ${union(vocabOf('cookies-from-browser', 'browser'))};
+
+/** 리눅스에서 크로미움 계열 쿠키를 푸는 키체인. */
+export type Keyring = ${union(vocabOf('cookies-from-browser', 'keyring'))};
 
 /** \`-f\` 가 받는 셀렉터. 빌더에서는 \`f.bv()\` 처럼 메서드가 된다. */
 export type Selector = ${union(SELS)};
