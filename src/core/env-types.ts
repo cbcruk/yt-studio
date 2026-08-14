@@ -32,8 +32,9 @@ export const doc = (s: string): string =>
 
 export const union = (xs: readonly string[]): string => xs.map(x => `'${x}'`).join(' | ');
 
-/** `-f` · `-o` · `-P` 는 값 자체가 구조라 `build.ts` 가 손으로 쓴 시그니처를 갖는다. */
-export const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
+/** `-f` · `-o` · `-P` · `--cookies-from-browser` 는 값 자체가 구조라 `build.ts` 가
+ * 손으로 쓴 시그니처를 갖는다. 다만 어휘는 스키마에서 온다. */
+export const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser']);
 
 /** 옵션 하나의 메서드 선언. JSDoc 까지 붙는다 — 자동완성에 뜨는 도움말이 이것이다. */
 export function optionMethod(o: Opt, extra?: string): string {

@@ -158,6 +158,7 @@ ytdlp(u).compatOptions('all', '-multistreams')   // '-' 로 빼기
 | 콜백 | `callback_kwargs['allowed_keys']` | `-o` · `-P` · `--exec` 의 앞머리 |
 | 파싱 뒤 | `validate_in(…)` | `--convert-subs` · `--ap-mso` |
 | 후처리기 | `FFmpeg*PP.SUPPORTED_EXTS` | `--audio-format` · `--remux-video` |
+| 쿠키 | `cookies.SUPPORTED_BROWSERS` · `_KEYRINGS` | `--cookies-from-browser` 의 자리별 |
 
 앞의 셋은 옵션 객체에 그대로 붙어 있어서 손으로 적을 것이 없다. 나머지 둘만
 **어디서 읽을지**를 적는데(값은 아니다), 상수가 사라지면 생성기가 그 자리에서
@@ -174,6 +175,18 @@ ytdlp(u).audioFormat('aac>mp3/best') // 그래도 막지 않는다
 (`FFmpegExtractAudioPP.FORMAT_RE`). 유니온으로 닫으면 **멀쩡한 값이 타입 오류**가
 되므로 일부러 열어 두고(`| (string & {})`) 어휘만 자동완성에 띄운다. 닫는 일은
 검증기가 한다 — 문법을 실제로 읽어서 대상 확장자만 대조한다.
+
+### 자리가 여럿일 때
+
+```ts
+ytdlp(u).cookiesFromBrowser('firefox', { container: 'Personal' })
+// → --cookies-from-browser firefox::Personal
+```
+
+`--cookies-from-browser` 는 `BROWSER[+KEYRING][:PROFILE][::CONTAINER]` 다. 문자열로
+이으면 `::` 와 `:` 를 헷갈리기 쉬워서(프로필 없이 컨테이너만 주는 형태가 특히)
+자리마다 이름을 붙였다. 문법은 `core/cookies.ts` 가 갖고 **어휘는 스키마가
+들고 온다** — 그 둘을 한 파일에 두었다가 `-o` 종류 표가 갈린 적이 있다.
 
 `-o thumbnail:%(id)s` 의 앞머리도 목록인데, 여기는 **경고**다. yt-dlp 가 모르는
 앞머리를 거절하지 않고 값에 그대로 남기기 때문이다 — `-o nope:%(title)s.%(ext)s`
@@ -373,6 +386,7 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   format-grammar.ts  -f 파서 · 컴파일러 · 셀렉터/필터 어휘
   output-template.ts -o 파서 · 컴파일러 · 필드/변환 어휘
   paths.ts           -P 항목 한 줄 읽기
+  cookies.ts         --cookies-from-browser 한 줄 읽기 (어휘는 스키마에서)
   help-schema.ts     yt-dlp --help 파서 — 손님 쪽 리플렉션
   env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
 src/browser.ts       파일 시스템을 모르는 입구 — studio(raw) 가 손잡이를 준다

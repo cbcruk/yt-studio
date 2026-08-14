@@ -19,6 +19,7 @@ import { scanCommand } from './command.js';
 import { parseFormat } from './format-grammar.js';
 import { parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
+import { parseCookieSource } from './cookies.js';
 import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Piece } from './output-template.js';
@@ -161,6 +162,18 @@ function checkKeys(opt: Opt, value: string | null): string | null {
     + ` — yt-dlp 는 이걸 종류로 안 읽고 값에 그대로 남긴다`;
 }
 
+/**
+ * `--cookies-from-browser` 를 진짜 파서에 넣어 본다.
+ *
+ * 브라우저 이름 하나만 보는 게 아니다 — `firefox::Personal` 처럼 자리가 넷인
+ * 구조라, 모양이 틀린 것과 어휘가 틀린 것을 갈라서 말해야 한다.
+ */
+function checkCookies(opt: Opt, value: string | null): string | null {
+  if (!opt.vocabs || value == null || value === '') return null;
+  try { parseCookieSource(value, opt.vocabs); return null; }
+  catch (e) { return `${opt.flag} — ${(e as Error).message}`; }
+}
+
 /** `-f` 를 진짜 파서에 넣어 본다. 못 읽으면 파서가 한 말을 그대로 돌려준다. */
 function checkFormat(value: string): string | null {
   try { parseFormat(value); return null; }
@@ -264,7 +277,7 @@ export function lintCommand(schema: Schema, text: string): LintResult {
       issues.push({ level: 'warn', flag: it.flag, opt: opt.id,
         msg: `${it.flag} 의 값이 비어 있다 (${opt.metavar || 'VALUE'}) — 채우거나 빼야 한다` });
     }
-    const bad = checkChoice(opt, value) ?? checkRule(opt, value);
+    const bad = checkChoice(opt, value) ?? checkRule(opt, value) ?? checkCookies(opt, value);
     if (bad) issues.push({ level: 'error', flag: it.flag, opt: opt.id, msg: bad });
 
     const odd = checkKeys(opt, value);

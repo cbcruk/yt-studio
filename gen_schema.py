@@ -108,6 +108,24 @@ def _format_rules():
     }
 
 
+# 값이 한 덩이가 아니라 **자리 여럿인 구조**일 때, 자리마다의 어휘.
+#
+#     --cookies-from-browser  BROWSER[+KEYRING][:PROFILE][::CONTAINER]
+#                             └ 목록   └ 목록      └ 자유    └ 자유
+#
+# 문법은 손으로 적는 층(`core/cookies.ts`)이 갖고, 어휘는 여기서 온다.
+# 그 둘을 한 파일에 두면 `-o` 종류 표가 그랬듯이 조용히 갈린다.
+def _value_vocabs():
+    from yt_dlp.cookies import SUPPORTED_BROWSERS, SUPPORTED_KEYRINGS
+
+    return {
+        "--cookies-from-browser": {
+            "browser": sorted(SUPPORTED_BROWSERS),
+            "keyring": sorted(SUPPORTED_KEYRINGS),
+        },
+    }
+
+
 def option_choices(opt, validated):
     """이 옵션이 받는 값이 정해져 있나. `(목록, 여러 개인가)` 또는 `None`.
 
@@ -214,6 +232,7 @@ def main():
     parser = yt_dlp.options.create_parser()
     validated = _validated_choices()
     rules = _format_rules()
+    vocabs = _value_vocabs()
     options = []
 
     for group in parser.option_groups:
@@ -245,6 +264,7 @@ def main():
                 "choices": choices,
                 "keys": option_keys(opt),
                 "rule": option_rule(long_opt, rules),
+                "vocabs": vocabs.get(long_opt),
                 "default": jsonable(opt.default),
                 "help": clean_help(opt.help, jsonable(opt.default)),
                 # 부정 짝 병합용

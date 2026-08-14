@@ -233,6 +233,7 @@ export function parseHelp(help: string, version: string, base: RawSchema): HelpR
       choices: prev && richer !== 'flag' ? prev.choices : null,
       keys: prev && richer !== 'flag' ? prev.keys : null,
       rule: prev && richer !== 'flag' ? prev.rule : null,
+      vocabs: prev && richer !== 'flag' ? prev.vocabs : null,
       default: prev?.default ?? null,
       help: p.help,
       negation: p.negation,

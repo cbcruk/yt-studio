@@ -50,6 +50,13 @@ export interface Opt {
    * 문법은 검증기가 본다.
    */
   rule: OptRule | null;
+  /**
+   * 값이 **자리 여럿인 구조**일 때, 자리마다의 어휘.
+   *
+   * `--cookies-from-browser BROWSER[+KEYRING][:PROFILE][::CONTAINER]` 하나뿐이다.
+   * 문법은 `core/cookies.ts` 가 갖고 여기는 어휘만 온다.
+   */
+  vocabs: Record<string, string[]> | null;
   default: unknown;
   help: string;
   /** `--no-part` 처럼 끄는 형태가 따로 있으면 그 플래그. */

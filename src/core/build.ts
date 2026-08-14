@@ -24,6 +24,7 @@ import { SELECTORS, emitTree } from './format-grammar.js';
 import { FIELDS, emitPiece } from './output-template.js';
 import { lintCommand } from './lint.js';
 import { quote } from './command.js';
+import { emitCookieSource } from './cookies.js';
 import type { Opt, Schema } from './schema.js';
 import { methodName, selMethod } from './env-types.js';
 
@@ -32,13 +33,24 @@ import type { Piece as OutNode } from './output-template.js';
 import type { Issue } from './lint.js';
 
 import type {
-  Arg, Conversion, Filters, FormatFactory as GenFactory, NumCond,
+  Arg, Browser, Conversion, Filters, FormatFactory as GenFactory, Keyring, NumCond,
   OutFields, OutType, Options, PathMap, StrCond,
 } from './options.gen.js';
 
 export type {
-  Arg, Conversion, Filters, NumCond, OutField, OutType, PathMap, Selector, StrCond, Version,
+  Arg, Browser, Conversion, Filters, Keyring, NumCond, OutField, OutType, PathMap,
+  Selector, StrCond, Version,
 } from './options.gen.js';
+
+/** `--cookies-from-browser` 의 브라우저 뒤 세 자리. 전부 안 줘도 된다. */
+export interface CookieFrom {
+  /** 리눅스에서 크로미움 계열 쿠키를 푸는 키체인. */
+  keyring?: Keyring;
+  /** 프로필 이름이나 프로필 디렉터리 경로. */
+  profile?: string;
+  /** 파이어폭스 컨테이너 이름. */
+  container?: string;
+}
 export type { Filter, FormatNode } from './format-grammar.js';
 export type { Issue } from './lint.js';
 
@@ -202,8 +214,8 @@ export function outTag(): OutTag {
 
 interface Part { id: string; flag: string; value?: string }
 
-// -f · -o · -P 는 값 자체가 구조라 손으로 쓴 메서드가 맡는다.
-const HAND_WRITTEN = new Set(['format', 'output', 'paths']);
+// -f · -o · -P · --cookies-from-browser 는 값 자체가 구조라 손으로 쓴 메서드가 맡는다.
+const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser']);
 
 /**
  * 스키마에서 자란 188개 메서드가 여기 합쳐진다.
@@ -294,6 +306,28 @@ export class Ytdlp {
       this.place('paths', flagOf(this.opt('paths')), type === 'home' ? String(path) : `${type}:${path}`);
     }
     return this;
+  }
+
+  /**
+   * `--cookies-from-browser` — 브라우저에서 쿠키를 읽어 온다.
+   *
+   *     .cookiesFromBrowser('firefox')
+   *     .cookiesFromBrowser('firefox', { container: 'Personal' })
+   *     .cookiesFromBrowser('chrome', { keyring: 'GNOMEKEYRING' })
+   *
+   * 값이 `BROWSER[+KEYRING][:PROFILE][::CONTAINER]` 라 자리가 넷이다. 문자열로
+   * 이어 붙이면 `::` 와 `:` 를 헷갈리기 쉬워서 자리마다 이름을 붙였다 —
+   * 프로필 없이 컨테이너만 주는 형태(`firefox::Personal`)가 특히 그렇다.
+   */
+  cookiesFromBrowser(browser: Browser, from: CookieFrom = {}): this {
+    const id = 'cookies-from-browser';
+    const value = emitCookieSource({
+      browser,
+      keyring: from.keyring ?? null,
+      profile: from.profile ?? null,
+      container: from.container ?? null,
+    });
+    return this.place(id, flagOf(this.opt(id)), value);
   }
 
   /** 지금까지 쌓은 것을 그대로 복사한다. */

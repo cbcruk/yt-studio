@@ -74,6 +74,21 @@ ytdlp(u).output('annotation', t => t`${t.id}.${t.ext}`);
 // @ts-expect-error yt-dlp 는 default: 를 종류로 안 읽는다 (파일 이름이 된다)
 ytdlp(u).output('default', t => t`${t.id}.${t.ext}`);
 
+// `--cookies-from-browser` 는 자리가 넷이라 문자열로 이으면 `::` 와 `:` 를
+// 헷갈린다. 자리마다 이름을 붙였고 어휘는 스키마에서 온다.
+ytdlp(u).cookiesFromBrowser('firefox');
+ytdlp(u).cookiesFromBrowser('chrome', { keyring: 'GNOMEKEYRING' });
+ytdlp(u).cookiesFromBrowser('firefox', { profile: '~/.mozilla/firefox/x', container: 'Work' });
+
+// @ts-expect-error 브라우저 오타
+ytdlp(u).cookiesFromBrowser('chrom');
+
+// @ts-expect-error 없는 키링
+ytdlp(u).cookiesFromBrowser('chrome', { keyring: 'NOPE' });
+
+// @ts-expect-error 자리 이름 오타
+ytdlp(u).cookiesFromBrowser('firefox', { conatiner: 'Work' });
+
 // 포맷 필터
 // @ts-expect-error 필터 키 오타
 ytdlp(u).format(f => f.bv({ heigth: { lte: 1080 } }));

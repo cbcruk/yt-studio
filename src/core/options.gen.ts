@@ -19,6 +19,12 @@ export const TYPES_VERSION: Version = '2026.07.04';
 /** 값을 받는 옵션에 줄 수 있는 것. */
 export type Arg = string | number;
 
+/** `--cookies-from-browser` 가 쿠키를 읽을 수 있는 브라우저. */
+export type Browser = 'brave' | 'chrome' | 'chromium' | 'edge' | 'firefox' | 'opera' | 'safari' | 'vivaldi' | 'whale';
+
+/** 리눅스에서 크로미움 계열 쿠키를 푸는 키체인. */
+export type Keyring = 'BASICTEXT' | 'GNOMEKEYRING' | 'KWALLET' | 'KWALLET5' | 'KWALLET6';
+
 /** `-f` 가 받는 셀렉터. 빌더에서는 `f.bv()` 처럼 메서드가 된다. */
 export type Selector = 'b' | 'b*' | 'w' | 'w*' | 'bv' | 'bv*' | 'wv' | 'wv*' | 'ba' | 'ba*' | 'wa' | 'wa*';
 
@@ -497,14 +503,6 @@ export interface Options {
    * @remarks `.cookies(false)` → `--no-cookies`
    */
   cookies(value: Arg): this;
-
-  /**
-   * `--cookies-from-browser` — The name of the browser to load cookies from. Currently supported browsers are: brave, chrome, chromium, edge, firefox, opera, safari, vivaldi, whale. Optionally, the KEYRING used for decrypting Chromium cookies on Linux, the name/path of the PROFILE to load cookies from, and the CONTAINER name (if Firefox) ("none" for no container) can be given with their respective separators. By default, all containers of the most recently accessed profile are used. Currently supported keyrings are: basictext, gnomekeyring, kwallet, kwallet5, kwallet6
-   *
-   * @stage connect · Filesystem Options
-   * @remarks `.cookiesFromBrowser(false)` → `--no-cookies-from-browser`
-   */
-  cookiesFromBrowser(value: Arg): this;
 
   /**
    * `--enable-file-urls` — Enable file:// URLs. This is disabled by default for security reasons.
