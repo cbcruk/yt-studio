@@ -54,9 +54,56 @@ STAGE_OVERRIDE = {
 # optparse 쪽은 callback 액션에 dict 기본값일 뿐이라 append 로 안 보인다.
 # --output·--progress-template 도 같은 성질이지만, 지금 UI 가 값 하나를
 # 전제하므로 건드리지 않는다. 그쪽을 열 때 여기 같이 추가할 것.
+#
+# allowed_values 를 쓰는 셋(아래 option_choices 참고)도 같은 성질이다 —
+# 값을 모아 집합을 만든다. 그쪽은 손으로 안 적고 리플렉션으로 붙인다.
 KIND_OVERRIDE = {
     "--paths": "repeatable",
 }
+
+
+# optparse 가 안 들고 있는 목록. yt-dlp 는 이 둘을 파싱한 **뒤에**
+# validate_in 으로 본다(yt_dlp/__init__.py) — 그래서 옵션 객체에는 안 남는다.
+#
+# 여기 손으로 적는 것은 **어디서 읽을지**뿐이고 값은 yt-dlp 가 준다. 그래서
+# 낡거나 지어낼 수가 없고, 상수가 사라지면 이 스크립트가 그 자리에서 죽는다 —
+# 조용히 빈 목록이 되는 것보다 낫다.
+def _validated_choices():
+    from yt_dlp.extractor.adobepass import MSO_INFO
+    from yt_dlp.postprocessor import FFmpegSubtitlesConvertorPP
+
+    return {
+        # "--convert-subs none" 으로 끄는 것이 문서에 있다. 목록에는 없다.
+        "--convert-subs": [*FFmpegSubtitlesConvertorPP.SUPPORTED_EXTS, "none"],
+        "--ap-mso": sorted(MSO_INFO),
+    }
+
+
+def option_choices(opt, validated):
+    """이 옵션이 받는 값이 정해져 있나. `(목록, 여러 개인가)` 또는 `None`.
+
+    세 군데서 나오는데 셋 다 yt-dlp 가 준 것이다.
+
+      1. optparse 의 `choices=` — `--fixup` 처럼 optparse 가 직접 거른다
+      2. `_set_from_options_callback` 의 `allowed_values` — `--compat-options`
+         처럼 **쉼표로 여러 개**를 받는다. `all` 과 별칭(`youtube-dl` 등)도
+         값이므로 같이 넣는다. 안 넣으면 멀쩡한 명령어가 오류로 잡힌다.
+      3. 파싱 뒤 `validate_in` — 위 표
+
+    `-` 를 앞에 붙여 빼는 형태(`all,-multistreams`)도 되는데, 그건 2번에서만
+    되므로 목록에 안 넣는다. "여러 개인가"가 곧 그 표시다.
+    """
+    if opt.choices:
+        return list(opt.choices), False
+
+    kwargs = getattr(opt, "callback_kwargs", None) or {}
+    allowed = kwargs.get("allowed_values")
+    if allowed is not None:
+        names = sorted(x for x in allowed if x is not None)
+        return [*names, *sorted(kwargs.get("aliases") or {}), "all"], True
+
+    fixed = validated.get(opt._long_opts[0] if opt._long_opts else None)
+    return (list(fixed), False) if fixed else None
 
 
 def clean_help(text, default):
@@ -111,6 +158,7 @@ def base_name(long_opt):
 
 def main():
     parser = yt_dlp.options.create_parser()
+    validated = _validated_choices()
     options = []
 
     for group in parser.option_groups:
@@ -124,6 +172,11 @@ def main():
                 continue
             long_opt = opt._long_opts[0]
             name, polarity = base_name(long_opt)
+            found = option_choices(opt, validated)
+            choices, many = found if found else (None, False)
+            # 목록이 있으면 종류는 그 목록이 정한다 — 여러 개면 repeatable,
+            # 하나면 choice. optparse 의 action 만 봐서는 둘 다 그냥 value 다.
+            kind = ("repeatable" if many else "choice") if choices else control_kind(opt)
             options.append({
                 "id": long_opt.lstrip("-"),
                 "flag": long_opt,
@@ -132,9 +185,9 @@ def main():
                 "stage": STAGE_OVERRIDE.get(long_opt, stage),
                 "group": group.title,
                 "dest": opt.dest,
-                "kind": KIND_OVERRIDE.get(long_opt, control_kind(opt)),
+                "kind": KIND_OVERRIDE.get(long_opt, kind),
                 "metavar": opt.metavar,
-                "choices": list(opt.choices) if opt.choices else None,
+                "choices": choices,
                 "default": jsonable(opt.default),
                 "help": clean_help(opt.help, jsonable(opt.default)),
                 # 부정 짝 병합용

@@ -59,6 +59,35 @@ test('choices 를 벗어난 값을 잡는다', () => {
   assert.match(msgs('yt-dlp --concat-playlist never,nope https://x/y'), /nope/);
 });
 
+// 목록을 넓히면 **틀린 것을 잡는 것보다 맞는 것을 안 잡는 게** 어려워진다.
+// yt-dlp 가 실제로 받는 형태를 여기 못 박는다 — 아래 넷은 진짜 yt-dlp 로
+// 확인한 것이다(optparse 를 통과한다).
+test('빼기와 별칭과 all 은 멀쩡한 값이다 — 목록이 넓어져도 오탐이 안 는다', () => {
+  for (const cmd of [
+    'yt-dlp --compat-options youtube-dl https://x/y',      // 별칭
+    'yt-dlp --compat-options all,-multistreams https://x/y', // all 로 켜고 빼기
+    'yt-dlp --sponsorblock-remove sponsor,intro https://x/y',
+    'yt-dlp --sponsorblock-mark default https://x/y',
+    'yt-dlp --convert-subs none https://x/y',              // 목록에 없지만 끄는 값
+  ]) {
+    assert.equal(lintCommand(cmd).counts.error, 0, `${cmd}\n${msgs(cmd)}`);
+  }
+});
+
+test('그래도 없는 값은 잡는다', () => {
+  assert.match(msgs('yt-dlp --compat-options youtube-dll https://x/y'), /youtube-dll/);
+  assert.match(msgs('yt-dlp --sponsorblock-remove sponsor,intr https://x/y'), /\bintr\b/);
+  assert.match(msgs('yt-dlp --convert-subs mp4 https://x/y'), /mp4/);
+  assert.match(msgs('yt-dlp --ap-mso Comcast https://x/y'), /Comcast/);
+});
+
+// 435개짜리 목록(--ap-mso)을 통째로 찍으면 판정을 읽을 수가 없다.
+test('목록이 길면 줄여서 보여 준다', () => {
+  const m = msgs('yt-dlp --ap-mso Comcast https://x/y');
+  assert.match(m, /… 435개/);
+  assert.ok(m.length < 300, `너무 길다 (${m.length}자)`);
+});
+
 test('-f 는 진짜 파서로 본다', () => {
   assert.match(msgs('yt-dlp -f "bv*[height<=1080]+ba/" https://x/y'), /-f 값을 읽지 못했다/);
   assert.match(msgs('yt-dlp -f "bv[height<=]x" https://x/y'), /-f 값을 읽지 못했다/);

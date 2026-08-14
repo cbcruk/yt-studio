@@ -139,6 +139,32 @@ ytdlp(u).fixup('nope')   → 'nope' is not assignable to '"never" | "ignore" | �
 편집거리로 후보를 뽑던 코드를 컴파일러가 공짜로 대신한다. `.toArray()` 는 `spawn`
 에 넘길 argv 를 준다.
 
+### 이름만이 아니라 **값**도 목록이 있다
+
+```ts
+ytdlp(u).convertSubs('srt')                      // 'srt'|'vtt'|'ass'|'lrc'|'none'
+ytdlp(u).apMso('Comcast_SSO')                    // TV 사업자 435개
+ytdlp(u).sponsorblockRemove('sponsor', 'intro')  // 여러 개
+ytdlp(u).compatOptions('all', '-multistreams')   // '-' 로 빼기
+```
+
+이것도 지어낸 목록이 아니다. yt-dlp 는 값이 정해진 옵션을 **세 군데**서 거르는데,
+`gen_schema.py` 가 셋 다 리플렉션한다.
+
+| 어디서 | 어떻게 | 예 |
+|---|---|---|
+| optparse | `choices=` | `--fixup` · `--concat-playlist` |
+| 콜백 | `callback_kwargs['allowed_values']` | `--compat-options` · `--sponsorblock-*` |
+| 파싱 뒤 | `validate_in(…)` | `--convert-subs` · `--ap-mso` |
+
+앞의 둘은 옵션 객체에 그대로 붙어 있어서 손으로 적을 것이 없다. 셋째만
+**어디서 읽을지**를 적는데(값은 아니다), 상수가 사라지면 생성기가 그 자리에서
+죽는다 — 조용히 빈 목록이 되는 것보다 낫다.
+
+목록이 닫혀 있다고 **멀쩡한 명령어를 오류로 잡으면 안 된다.** `--compat-options`
+같은 것들은 쉼표로 여러 개를 받고, `all` 과 별칭(`youtube-dl`)이 있고, `-` 를
+붙여 뺄 수도 있다. 검증기가 그 넷을 다 안다.
+
 > 빌더 전체는 **[docs/builder.md](docs/builder.md)** 에 있다. 왜 노드 그래프가
 > 아니라 이것이 맞는지도 거기 적어 뒀다.
 

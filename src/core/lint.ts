@@ -92,15 +92,27 @@ export function nearestFlags(schema: Schema, flag: string, limit = 3): string[] 
     .slice(0, limit).map(x => x.f);
 }
 
-/** `--merge-output-format mp4` 처럼 고를 수 있는 값이 정해진 옵션. */
+/**
+ * `--fixup never` 처럼 고를 수 있는 값이 정해진 옵션.
+ *
+ * 목록은 yt-dlp 를 리플렉션한 것이라 닫혀 있다 — 없는 값을 주면 yt-dlp 도
+ * 거절한다. 다만 **거절하지 말아야 할 두 가지**가 있다.
+ *
+ *   · 쉼표로 여러 개 (`--sponsorblock-remove sponsor,intro`)
+ *   · 앞에 `-` 를 붙여 빼기 (`--compat-options all,-multistreams`)
+ *
+ * 둘 다 `_set_from_options_callback` 이 진짜로 받는 형태다. 안 봐주면 멀쩡한
+ * 명령어가 오류로 잡히는데, 이 도구에서 그건 못 잡는 것보다 나쁘다.
+ */
 function checkChoice(opt: Opt, value: string | null): string | null {
   const { choices } = opt;
   if (!choices || value == null) return null;
-  // 쉼표로 여러 개를 주는 옵션이 있다 (--sponsorblock-remove 등).
+  const many = opt.kind === 'repeatable';
   const parts = String(value).split(',').map(s => s.trim()).filter(Boolean);
-  const bad = parts.filter(p => !choices.includes(p));
+  const bad = parts.filter(p => !choices.includes(many ? p.replace(/^-/, '') : p));
   if (!bad.length) return null;
-  return `${bad.join(', ')} 는 고를 수 있는 값이 아니다 (${choices.join(' · ')})`;
+  const shown = choices.length > 12 ? `${choices.slice(0, 12).join(' · ')} … ${choices.length}개` : choices.join(' · ');
+  return `${bad.join(', ')} 는 고를 수 있는 값이 아니다 (${shown})`;
 }
 
 /** `-f` 를 진짜 파서에 넣어 본다. 못 읽으면 파서가 한 말을 그대로 돌려준다. */

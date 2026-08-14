@@ -227,7 +227,10 @@ export function parseHelp(help: string, version: string, base: RawSchema): HelpR
       // 값을 안 받는 옵션인데 optparse 에는 metavar 가 달린 경우가 있다
       // (--format-sort-force). 도움말에는 안 나오므로 번들에서 물려받는다.
       metavar: p.metavar ?? prev?.metavar ?? null,
-      choices: prev && richer === 'choice' ? prev.choices : null,
+      // 고를 수 있는 값은 도움말에 사람 말로만 있다 — `(currently supported:
+      // best (default), aac, …)` 처럼 괄호가 겹쳐서 캐면 부서진다. 값을 받는
+      // 옵션이라는 것까지만 맞으면 번들의 목록을 그대로 쓴다.
+      choices: prev && richer !== 'flag' ? prev.choices : null,
       default: prev?.default ?? null,
       help: p.help,
       negation: p.negation,

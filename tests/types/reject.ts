@@ -25,6 +25,34 @@ ytdlp(u).fixup('nope');
 
 ytdlp(u).fixup('never');                    // 통과해야 한다
 
+// 목록이 optparse 의 choices= 에만 있는 게 아니다. yt-dlp 는 파싱한 뒤에
+// validate_in 으로 보기도 하고(--convert-subs · --ap-mso), 콜백의
+// allowed_values 로 보기도 한다(--compat-options · --sponsorblock-*).
+// gen_schema.py 가 그 셋을 다 리플렉션하므로 여기서도 다 막힌다.
+
+// @ts-expect-error --convert-subs 는 자막 포맷만 받는다
+ytdlp(u).convertSubs('mp4');
+
+ytdlp(u).convertSubs('srt');
+ytdlp(u).convertSubs('none');               // 끄는 값도 목록에 있다
+
+// @ts-expect-error TV 사업자 식별자 오타 (Comcast_SSO 다)
+ytdlp(u).apMso('Comcast');
+
+ytdlp(u).apMso('Comcast_SSO');
+
+// @ts-expect-error 별칭 오타 (youtube-dl 이다)
+ytdlp(u).compatOptions('youtube-dll');
+
+// 여러 개를 주고, `-` 로 빼고, 별칭과 all 을 쓰는 것 전부 yt-dlp 가 받는 형태다
+ytdlp(u).compatOptions('all', '-multistreams');
+ytdlp(u).compatOptions('youtube-dl');
+ytdlp(u).sponsorblockRemove('sponsor', 'intro');
+ytdlp(u).sponsorblockMark('default');
+
+// @ts-expect-error 빼기는 되지만 없는 값은 여전히 못 쓴다
+ytdlp(u).sponsorblockRemove('-intr');
+
 // 포맷 필터
 // @ts-expect-error 필터 키 오타
 ytdlp(u).format(f => f.bv({ heigth: { lte: 1080 } }));
