@@ -115,6 +115,52 @@ function checkChoice(opt: Opt, value: string | null): string | null {
   return `${bad.join(', ')} 는 고를 수 있는 값이 아니다 (${shown})`;
 }
 
+/**
+ * `--recode-video "aac>mp3/mkv"` 처럼 어휘 위의 문법인 값.
+ *
+ * yt-dlp 의 `FFmpeg*PP.FORMAT_RE` 와 같은 것을 본다 — `/` 로 이은 선호 순서에
+ * 각 칸이 `[원본>]대상` 이고, **대상만** 어휘에 있어야 한다. 원본은 "이
+ * 확장자일 때만"이라 아무 확장자나 온다.
+ *
+ * 타입은 이 문법을 못 막는다(막으면 멀쩡한 값이 오류가 된다). 그래서 닫는
+ * 일은 여기서 한다.
+ */
+function checkRule(opt: Opt, value: string | null): string | null {
+  const { rule } = opt;
+  if (!rule || value == null || value === '') return null;
+
+  const bad: string[] = [];
+  for (const part of String(value).split('/')) {
+    const s = part.trim();
+    if (!s) { bad.push('(빈 칸)'); continue; }
+    const i = rule.from ? s.indexOf('>') : -1;
+    const to = (i >= 0 ? s.slice(i + 1) : s).trim();
+    if (!rule.vocab.includes(to)) bad.push(to || s);
+  }
+  if (!bad.length) return null;
+
+  const how = rule.from ? '[원본>]대상 을 / 로 이어 준다' : '/ 로 이어 준다';
+  return `${bad.join(', ')} 는 ${opt.flag} 가 만들 수 있는 것이 아니다 (${rule.vocab.join(' · ')}) — ${how}`;
+}
+
+/**
+ * `-o thumbnail:%(id)s` 처럼 값 앞에 붙는 종류.
+ *
+ * 모르는 종류를 줘도 yt-dlp 는 **거절하지 않는다** — 종류가 아닌 것으로 보고
+ * 값 전체를 기본 자리에 넣는다. 그래서 `-o nope:%(id)s.%(ext)s` 는 오류 없이
+ * `nope:` 로 시작하는 파일을 만든다. 조용히 어긋나는 쪽이라 여기서 말해 준다.
+ *
+ * 경고다 — 값에 그냥 콜론이 든 것일 수도 있어서다(`--exec "sed s/a:b/c/ …"`).
+ * 그래서 **종류처럼 생겼을 때만** 본다: 콜론 앞이 낱말 하나일 때.
+ */
+function checkKeys(opt: Opt, value: string | null): string | null {
+  if (!opt.keys?.length || !value) return null;
+  const head = /^(\w+):/.exec(value)?.[1];
+  if (!head || opt.keys.includes(head)) return null;
+  return `${head}: 는 ${opt.flag} 가 아는 종류가 아니다 (${opt.keys.join(' · ')})`
+    + ` — yt-dlp 는 이걸 종류로 안 읽고 값에 그대로 남긴다`;
+}
+
 /** `-f` 를 진짜 파서에 넣어 본다. 못 읽으면 파서가 한 말을 그대로 돌려준다. */
 function checkFormat(value: string): string | null {
   try { parseFormat(value); return null; }
@@ -218,8 +264,11 @@ export function lintCommand(schema: Schema, text: string): LintResult {
       issues.push({ level: 'warn', flag: it.flag, opt: opt.id,
         msg: `${it.flag} 의 값이 비어 있다 (${opt.metavar || 'VALUE'}) — 채우거나 빼야 한다` });
     }
-    const bad = checkChoice(opt, value);
+    const bad = checkChoice(opt, value) ?? checkRule(opt, value);
     if (bad) issues.push({ level: 'error', flag: it.flag, opt: opt.id, msg: bad });
+
+    const odd = checkKeys(opt, value);
+    if (odd) issues.push({ level: 'warn', flag: it.flag, opt: opt.id, msg: odd });
   }
 
   for (const id in count) {

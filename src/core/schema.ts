@@ -34,7 +34,22 @@ export interface Opt {
   dest: string | null;
   kind: OptKind;
   metavar: string | null;
+  /** 값 전체가 이 중 하나여야 한다. `--fixup never` */
   choices: string[] | null;
+  /**
+   * 값 **앞에** 붙는 종류의 목록. `-o thumbnail:%(id)s` 의 `thumbnail`.
+   *
+   * 값 자체는 자유 문자열(경로 · 템플릿 · 명령어)이라 `choices` 가 아니다.
+   * 앞머리만 닫혀 있다.
+   */
+  keys: string[] | null;
+  /**
+   * 값이 **어휘 위의 작은 문법**인 것. `--recode-video "aac>mp3/mkv"`
+   *
+   * `choices` 로 쓰면 `aac>mp3` 가 오류로 잡힌다. 어휘는 자동완성이 쓰고,
+   * 문법은 검증기가 본다.
+   */
+  rule: OptRule | null;
   default: unknown;
   help: string;
   /** `--no-part` 처럼 끄는 형태가 따로 있으면 그 플래그. */
@@ -48,6 +63,19 @@ export interface Opt {
  * `repeatable` 은 여러 번 줄 수 있다.
  */
 export type OptKind = 'flag' | 'value' | 'choice' | 'repeatable';
+
+/**
+ * `[원본>]대상(/[원본>]대상)*` — yt-dlp 의 `FFmpeg*PP.FORMAT_RE` 를 옮긴 것.
+ *
+ * `/` 로 이은 것은 선호 순서다(앞엣것부터). `원본>` 은 "이 확장자일 때만"이라
+ * 어휘가 아니라 아무 확장자나 온다.
+ */
+export interface OptRule {
+  /** 대상으로 쓸 수 있는 확장자. */
+  vocab: string[];
+  /** `원본>대상` 형태를 받나. `--merge-output-format` 만 안 받는다. */
+  from: boolean;
+}
 
 /** 생애주기 단계. 사람이 읽을 이름을 붙이려고 손으로 채운 층이다. */
 export interface Stage {

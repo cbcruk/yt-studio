@@ -13,11 +13,11 @@
 
 export const OUT_TYPES: [type: string, label: string][] = [
   ['', '기본 (모든 파일)'],
-  ['default', 'default — 기본'],
   ['chapter', 'chapter — 챕터별 분할 파일'],
   ['subtitle', 'subtitle — 자막'],
   ['thumbnail', 'thumbnail — 썸네일'],
   ['description', 'description — 설명'],
+  ['annotation', 'annotation — 주석 (yt-dlp 가 받지만 유튜브가 없앤 기능이다)'],
   ['infojson', 'infojson — 메타데이터 JSON'],
   ['link', 'link — 인터넷 바로가기'],
   ['pl_video', 'pl_video — 재생목록 항목'],

@@ -281,3 +281,21 @@ test('yt-dlp 가 정한 값 목록이 실려 있다', () => {
   assert.equal(schema.byId['compat-options']!.kind, 'repeatable');
   assert.equal(schema.byId['convert-subs']!.kind, 'choice');
 });
+
+// 손으로 적은 어휘 층(output-template.ts)과 리플렉션한 스키마가 갈리면
+// **멀쩡한 값이 타입 오류가 되거나, 안 되는 값이 통과한다.** 실제로 둘 다
+// 있었다 — `annotation` 이 빠져 있었고, yt-dlp 가 종류로 안 읽는 `default` 가
+// 들어 있었다(`-o default:%(id)s` 는 `default:` 로 시작하는 파일을 만든다).
+test('손으로 적은 -o 종류가 스키마와 같다', async () => {
+  const { OUT_TYPES } = await import('../../src/core/output-template.js');
+  const ours = OUT_TYPES.map(([v]) => v).filter(Boolean);
+  const theirs = schema.byId['output']!.keys!;
+  assert.ok(theirs?.length, '스키마에 --output 의 종류가 없다');
+  assert.deepEqual([...ours].sort(), [...theirs].sort());
+});
+
+test('-P 종류는 -o 것에 home·temp 를 더한 것이다', async () => {
+  const { OUT_TYPES } = await import('../../src/core/output-template.js');
+  const ours = new Set([...OUT_TYPES.map(([v]) => v).filter(Boolean), 'home', 'temp']);
+  assert.deepEqual([...ours].sort(), [...schema.byId['paths']!.keys!].sort());
+});

@@ -193,3 +193,48 @@ test('부정형은 끈 것으로 읽는다', () => {
   const r = lintCommand('yt-dlp --no-embed-subs --write-subs https://x/y');
   assert.equal(r.values['embed-subs'], false);
 });
+
+// 값이 어휘 하나가 아니라 **어휘 위의 문법**인 것들. 타입은 이걸 못 막는다 —
+// 막으면 `aac>mp3/best` 가 오류가 되므로 일부러 열어 뒀다. 닫는 일은 여기다.
+test('[원본>]대상 을 / 로 이은 것을 읽는다', () => {
+  for (const cmd of [
+    'yt-dlp --audio-format mp3 https://x/y',
+    'yt-dlp --audio-format best https://x/y',
+    'yt-dlp --audio-format "aac>mp3/best" https://x/y',
+    'yt-dlp --remux-video "mkv/mp4" https://x/y',
+    'yt-dlp --recode-video "webm>mp4" https://x/y',
+    'yt-dlp --convert-thumbnails none https://x/y',
+    'yt-dlp --merge-output-format "mp4/mkv" https://x/y',
+  ]) {
+    assert.equal(lintCommand(cmd).counts.error, 0, `${cmd}\n${msgs(cmd)}`);
+  }
+});
+
+test('만들 수 없는 확장자는 잡는다', () => {
+  assert.match(msgs('yt-dlp --audio-format mp4 https://x/y'), /mp4 는 --audio-format/);
+  assert.match(msgs('yt-dlp --audio-format "aac>mp4" https://x/y'), /mp4 는/);
+  assert.match(msgs('yt-dlp --convert-thumbnails gif https://x/y'), /gif 는/);
+  // 이쪽만 원본> 를 안 받는다 — yt-dlp 의 정규식이 `(ext)(/(ext))*` 하나뿐이다
+  assert.match(msgs('yt-dlp --merge-output-format "mp4>mkv" https://x/y'), /mp4>mkv 는/);
+});
+
+// yt-dlp 는 모르는 종류를 **거절하지 않는다.** 종류가 아닌 것으로 보고 값에
+// 그대로 남긴다 — `-o nope:%(id)s.%(ext)s` 는 `nope:` 로 시작하는 파일이 된다.
+test('모르는 종류 접두어를 알려 준다 — 조용히 파일 이름이 된다', () => {
+  const r = lintCommand('yt-dlp -o nope:%(title)s.%(ext)s https://x/y');
+  assert.equal(r.counts.error, 0, '오류가 아니라 경고다');
+  assert.match(msgs('yt-dlp -o nope:%(title)s.%(ext)s https://x/y'), /nope: 는 --output 가 아는 종류가 아니다/);
+  assert.match(msgs('yt-dlp --downloader zzz:ffmpeg https://x/y'), /zzz: 는 --downloader/);
+});
+
+test('값에 그냥 든 콜론은 안 건드린다', () => {
+  for (const cmd of [
+    'yt-dlp -o annotation:%(title)s.%(ext)s https://x/y',   // 진짜 종류
+    'yt-dlp --exec after_move:echo\\ hi https://x/y',
+    'yt-dlp --exec "sed -i s/a:b/c/ %(filepath)q" https://x/y',  // 종류처럼 안 생겼다
+    'yt-dlp --retry-sleep fragment:exp=1:20 https://x/y',
+    'yt-dlp --color stderr:never https://x/y',
+  ]) {
+    assert.deepEqual(lintCommand(cmd).issues.filter(i => i.level !== 'info'), [], cmd);
+  }
+});

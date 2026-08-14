@@ -130,7 +130,7 @@ export interface Filters {
 
 /** `-o` 템플릿에 자주 쓰는 필드. 나머지는 `t.field('이름')` 으로. */
 export type OutField = 'title' | 'fulltitle' | 'id' | 'ext' | 'upload_date' | 'timestamp' | 'duration' | 'duration_string' | 'view_count' | 'like_count' | 'webpage_url' | 'uploader' | 'uploader_id' | 'channel' | 'channel_id' | 'artist' | 'album' | 'track' | 'playlist' | 'playlist_title' | 'playlist_id' | 'playlist_index' | 'playlist_count' | 'n_entries' | 'autonumber' | 'format' | 'format_id' | 'format_note' | 'resolution' | 'height' | 'width' | 'fps' | 'vcodec' | 'acodec' | 'filesize' | 'chapter' | 'chapter_number' | 'section_title' | 'section_number' | 'section_start' | 'section_end' | 'extractor' | 'extractor_key' | 'epoch';
-export type OutType = 'default' | 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
+export type OutType = 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'annotation' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
 export type Conversion = 's' | 'd' | 'f' | 'B' | 'j' | 'l' | 'q' | 'D' | 'S' | 'U' | 'h';
 
 /**
@@ -236,11 +236,11 @@ export interface PathMap {
   home?: string;
   /** 받는 동안 쓰는 임시 자리. */
   temp?: string;
-  default?: string;
   chapter?: string;
   subtitle?: string;
   thumbnail?: string;
   description?: string;
+  annotation?: string;
   infojson?: string;
   link?: string;
   pl_video?: string;
@@ -380,7 +380,7 @@ export interface Options {
    *
    * @stage run · General Options
    */
-  presetAlias(value: Arg): this;
+  presetAlias(value: 'mp3' | 'aac' | 'mp4' | 'mkv' | 'sleep'): this;
 
   /**
    * `--remote-components` — Remote components to allow yt-dlp to fetch when required. This option is currently not needed if you are using an official executable or have the requisite version of the yt-dlp-ejs package installed. You can use this option multiple times to allow multiple components. Supported values: ejs:npm (external JavaScript components from npm), ejs:github (external JavaScript components from yt-dlp-ejs GitHub). By default, no remote components are allowed
@@ -899,7 +899,7 @@ export interface Options {
    *
    * @stage format · Video Format Options
    */
-  mergeOutputFormat(value: Arg): this;
+  mergeOutputFormat(value: 'avi' | 'flv' | 'mkv' | 'mov' | 'mp4' | 'webm' | (string & {})): this;
 
   /**
    * `--prefer-free-formats` — Prefer video formats with free containers over non-free ones of the same quality. Use with "-S ext" to strictly prefer free containers irrespective of quality
@@ -1104,7 +1104,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  audioFormat(value: Arg): this;
+  audioFormat(value: 'best' | 'mp3' | 'aac' | 'm4a' | 'opus' | 'vorbis' | 'flac' | 'alac' | 'wav' | (string & {})): this;
 
   /**
    * `--audio-quality` — Specify ffmpeg audio quality to use when converting the audio with -x. Insert a value between 0 (best) and 10 (worst) for VBR or a specific bitrate like 128K (default 5)
@@ -1132,7 +1132,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  convertThumbnails(value: Arg): this;
+  convertThumbnails(value: 'jpg' | 'png' | 'webp' | 'none' | (string & {})): this;
 
   /**
    * `--embed-chapters` (--add-chapters) — Add chapter markers to the video file (Alias: --add-chapters)
@@ -1253,7 +1253,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  recodeVideo(value: Arg): this;
+  recodeVideo(value: 'avi' | 'flv' | 'gif' | 'mkv' | 'mov' | 'mp4' | 'webm' | 'aac' | 'aiff' | 'alac' | 'flac' | 'm4a' | 'mka' | 'mp3' | 'ogg' | 'opus' | 'vorbis' | 'wav' | (string & {})): this;
 
   /**
    * `--remove-chapters` — Remove chapters whose title matches the given regular expression. The syntax is the same as --download-sections. This option can be used multiple times
@@ -1268,7 +1268,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  remuxVideo(value: Arg): this;
+  remuxVideo(value: 'avi' | 'flv' | 'gif' | 'mkv' | 'mov' | 'mp4' | 'webm' | 'aac' | 'aiff' | 'alac' | 'flac' | 'm4a' | 'mka' | 'mp3' | 'ogg' | 'opus' | 'vorbis' | 'wav' | (string & {})): this;
 
   /**
    * `--replace-in-metadata` — Replace text in a metadata field using the given regex. This option can be used multiple times. Supported values of "WHEN" are the same as that of --use-postprocessor (default: pre_process)

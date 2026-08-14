@@ -53,6 +53,27 @@ ytdlp(u).sponsorblockMark('default');
 // @ts-expect-error 빼기는 되지만 없는 값은 여전히 못 쓴다
 ytdlp(u).sponsorblockRemove('-intr');
 
+// 어휘 위의 문법인 값(`--audio-format` 등)은 **일부러 안 닫는다** —
+// `aac>mp3/best` 가 멀쩡한 값이라 유니온으로 막으면 거짓 오류가 된다.
+// 대신 어휘가 자동완성에 뜨고, 문법은 검증기(`core/lint.js`)가 본다.
+ytdlp(u).audioFormat('mp3');
+ytdlp(u).audioFormat('aac>mp3/best');
+ytdlp(u).remuxVideo('mkv/mp4');
+ytdlp(u).mergeOutputFormat('mp4');
+
+// 프리셋은 닫혀 있다 — 콜백이 쓰는 표가 yt-dlp 모듈에 그대로 있다
+ytdlp(u).presetAlias('mp3');
+
+// @ts-expect-error 없는 프리셋
+ytdlp(u).presetAlias('mp5');
+
+// -o 의 종류도 목록이다. 예전에 이 표가 yt-dlp 와 갈려 있었다 —
+// `annotation` 이 빠져 있었고, yt-dlp 가 종류로 안 읽는 `default` 가 있었다.
+ytdlp(u).output('annotation', t => t`${t.id}.${t.ext}`);
+
+// @ts-expect-error yt-dlp 는 default: 를 종류로 안 읽는다 (파일 이름이 된다)
+ytdlp(u).output('default', t => t`${t.id}.${t.ext}`);
+
 // 포맷 필터
 // @ts-expect-error 필터 키 오타
 ytdlp(u).format(f => f.bv({ heigth: { lte: 1080 } }));

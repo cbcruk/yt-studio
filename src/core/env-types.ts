@@ -66,6 +66,11 @@ export function optionMethod(o: Opt, extra?: string): string {
 function signature(o: Opt): string {
   if (o.kind === 'flag') return 'on?: boolean';
 
+  // 어휘 위의 문법(`aac>mp3/best`)은 유니온으로 닫으면 안 된다 — 멀쩡한 값이
+  // 타입 오류가 된다. `| (string & {})` 는 아무 문자열이나 받으면서도 **어휘는
+  // 자동완성에 띄운다**. 문법 자체는 검증기가 본다.
+  if (o.rule) return `value: ${union(o.rule.vocab)} | (string & {})`;
+
   const one = o.choices?.length ? union(o.choices) : 'Arg';
   if (o.kind !== 'repeatable') return `value: ${one}`;
   if (!o.choices?.length) return '...values: Arg[]';

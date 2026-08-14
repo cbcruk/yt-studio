@@ -231,6 +231,8 @@ export function parseHelp(help: string, version: string, base: RawSchema): HelpR
       // best (default), aac, …)` 처럼 괄호가 겹쳐서 캐면 부서진다. 값을 받는
       // 옵션이라는 것까지만 맞으면 번들의 목록을 그대로 쓴다.
       choices: prev && richer !== 'flag' ? prev.choices : null,
+      keys: prev && richer !== 'flag' ? prev.keys : null,
+      rule: prev && richer !== 'flag' ? prev.rule : null,
       default: prev?.default ?? null,
       help: p.help,
       negation: p.negation,
