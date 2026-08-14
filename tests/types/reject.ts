@@ -89,6 +89,41 @@ ytdlp(u).cookiesFromBrowser('chrome', { keyring: 'NOPE' });
 // @ts-expect-error 자리 이름 오타
 ytdlp(u).cookiesFromBrowser('firefox', { conatiner: 'Work' });
 
+// 값의 모양 — 한동안 값 받는 옵션이 전부 `Arg = string | number` 였다.
+// 그건 양쪽으로 틀렸다: 경로에 숫자를 받고, 초에 아무 문자열을 받았다.
+
+// @ts-expect-error 파일 경로는 숫자가 아니다
+ytdlp(u).cookies(42);
+
+// @ts-expect-error URL 도 숫자가 아니다
+ytdlp(u).proxy(8080);
+
+// @ts-expect-error optparse 가 float 로 읽는다
+ytdlp(u).socketTimeout('빠르게');
+
+// @ts-expect-error parse_bytes 가 못 읽는다
+ytdlp(u).maxFilesize('아주 큰 것');
+
+// @ts-expect-error 표에 없는 단위 (parse_bytes('50KB') → None)
+ytdlp(u).maxFilesize('50KB');
+
+// @ts-expect-error 수 아니면 'infinite' 다
+ytdlp(u).retries('많이');
+
+// yt-dlp 가 진짜로 받는 값은 그대로 통과해야 한다 — parse_bytes 로 대조한 것들
+ytdlp(u).maxFilesize(1024);
+ytdlp(u).maxFilesize('50K');
+ytdlp(u).maxFilesize('44.6M');
+ytdlp(u).limitRate('2.5g');
+ytdlp(u).retries('infinite');
+ytdlp(u).retries(10);
+ytdlp(u).socketTimeout(5.5);
+ytdlp(u).cookies('~/cookies.txt');
+
+// 숫자를 쓰는 게 자연스러운 자리는 안 좁혔다 — 좁혔으면 이게 오류가 됐다
+ytdlp(u).audioQuality(0);
+ytdlp(u).audioQuality('128K');
+
 // 포맷 필터
 // @ts-expect-error 필터 키 오타
 ytdlp(u).format(f => f.bv({ heigth: { lte: 1080 } }));

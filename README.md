@@ -127,7 +127,7 @@ ytdlp('https://youtu.be/abc')
 //        https://youtu.be/abc
 ```
 
-메서드 188개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은 곳에서
+메서드 187개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은 곳에서
 나오므로 **자동완성에 뜨는 옵션 = 리플렉션한 yt-dlp 의 옵션**이다. 모델의 기억에서
 나온 게 아니다. 그래서 검증기가 하던 일의 절반이 컴파일 타임으로 올라간다.
 
@@ -138,6 +138,31 @@ ytdlp(u).fixup('nope')   → 'nope' is not assignable to '"never" | "ignore" | �
 
 편집거리로 후보를 뽑던 코드를 컴파일러가 공짜로 대신한다. `.toArray()` 는 `spawn`
 에 넘길 argv 를 준다.
+
+### 값의 **모양**도 타입이 안다
+
+한동안 값 받는 옵션은 전부 `Arg = string | number` 였다. 그건 양쪽으로 틀렸다 —
+경로에 숫자를 받고, 초에 아무 문자열을 받았다.
+
+```ts
+ytdlp(u).cookies(42)             // ✗ 파일 경로는 숫자가 아니다
+ytdlp(u).socketTimeout('빠르게')   // ✗ optparse 가 float 로 읽는다
+ytdlp(u).maxFilesize('50KB')     // ✗ parse_bytes 가 못 읽는 단위다
+ytdlp(u).retries('많이')           // ✗ 수 아니면 'infinite'
+
+ytdlp(u).maxFilesize('44.6M')    // ✓ 소수도 단위도 된다
+ytdlp(u).audioQuality(0)         // ✓ 여긴 안 좁혔다 — 숫자가 자연스럽다
+```
+
+여기서도 목록은 손으로 안 적는다. optparse 가 옵션마다 값을 **무엇으로 읽는지**
+(`int` · `float` · `string`)를 들고 있고 그게 스키마에 실린다. `arg-types.ts` 는
+그 위에 두 가지만 얹는다 — 절대 숫자일 수 없는 metavar(경로 · URL · 비밀번호)와,
+모양이 정해진 것 둘(`Size` · `Retries`).
+
+**좁힐 때 지키는 것 하나: yt-dlp 가 받는 값을 막으면 안 된다.** 그래서
+`--audio-quality` 는 안 건드렸다 — `0` 도 `128K` 도 쓴다. 좁힌 것은 전부 yt-dlp 의
+파서(`parse_bytes` 등)에 넣어 대조했고, 손으로 적은 metavar 가 스키마에서 사라지면
+검사가 잡는다.
 
 ### 이름만이 아니라 **값**도 목록이 있다
 
@@ -378,7 +403,7 @@ yt.ytdlp('https://youtu.be/abc').extractAudio().build();
 ```
 src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript 다
   schema.ts          리플렉션한 JSON → 색인. 값이다 — 가변 전역이 없다
-  build.ts           코드로 쓰는 명령어 — 메서드 188개가 스키마에서 자란다
+  build.ts           코드로 쓰는 명령어 — 메서드 187개가 스키마에서 자란다
   options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.ts 가 만든다)
   lint.ts            명령어 진단 — 이 도구의 중심
   explain.ts         토큰별 설명 · 파일명 미리보기 · 다음 걸음

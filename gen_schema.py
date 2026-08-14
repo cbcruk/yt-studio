@@ -265,6 +265,10 @@ def main():
                 "keys": option_keys(opt),
                 "rule": option_rule(long_opt, rules),
                 "vocabs": vocabs.get(long_opt),
+                # optparse 가 값을 어떤 것으로 읽나. int·float 는 진짜 수다 —
+                # 지금까지 전부 `string | number` 였는데, 그러면 타입이
+                # `--socket-timeout '빠르게'` 를 못 막는다.
+                "valueType": opt.type,
                 "default": jsonable(opt.default),
                 "help": clean_help(opt.help, jsonable(opt.default)),
                 # 부정 짝 병합용

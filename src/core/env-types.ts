@@ -12,6 +12,7 @@
  * 이 모듈은 아무것도 import 하지 않는다(타입만 빼고). 생성기가 이걸 쓰는데
  * 생성물에 기대면 `options.gen.ts` 가 없을 때 생성기가 못 돈다.
  */
+import { argType } from './arg-types.js';
 import type { Opt } from './schema.js';
 
 /** `--embed-subs` → `embedSubs`. 짧은 플래그는 안 쓴다 — 코드는 읽으라고 있다. */
@@ -72,9 +73,9 @@ function signature(o: Opt): string {
   // 자동완성에 띄운다**. 문법 자체는 검증기가 본다.
   if (o.rule) return `value: ${union(o.rule.vocab)} | (string & {})`;
 
-  const one = o.choices?.length ? union(o.choices) : 'Arg';
+  const one = o.choices?.length ? union(o.choices) : (argType(o) ?? 'Arg');
   if (o.kind !== 'repeatable') return `value: ${one}`;
-  if (!o.choices?.length) return '...values: Arg[]';
+  if (!o.choices?.length) return `...values: ${argType(o) ?? 'Arg'}[]`;
   return `...values: (${one} | \`-\${${one}}\`)[]`;
 }
 
