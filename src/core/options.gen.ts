@@ -146,8 +146,120 @@ export interface Filters {
   dynamic_range?: string | StrCond | boolean;
 }
 
+/**
+ * `--match-filters` 가 보는 필드. **연산자는 `-f` 필터와 같고 필드는 `-o`
+ * 템플릿과 같다** — yt-dlp 가 그렇게 정의한다("Any OUTPUT TEMPLATE field").
+ *
+ * **닫으면 안 된다.** yt-dlp 는 info dict 의 아무 키나 받으므로(추출기마다 다르다)
+ * 여기 없는 필드를 막으면 멀쩡한 조건이 타입 오류가 된다. 그래서 아는 것은
+ * 자동완성에 띄우고 나머지는 열어 둔다 — 대신 필드 이름 오타는 못 잡는다.
+ */
+export interface MatchFields {
+  /** `title` — 제목 */
+  title?: number | NumCond | string | StrCond | boolean;
+  /** `fulltitle` — 제목 (원본) */
+  fulltitle?: number | NumCond | string | StrCond | boolean;
+  /** `id` — 영상 ID */
+  id?: number | NumCond | string | StrCond | boolean;
+  /** `ext` — 확장자 */
+  ext?: number | NumCond | string | StrCond | boolean;
+  /** `upload_date` — 업로드 날짜 (YYYYMMDD) */
+  upload_date?: number | NumCond | string | StrCond | boolean;
+  /** `timestamp` — 업로드 시각 (epoch) */
+  timestamp?: number | NumCond | string | StrCond | boolean;
+  /** `duration` — 길이 (초) */
+  duration?: number | NumCond | string | StrCond | boolean;
+  /** `duration_string` — 길이 (HH:MM:SS) */
+  duration_string?: number | NumCond | string | StrCond | boolean;
+  /** `view_count` — 조회수 */
+  view_count?: number | NumCond | string | StrCond | boolean;
+  /** `like_count` — 좋아요 수 */
+  like_count?: number | NumCond | string | StrCond | boolean;
+  /** `webpage_url` — 페이지 URL */
+  webpage_url?: number | NumCond | string | StrCond | boolean;
+  /** `is_live` — 지금 생중계인가 */
+  is_live?: number | NumCond | string | StrCond | boolean;
+  /** `was_live` — 생중계였던 것인가 */
+  was_live?: number | NumCond | string | StrCond | boolean;
+  /** `live_status` — 생중계 상태 (is_live · was_live · upcoming …) */
+  live_status?: number | NumCond | string | StrCond | boolean;
+  /** `availability` — 공개 범위 (public · unlisted · subscriber_only …) */
+  availability?: number | NumCond | string | StrCond | boolean;
+  /** `age_limit` — 연령 제한 */
+  age_limit?: number | NumCond | string | StrCond | boolean;
+  /** `license` — 라이선스 */
+  license?: number | NumCond | string | StrCond | boolean;
+  /** `uploader` — 업로더 */
+  uploader?: number | NumCond | string | StrCond | boolean;
+  /** `uploader_id` — 업로더 ID */
+  uploader_id?: number | NumCond | string | StrCond | boolean;
+  /** `channel` — 채널 */
+  channel?: number | NumCond | string | StrCond | boolean;
+  /** `channel_id` — 채널 ID */
+  channel_id?: number | NumCond | string | StrCond | boolean;
+  /** `artist` — 아티스트 */
+  artist?: number | NumCond | string | StrCond | boolean;
+  /** `album` — 앨범 */
+  album?: number | NumCond | string | StrCond | boolean;
+  /** `track` — 트랙 */
+  track?: number | NumCond | string | StrCond | boolean;
+  /** `playlist` — 재생목록 */
+  playlist?: number | NumCond | string | StrCond | boolean;
+  /** `playlist_title` — 재생목록 제목 */
+  playlist_title?: number | NumCond | string | StrCond | boolean;
+  /** `playlist_id` — 재생목록 ID */
+  playlist_id?: number | NumCond | string | StrCond | boolean;
+  /** `playlist_index` — 재생목록 번호 */
+  playlist_index?: number | NumCond | string | StrCond | boolean;
+  /** `playlist_count` — 재생목록 개수 */
+  playlist_count?: number | NumCond | string | StrCond | boolean;
+  /** `n_entries` — 항목 수 */
+  n_entries?: number | NumCond | string | StrCond | boolean;
+  /** `autonumber` — 자동 번호 */
+  autonumber?: number | NumCond | string | StrCond | boolean;
+  /** `format` — 포맷 */
+  format?: number | NumCond | string | StrCond | boolean;
+  /** `format_id` — 포맷 ID */
+  format_id?: number | NumCond | string | StrCond | boolean;
+  /** `format_note` — 포맷 노트 */
+  format_note?: number | NumCond | string | StrCond | boolean;
+  /** `resolution` — 해상도 */
+  resolution?: number | NumCond | string | StrCond | boolean;
+  /** `height` — 세로 */
+  height?: number | NumCond | string | StrCond | boolean;
+  /** `width` — 가로 */
+  width?: number | NumCond | string | StrCond | boolean;
+  /** `fps` — 프레임 */
+  fps?: number | NumCond | string | StrCond | boolean;
+  /** `vcodec` — 영상 코덱 */
+  vcodec?: number | NumCond | string | StrCond | boolean;
+  /** `acodec` — 음성 코덱 */
+  acodec?: number | NumCond | string | StrCond | boolean;
+  /** `filesize` — 파일 크기 */
+  filesize?: number | NumCond | string | StrCond | boolean;
+  /** `chapter` — 챕터 */
+  chapter?: number | NumCond | string | StrCond | boolean;
+  /** `chapter_number` — 챕터 번호 */
+  chapter_number?: number | NumCond | string | StrCond | boolean;
+  /** `section_title` — 구간 제목 */
+  section_title?: number | NumCond | string | StrCond | boolean;
+  /** `section_number` — 구간 번호 */
+  section_number?: number | NumCond | string | StrCond | boolean;
+  /** `section_start` — 구간 시작 */
+  section_start?: number | NumCond | string | StrCond | boolean;
+  /** `section_end` — 구간 끝 */
+  section_end?: number | NumCond | string | StrCond | boolean;
+  /** `extractor` — 추출기 */
+  extractor?: number | NumCond | string | StrCond | boolean;
+  /** `extractor_key` — 추출기 키 */
+  extractor_key?: number | NumCond | string | StrCond | boolean;
+  /** `epoch` — 현재 시각 (epoch) */
+  epoch?: number | NumCond | string | StrCond | boolean;
+  [field: string]: number | NumCond | string | StrCond | boolean | undefined;
+}
+
 /** `-o` 템플릿에 자주 쓰는 필드. 나머지는 `t.field('이름')` 으로. */
-export type OutField = 'title' | 'fulltitle' | 'id' | 'ext' | 'upload_date' | 'timestamp' | 'duration' | 'duration_string' | 'view_count' | 'like_count' | 'webpage_url' | 'uploader' | 'uploader_id' | 'channel' | 'channel_id' | 'artist' | 'album' | 'track' | 'playlist' | 'playlist_title' | 'playlist_id' | 'playlist_index' | 'playlist_count' | 'n_entries' | 'autonumber' | 'format' | 'format_id' | 'format_note' | 'resolution' | 'height' | 'width' | 'fps' | 'vcodec' | 'acodec' | 'filesize' | 'chapter' | 'chapter_number' | 'section_title' | 'section_number' | 'section_start' | 'section_end' | 'extractor' | 'extractor_key' | 'epoch';
+export type OutField = 'title' | 'fulltitle' | 'id' | 'ext' | 'upload_date' | 'timestamp' | 'duration' | 'duration_string' | 'view_count' | 'like_count' | 'webpage_url' | 'is_live' | 'was_live' | 'live_status' | 'availability' | 'age_limit' | 'license' | 'uploader' | 'uploader_id' | 'channel' | 'channel_id' | 'artist' | 'album' | 'track' | 'playlist' | 'playlist_title' | 'playlist_id' | 'playlist_index' | 'playlist_count' | 'n_entries' | 'autonumber' | 'format' | 'format_id' | 'format_note' | 'resolution' | 'height' | 'width' | 'fps' | 'vcodec' | 'acodec' | 'filesize' | 'chapter' | 'chapter_number' | 'section_title' | 'section_number' | 'section_start' | 'section_end' | 'extractor' | 'extractor_key' | 'epoch';
 export type OutType = 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'annotation' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
 export type Conversion = 's' | 'd' | 'f' | 'B' | 'j' | 'l' | 'q' | 'D' | 'S' | 'U' | 'h';
 
@@ -180,6 +292,18 @@ export interface OutFields<P> {
   readonly like_count: P;
   /** `%(webpage_url)s` — 페이지 URL */
   readonly webpage_url: P;
+  /** `%(is_live)s` — 지금 생중계인가 */
+  readonly is_live: P;
+  /** `%(was_live)s` — 생중계였던 것인가 */
+  readonly was_live: P;
+  /** `%(live_status)s` — 생중계 상태 (is_live · was_live · upcoming …) */
+  readonly live_status: P;
+  /** `%(availability)s` — 공개 범위 (public · unlisted · subscriber_only …) */
+  readonly availability: P;
+  /** `%(age_limit)s` — 연령 제한 */
+  readonly age_limit: P;
+  /** `%(license)s` — 라이선스 */
+  readonly license: P;
   /** `%(uploader)s` — 업로더 */
   readonly uploader: P;
   /** `%(uploader_id)s` — 업로더 ID */
@@ -283,7 +407,9 @@ export interface Options {
   abortOnError(on?: boolean): this;
 
   /**
-   * `--alias` — Create aliases for an option string. Unless an alias starts with a dash "-", it is prefixed with "--". Arguments are parsed according to the Python string formatting mini-language. E.g. --alias get-audio,-X "-S aext:{0},abr -x --audio-format {0}" creates options "--get-audio" and "-X" that takes an argument (ARG0) and expands to "-S aext:ARG0,abr -x --audio-format ARG0". All defined aliases are listed in the --help output. Alias options can trigger more aliases; so be careful to avoid defining recursive options. As a safety measure, each alias may be triggered a maximum of 100 times. This option can be used multiple times
+   * `--alias` — 옵션 묶음에 새 이름을 붙인다. `--alias mp3 "-x --audio-format mp3"`.
+   *
+   * Create aliases for an option string. Unless an alias starts with a dash "-", it is prefixed with "--". Arguments are parsed according to the Python string formatting mini-language. E.g. --alias get-audio,-X "-S aext:{0},abr -x --audio-format {0}" creates options "--get-audio" and "-X" that takes an argument (ARG0) and expands to "-S aext:ARG0,abr -x --audio-format ARG0". All defined aliases are listed in the --help output. Alias options can trigger more aliases; so be careful to avoid defining recursive options. As a safety measure, each alias may be triggered a maximum of 100 times. This option can be used multiple times
    *
    * @stage run · General Options
    */
@@ -355,7 +481,9 @@ export interface Options {
   ignoreErrors(on?: boolean): this;
 
   /**
-   * `--js-runtimes` — Additional JavaScript runtime to enable, with an optional location for the runtime (either the path to the binary or its containing directory). This option can be used multiple times to enable multiple runtimes. Supported runtimes are (in order of priority, from highest to lowest): deno, node, quickjs, bun. Only "deno" is enabled by default. The highest priority runtime that is both enabled and available will be used. In order to use a lower priority runtime when "deno" is available, --no-js-runtimes needs to be passed before enabling other runtimes
+   * `--js-runtimes` — 자바스크립트가 필요한 추출기가 쓸 런타임. `deno` · `node` 등.
+   *
+   * Additional JavaScript runtime to enable, with an optional location for the runtime (either the path to the binary or its containing directory). This option can be used multiple times to enable multiple runtimes. Supported runtimes are (in order of priority, from highest to lowest): deno, node, quickjs, bun. Only "deno" is enabled by default. The highest priority runtime that is both enabled and available will be used. In order to use a lower priority runtime when "deno" is available, --no-js-runtimes needs to be passed before enabling other runtimes
    *
    * @stage run · General Options
    * @remarks `.jsRuntimes(false)` → `--no-js-runtimes`
@@ -735,14 +863,6 @@ export interface Options {
   ageLimit(value: number): this;
 
   /**
-   * `--break-match-filters` — Same as "--match-filters" but stops the download process when a video is rejected
-   *
-   * @stage select · Video Selection
-   * @remarks `.breakMatchFilters(false)` → `--no-break-match-filters`
-   */
-  breakMatchFilters(...values: Arg[]): this;
-
-  /**
    * `--break-on-existing` — Stop the download process when encountering a file that is in the archive supplied with the --download-archive option
    *
    * @stage select · Video Selection
@@ -780,20 +900,14 @@ export interface Options {
   datebefore(value: Arg): this;
 
   /**
-   * `--download-archive` — Download only videos not listed in the archive file. Record the IDs of all downloaded videos in it
+   * `--download-archive` — 여기 적힌 것은 건너뛴다. 받은 것은 여기 적는다 — 이어받기용.
+   *
+   * Download only videos not listed in the archive file. Record the IDs of all downloaded videos in it
    *
    * @stage select · Video Selection
    * @remarks `.downloadArchive(false)` → `--no-download-archive`
    */
   downloadArchive(value: string): this;
-
-  /**
-   * `--match-filters` — Generic video filter. Any "OUTPUT TEMPLATE" field can be compared with a number or a string using the operators defined in "Filtering Formats". You can also simply specify a field to match if the field is present, use "!field" to check if the field is not present, and "&" to check multiple conditions. Use a "\" to escape "&" or quotes if needed. If used multiple times, the filter matches if at least one of the conditions is met. E.g. --match-filters !is_live --match-filters "like_count>?100 & description~='(?i)\bcats \& dogs\b'" matches only videos that are not live OR those that have a like count more than 100 (or the like field is not available) and also has a description that contains the phrase "cats & dogs" (caseless). Use "--match-filters -" to interactively ask whether to download each video
-   *
-   * @stage select · Video Selection
-   * @remarks `.matchFilters(false)` → `--no-match-filters`
-   */
-  matchFilters(...values: Arg[]): this;
 
   /**
    * `--max-downloads` — Abort after downloading NUMBER files
@@ -817,7 +931,9 @@ export interface Options {
   minFilesize(value: Size): this;
 
   /**
-   * `--no-playlist` — Download only the video, if the URL refers to a video and a playlist
+   * `--no-playlist` — URL 이 재생목록을 가리켜도 영상 하나만 받는다.
+   *
+   * Download only the video, if the URL refers to a video and a playlist
    *
    * @stage select · Video Selection
    * @remarks `.noPlaylist(false)` → `--yes-playlist`
@@ -825,7 +941,9 @@ export interface Options {
   noPlaylist(on?: boolean): this;
 
   /**
-   * `--playlist-items` (-I) — Comma-separated playlist_index of the items to download. You can specify a range using "[START]:[STOP][:STEP]". For backward compatibility, START-STOP is also supported. Use negative indices to count from the right and negative STEP to download in reverse order. E.g. "-I 1:3,7,-5::2" used on a playlist of size 15 will download the items at index 1,2,3,7,11,13,15
+   * `--playlist-items` (-I) — 재생목록에서 몇 번째를 받을지. `1,3,5-7` · `::2`(홀수) · `-1`(마지막).
+   *
+   * Comma-separated playlist_index of the items to download. You can specify a range using "[START]:[STOP][:STEP]". For backward compatibility, START-STOP is also supported. Use negative indices to count from the right and negative STEP to download in reverse order. E.g. "-I 1:3,7,-5::2" used on a playlist of size 15 will download the items at index 1,2,3,7,11,13,15
    *
    * @stage select · Video Selection
    */
@@ -927,7 +1045,9 @@ export interface Options {
   subFormat(value: Arg): this;
 
   /**
-   * `--sub-langs` (--srt-langs) — Languages of the subtitles to download (can be regex) or "all" separated by commas, e.g. --sub-langs "en.*,ja" (where "en.*" is a regex pattern that matches "en" followed by 0 or more of any character). You can prefix the language code with a "-" to exclude it from the requested languages, e.g. --sub-langs all,-live_chat. Use --list-subs for a list of available language tags
+   * `--sub-langs` (--srt-langs) — 받을 자막 언어. `ko,en` 처럼 쉼표로, `all` 이면 전부, `-live_chat` 로 뺀다.
+   *
+   * Languages of the subtitles to download (can be regex) or "all" separated by commas, e.g. --sub-langs "en.*,ja" (where "en.*" is a regex pattern that matches "en" followed by 0 or more of any character). You can prefix the language code with a "-" to exclude it from the requested languages, e.g. --sub-langs all,-live_chat. Use --list-subs for a list of available language tags
    *
    * @stage format · Subtitle Options
    */
@@ -987,18 +1107,13 @@ export interface Options {
   bufferSize(value: Size): this;
 
   /**
-   * `--concurrent-fragments` (-N) — Number of fragments of a dash/hlsnative video that should be downloaded concurrently (default is 1)
+   * `--concurrent-fragments` (-N) — 조각을 몇 개씩 동시에 받을지. DASH · HLS 에서만 먹는다.
+   *
+   * Number of fragments of a dash/hlsnative video that should be downloaded concurrently (default is 1)
    *
    * @stage download · Download Options
    */
   concurrentFragments(value: number): this;
-
-  /**
-   * `--download-sections` — Download only chapters that match the regular expression. A "*" prefix denotes time-range instead of chapter. Negative timestamps are calculated from the end. "*from-url" can be used to download between the "start_time" and "end_time" extracted from the URL. Needs ffmpeg. This option can be used multiple times to download multiple sections, e.g. --download-sections "*10:15-inf" --download-sections "intro"
-   *
-   * @stage download · Download Options
-   */
-  downloadSections(...values: Arg[]): this;
 
   /**
    * `--downloader` (--external-downloader) — Name or path of the external downloader to use (optionally) prefixed by the protocols (http, ftp, m3u8, dash, rtmp) to use it for. Currently supports native, aria2c, axel, curl, ffmpeg, httpie, wget. You can use this option multiple times to set different downloaders for different protocols. E.g. --downloader aria2c --downloader "dash,m3u8:native" will use aria2c for http/ftp downloads, and the native downloader for dash/m3u8 downloads (Alias: --external-downloader)
@@ -1060,7 +1175,9 @@ export interface Options {
   lazyPlaylist(on?: boolean): this;
 
   /**
-   * `--limit-rate` (-r · --rate-limit) — Maximum download rate in bytes per second, e.g. 50K or 4.2M
+   * `--limit-rate` (-r · --rate-limit) — 초당 받을 최대 바이트. `50K` · `4.2M`.
+   *
+   * Maximum download rate in bytes per second, e.g. 50K or 4.2M
    *
    * @stage download · Download Options
    */
@@ -1161,7 +1278,9 @@ export interface Options {
   embedInfoJson(on?: boolean): this;
 
   /**
-   * `--embed-metadata` (--add-metadata) — Embed metadata to the video file. Also embeds chapters/infojson if present unless --no-embed-chapters/--no-embed-info-json are used (Alias: --add-metadata)
+   * `--embed-metadata` (--add-metadata) — 제목 · 업로더 같은 정보를 파일에 넣는다. 챕터도 같이.
+   *
+   * Embed metadata to the video file. Also embeds chapters/infojson if present unless --no-embed-chapters/--no-embed-info-json are used (Alias: --add-metadata)
    *
    * @stage process · Post-Processing Options
    * @remarks `.embedMetadata(false)` → `--no-embed-metadata`
@@ -1169,7 +1288,9 @@ export interface Options {
   embedMetadata(on?: boolean): this;
 
   /**
-   * `--embed-subs` — Embed subtitles in the video (only for mp4, webm and mkv videos)
+   * `--embed-subs` — 자막을 영상 파일 안에 넣는다. **받기까지 하지는 않는다** — `--write-subs` 가 따로 있어야 한다.
+   *
+   * Embed subtitles in the video (only for mp4, webm and mkv videos)
    *
    * @stage process · Post-Processing Options
    * @remarks `.embedSubs(false)` → `--no-embed-subs`
@@ -1177,7 +1298,9 @@ export interface Options {
   embedSubs(on?: boolean): this;
 
   /**
-   * `--embed-thumbnail` — Embed thumbnail in the video as cover art
+   * `--embed-thumbnail` — 썸네일을 커버 아트로 넣는다.
+   *
+   * Embed thumbnail in the video as cover art
    *
    * @stage process · Post-Processing Options
    * @remarks `.embedThumbnail(false)` → `--no-embed-thumbnail`
@@ -1193,7 +1316,9 @@ export interface Options {
   exec(value: Arg): this;
 
   /**
-   * `--extract-audio` (-x) — Convert video files to audio-only files (requires ffmpeg and ffprobe)
+   * `--extract-audio` (-x) — 영상을 버리고 음성만 남긴다. ffmpeg 이 있어야 한다.
+   *
+   * Convert video files to audio-only files (requires ffmpeg and ffprobe)
    *
    * @stage process · Post-Processing Options
    */
@@ -1252,7 +1377,9 @@ export interface Options {
   postOverwrites(on?: boolean): this;
 
   /**
-   * `--postprocessor-args` (--ppa) — Give these arguments to the postprocessors. Specify the postprocessor/executable name and the arguments separated by a colon ":" to give the argument to the specified postprocessor/executable. Supported PP are: Merger, ModifyChapters, SplitChapters, ExtractAudio, VideoRemuxer, VideoConvertor, Metadata, EmbedSubtitle, EmbedThumbnail, SubtitlesConvertor, ThumbnailsConvertor, FixupStretched, FixupM4a, FixupM3u8, FixupTimestamp and FixupDuration. The supported executables are: AtomicParsley, FFmpeg and FFprobe. You can also specify "PP+EXE:ARGS" to give the arguments to the specified executable only when being used by the specified postprocessor. Additionally, for ffmpeg/ffprobe, "_i"/"_o" can be appended to the prefix optionally followed by a number to pass the argument before the specified input/output file, e.g. --ppa "Merger+ffmpeg_i1:-v quiet". You can use this option multiple times to give different arguments to different postprocessors. (Alias: --ppa)
+   * `--postprocessor-args` (--ppa) — 후처리기에 넘길 ffmpeg 인자. `ffmpeg:-vcodec libx265` 처럼 `이름:인자` 로 준다.
+   *
+   * Give these arguments to the postprocessors. Specify the postprocessor/executable name and the arguments separated by a colon ":" to give the argument to the specified postprocessor/executable. Supported PP are: Merger, ModifyChapters, SplitChapters, ExtractAudio, VideoRemuxer, VideoConvertor, Metadata, EmbedSubtitle, EmbedThumbnail, SubtitlesConvertor, ThumbnailsConvertor, FixupStretched, FixupM4a, FixupM3u8, FixupTimestamp and FixupDuration. The supported executables are: AtomicParsley, FFmpeg and FFprobe. You can also specify "PP+EXE:ARGS" to give the arguments to the specified executable only when being used by the specified postprocessor. Additionally, for ffmpeg/ffprobe, "_i"/"_o" can be appended to the prefix optionally followed by a number to pass the argument before the specified input/output file, e.g. --ppa "Merger+ffmpeg_i1:-v quiet". You can use this option multiple times to give different arguments to different postprocessors. (Alias: --ppa)
    *
    * @stage process · Post-Processing Options
    */
@@ -1317,14 +1444,18 @@ export interface Options {
   sponsorblockMark(...values: ('chapter' | 'filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'poi_highlight' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all' | `-${'chapter' | 'filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'poi_highlight' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all'}`)[]): this;
 
   /**
-   * `--sponsorblock-remove` — SponsorBlock categories to be removed from the video file, separated by commas. If a category is present in both mark and remove, remove takes precedence. The syntax and available categories are the same as for --sponsorblock-mark except that "default" refers to "all,-filler" and poi_highlight, chapter are not available
+   * `--sponsorblock-remove` — SponsorBlock 이 표시한 구간을 파일에서 잘라낸다. `sponsor,intro` 처럼 여러 개.
+   *
+   * SponsorBlock categories to be removed from the video file, separated by commas. If a category is present in both mark and remove, remove takes precedence. The syntax and available categories are the same as for --sponsorblock-mark except that "default" refers to "all,-filler" and poi_highlight, chapter are not available
    *
    * @stage process · SponsorBlock Options
    */
   sponsorblockRemove(...values: ('filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all' | `-${'filler' | 'hook' | 'interaction' | 'intro' | 'music_offtopic' | 'outro' | 'preview' | 'selfpromo' | 'sponsor' | 'default' | 'all'}`)[]): this;
 
   /**
-   * `--use-postprocessor` — The (case-sensitive) name of plugin postprocessors to be enabled, and (optionally) arguments to be passed to it, separated by a colon ":". ARGS are a semicolon ";" delimited list of NAME=VALUE. The "when" argument determines when the postprocessor is invoked. It can be one of "pre_process" (after video extraction), "after_filter" (after video passes filter), "video" (after --format; before --print/--output), "before_dl" (before each video download), "post_process" (after each video download; default), "after_move" (after moving the video file to its final location), "after_video" (after downloading and processing all formats of a video), or "playlist" (at end of playlist). This option can be used multiple times to add different postprocessors
+   * `--use-postprocessor` — 플러그인 후처리기를 켠다. `이름[+언제][:인자]` — 언제는 `--exec` 의 WHEN 과 같다.
+   *
+   * The (case-sensitive) name of plugin postprocessors to be enabled, and (optionally) arguments to be passed to it, separated by a colon ":". ARGS are a semicolon ";" delimited list of NAME=VALUE. The "when" argument determines when the postprocessor is invoked. It can be one of "pre_process" (after video extraction), "after_filter" (after video passes filter), "video" (after --format; before --print/--output), "before_dl" (before each video download), "post_process" (after each video download; default), "after_move" (after moving the video file to its final location), "after_video" (after downloading and processing all formats of a video), or "playlist" (at end of playlist). This option can be used multiple times to add different postprocessors
    *
    * @stage process · Post-Processing Options
    */
@@ -1613,7 +1744,9 @@ export interface Options {
   quiet(on?: boolean): this;
 
   /**
-   * `--simulate` (-s) — Do not download the video and do not write anything to disk
+   * `--simulate` (-s) — 받는 척만 한다 — 파일도 로그도 안 남는다. 명령어를 시험할 때.
+   *
+   * Do not download the video and do not write anything to disk
    *
    * @stage report · Verbosity and Simulation Options
    * @remarks `.simulate(false)` → `--no-simulate`

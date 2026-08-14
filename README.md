@@ -5,6 +5,10 @@
 
 **설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.**
 
+옵션 목록도, 값 목록도, 값의 모양도 **손으로 안 적었다.** yt-dlp 자신이 검증에
+쓰는 것을 리플렉션한다 — 그래서 자동완성에 뜨는 것은 정의상 지금 깔린 yt-dlp 가
+받는 것이다.
+
 ```
 npm i ytstudio
 npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
@@ -127,7 +131,7 @@ ytdlp('https://youtu.be/abc')
 //        https://youtu.be/abc
 ```
 
-메서드 187개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은 곳에서
+메서드 184개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은 곳에서
 나오므로 **자동완성에 뜨는 옵션 = 리플렉션한 yt-dlp 의 옵션**이다. 모델의 기억에서
 나온 게 아니다. 그래서 검증기가 하던 일의 절반이 컴파일 타임으로 올라간다.
 
@@ -212,6 +216,21 @@ ytdlp(u).cookiesFromBrowser('firefox', { container: 'Personal' })
 이으면 `::` 와 `:` 를 헷갈리기 쉬워서(프로필 없이 컨테이너만 주는 형태가 특히)
 자리마다 이름을 붙였다. 문법은 `core/cookies.ts` 가 갖고 **어휘는 스키마가
 들고 온다** — 그 둘을 한 파일에 두었다가 `-o` 종류 표가 갈린 적이 있다.
+
+```ts
+ytdlp(u).matchFilters({ duration: { gt: 120 }, is_live: false })
+// → --match-filters "duration>120 & !is_live"
+
+ytdlp(u).downloadSections({ from: 60, to: '2:30' })
+// → --download-sections "*60-2:30"
+```
+
+`--match-filters` 는 **연산자가 `-f` 필터와 같고 필드가 `-o` 템플릿과 같다** —
+yt-dlp 가 그렇게 정의한다. 그래서 있던 것을 그대로 쓴다. 필드 이름은 **안 닫았다**:
+추출기마다 info dict 키가 달라서 닫으면 멀쩡한 조건이 오류가 된다.
+
+`--download-sections` 는 객체면 시간 구간이고 문자열이면 챕터 정규식이다. `*` 를
+빼먹으면 yt-dlp 가 조용히 정규식으로 읽어서, 별표를 손으로 붙이게 두지 않았다.
 
 `-o thumbnail:%(id)s` 의 앞머리도 목록인데, 여기는 **경고**다. yt-dlp 가 모르는
 앞머리를 거절하지 않고 값에 그대로 남기기 때문이다 — `-o nope:%(title)s.%(ext)s`
@@ -403,7 +422,7 @@ yt.ytdlp('https://youtu.be/abc').extractAudio().build();
 ```
 src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript 다
   schema.ts          리플렉션한 JSON → 색인. 값이다 — 가변 전역이 없다
-  build.ts           코드로 쓰는 명령어 — 메서드 187개가 스키마에서 자란다
+  build.ts           코드로 쓰는 명령어 — 메서드 184개가 스키마에서 자란다
   options.gen.ts     생성물: 옵션 타입 · 필터 · 필드 (gen_options.ts 가 만든다)
   lint.ts            명령어 진단 — 이 도구의 중심
   explain.ts         토큰별 설명 · 파일명 미리보기 · 다음 걸음
@@ -557,6 +576,23 @@ LLM 에게 물어보는 것과 다른 이유이기도 하다 — 모델도 그�
 import { spawn } from 'node:child_process';
 spawn('yt-dlp', ytdlp(url).format('bv+ba').toArray(), { stdio: 'inherit' });
 ```
+
+**yt-dlp 를 받아 오거나 올리지 않는다.** 바이너리를 관리하는 래퍼는 이미 있다
+(`ytdlp-nodejs` 등). 그쪽은 `spawn` 을 감싸는 게 본업이고 타입은 거기 딸린
+편의라서, 두 층이 겹치지 않는다.
+
+|  | 실행 래퍼 | ytstudio |
+|---|---|---|
+| 하는 일 | 다운로드 · 스트리밍 · 메타데이터 | 명령어를 **짓고 검사한다** |
+| 바이너리 | 직접 받고 올린다 | 안 건드린다 |
+| 옵션 목록 | 대개 손으로 적는다 | 리플렉션 |
+| 검증 | 없다 | 이게 중심이다 |
+
+손으로 적은 목록이 어떻게 되는지는 재 봤다. 어느 래퍼의 타입에 적힌 플래그
+251개를 yt-dlp 2026.07.04 에 물어보니 **12개가 이제 없는 것**이었다
+(`--write-all-subs` · `--no-part-files` · `--print-command-line` …). 그중 몇은
+optparse 의 접두어 축약 덕에 우연히 통하지만, 나머지는 타입이 통과시키고
+yt-dlp 가 거부한다. 검증기에서 낼 수 있는 최악의 결과다.
 
 **조합 규칙도 상상으로 안 늘린다.** `core/lint.ts` 의 `crossChecks` 는 지금 6개인데,
 전부 실제로 밟은 것들이다. 거짓 경고는 검증기에서 제일 비싼 실수다 — 한 번 내면

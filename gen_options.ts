@@ -49,6 +49,12 @@ const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
 ).join('\n');
 
+// --match-filters 는 -o 필드를 -f 연산자로 비교한다. 숫자 필드인지 아닌지를
+// 우리가 모르므로 양쪽을 다 받는다 — yt-dlp 도 값을 보고 정한다.
+const matchProps = OUT_FIELDS.map(f =>
+  `  /** \`${f}\` — ${doc(FIELD_HELP[f])} */\n  ${f}?: number | NumCond | string | StrCond | boolean;`,
+).join('\n');
+
 // map 에 그대로 넘기면 안 된다 — optionMethod 의 둘째 인자에 인덱스가 꽂힌다.
 const optionMethods = SCHEMA.options
   .filter(o => !HAND_WRITTEN.has(o.id))
@@ -136,6 +142,19 @@ export interface StrCond {
  */
 export interface Filters {
 ${filterProps}
+}
+
+/**
+ * \`--match-filters\` 가 보는 필드. **연산자는 \`-f\` 필터와 같고 필드는 \`-o\`
+ * 템플릿과 같다** — yt-dlp 가 그렇게 정의한다("Any OUTPUT TEMPLATE field").
+ *
+ * **닫으면 안 된다.** yt-dlp 는 info dict 의 아무 키나 받으므로(추출기마다 다르다)
+ * 여기 없는 필드를 막으면 멀쩡한 조건이 타입 오류가 된다. 그래서 아는 것은
+ * 자동완성에 띄우고 나머지는 열어 둔다 — 대신 필드 이름 오타는 못 잡는다.
+ */
+export interface MatchFields {
+${matchProps}
+  [field: string]: number | NumCond | string | StrCond | boolean | undefined;
 }
 
 /** \`-o\` 템플릿에 자주 쓰는 필드. 나머지는 \`t.field('이름')\` 으로. */

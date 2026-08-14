@@ -13,6 +13,7 @@
  * 생성물에 기대면 `options.gen.ts` 가 없을 때 생성기가 못 돈다.
  */
 import { argType } from './arg-types.js';
+import { NOTES } from './option-notes.js';
 import type { Opt } from './schema.js';
 
 /** `--embed-subs` → `embedSubs`. 짧은 플래그는 안 쓴다 — 코드는 읽으라고 있다. */
@@ -35,18 +36,21 @@ export const union = (xs: readonly string[]): string => xs.map(x => `'${x}'`).jo
 
 /** `-f` · `-o` · `-P` · `--cookies-from-browser` 는 값 자체가 구조라 `build.ts` 가
  * 손으로 쓴 시그니처를 갖는다. 다만 어휘는 스키마에서 온다. */
-export const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser']);
+export const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser',
+  'match-filters', 'break-match-filters', 'download-sections']);
 
 /** 옵션 하나의 메서드 선언. JSDoc 까지 붙는다 — 자동완성에 뜨는 도움말이 이것이다. */
 export function optionMethod(o: Opt, extra?: string): string {
   const name = methodName(o.flag);
   const alias = [o.short, ...(o.aliases || [])].filter(Boolean);
-  const lines = [
-    '  /**',
-    `   * \`${o.flag}\`${alias.length ? ` (${alias.join(' · ')})` : ''} — ${doc(o.help)}`,
-    '   *',
-    `   * @stage ${o.stage} · ${doc(o.group)}`,
-  ];
+  // 한국어 한 줄이 있으면 앞에 세우고 yt-dlp 의 말을 뒤에 둔다. 원문이 진실이고
+  // 우리 것은 길잡이라서 순서가 그렇다. 없으면 지금까지처럼 원문만 뜬다.
+  const note = NOTES[o.id];
+  const head = `\`${o.flag}\`${alias.length ? ` (${alias.join(' · ')})` : ''}`;
+  const lines = note
+    ? ['  /**', `   * ${head} — ${doc(note)}`, '   *', `   * ${doc(o.help)}`, '   *',
+      `   * @stage ${o.stage} · ${doc(o.group)}`]
+    : ['  /**', `   * ${head} — ${doc(o.help)}`, '   *', `   * @stage ${o.stage} · ${doc(o.group)}`];
   if (o.negation) lines.push(`   * @remarks \`.${name}(false)\` → \`${o.negation}\``);
   if (extra) lines.push(`   * ${extra}`);
   lines.push('   */');

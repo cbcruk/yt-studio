@@ -32,6 +32,10 @@ export const FIELDS: [group: string, items: [field: string, label: string][]][] 
     ['upload_date', '업로드 날짜 (YYYYMMDD)'], ['timestamp', '업로드 시각 (epoch)'],
     ['duration', '길이 (초)'], ['duration_string', '길이 (HH:MM:SS)'],
     ['view_count', '조회수'], ['like_count', '좋아요 수'], ['webpage_url', '페이지 URL'],
+    ['is_live', '지금 생중계인가'], ['was_live', '생중계였던 것인가'],
+    ['live_status', '생중계 상태 (is_live · was_live · upcoming …)'],
+    ['availability', '공개 범위 (public · unlisted · subscriber_only …)'],
+    ['age_limit', '연령 제한'], ['license', '라이선스'],
   ]],
   ['채널·사람', [
     ['uploader', '업로더'], ['uploader_id', '업로더 ID'],
