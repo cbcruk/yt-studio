@@ -4,3 +4,4 @@ node_modules/
 .vite-build/
 lib/
 demo/dist/
+spikes/*/dist/

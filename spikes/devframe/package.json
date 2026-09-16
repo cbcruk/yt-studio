@@ -1,0 +1,19 @@
+{
+  "name": "ytstudio-devframe-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:app": "vite build --config app/vite.config.ts",
+    "dev": "node bin.ts",
+    "mcp": "node bin.ts mcp",
+    "check": "../../node_modules/.bin/tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@devframes/agentic": "1.0.0",
+    "cac": "^7.0.0",
+    "devframe": "1.0.0"
+  },
+  "devDependencies": {
+    "vite": "^8.2.1"
+  }
+}
