@@ -1,67 +1,72 @@
-# JSDoc 규칙
+# JSDoc Rules
 
-`ytstudio` 의 공개 표면에 JSDoc 을 쓰는 규칙. 공개 선언을 새로 쓰거나 고칠 때마다
-전부 적용한다.
+Rules for writing JSDoc on `ytstudio`'s public surface. Apply all of them
+whenever you write or change a public declaration.
 
-**공개 표면**은 입구 둘(`ytstudio` = `src/index.ts`, `ytstudio/browser` =
-`src/browser.ts`)에서 내보내 닿는 선언 전부다. `src/core/*` 에 있어도 입구가 다시
-내보내면 공개다. 손님이 보는 것은 소스가 아니라 `tsc` 가 낸 `lib/**/*.d.ts` 라서,
-검사도 그걸 읽는다.
+The **public surface** is every declaration reachable from the two entry points
+(`ytstudio` = `src/index.ts`, `ytstudio/browser` = `src/browser.ts`). Something
+in `src/core/*` is public if an entry point re-exports it. Users see the
+`lib/**/*.d.ts` emitted by `tsc`, not the source, so the check reads that.
 
-## 말투
+## Language
 
-이 저장소의 주석은 **한국어**이고 README 와 같은 말투(`~다`)를 쓴다. 코드 이름 ·
-플래그 · 값은 백틱으로 감싼다.
+Comments in this repo are **English**, written in the same terse, declarative
+voice as the rest of the code. Wrap code names, flags, and values in backticks.
 
-## 첫 단락
+Runtime strings — lint messages, CLI output, error messages — stay **Korean**.
+They aren't comments; don't translate them as part of documentation work.
 
-에디터 자동완성 목록과 마우스오버에 가장 먼저 뜨는 것이 첫 단락이다. **그 심볼이
-무엇을 하는지 한 문장으로** 쓴다. 목록을 훑는 사람이 다른 것을 열어 보지 않고
-고를 수 있어야 한다.
+## First paragraph
 
-**왜 이렇게 생겼나**(예전에 어떻게 깨졌고, 무엇을 안 하기로 했나)는 둘째 단락부터
-쓴다. 이 저장소가 주석에 가장 많이 적는 것이 그 이유이므로 줄이지 않는다 — 첫
-단락에서 빼기만 한다.
+The first paragraph is what shows up first in editor autocomplete lists and
+hovers. Write **one sentence on what the symbol does**. Someone scanning the
+list should be able to pick it without opening anything else.
 
-```ts
-/**
- * 명령어 문자열을 설치된 yt-dlp 의 스키마와 문법에 대조한다.
- *
- * 빌더가 못 하는 일이다. 빌더는 빌더로 쓴 것만 보지만, …
- */
-```
-
-## 타입
-
-타입은 시그니처가 말한다. 주석은 **뜻**을 말한다 — 값이 무엇을 나타내는지, 범위,
-특별한 값(`null` · 빈 문자열이 무슨 뜻인지).
-
-`@param` · `@returns` 는 시그니처가 못 말하는 것이 있을 때만 쓴다.
+**Why it looks this way** (how it broke before, what was decided against) goes
+in the second paragraph onward. That rationale is what this repo writes most in
+comments, so don't trim it — just keep it out of the first paragraph.
 
 ```ts
 /**
- * 지금 옵션 조합에 이어서 줄 만한 옵션들.
+ * Checks a command string against the installed yt-dlp's schema and grammar.
  *
- * @param limit 최대 개수. 기본 6.
+ * This is what the builder can't do. The builder only sees …
  */
 ```
 
-유니온 멤버 · 인터페이스 필드는 필드마다 한 줄 주석을 단다. `null` 이나 선택
-필드라면 **언제 비는지**를 적는다.
+## Types
+
+The signature states the type. The comment states the **meaning** — what the
+value represents, its range, and what special values (`null`, empty string)
+mean.
+
+Use `@param` and `@returns` only when there's something the signature can't say.
 
 ```ts
-/** 값을 받지 않는 플래그면 `null`. */
+/**
+ * Options that would naturally come next for the current combination.
+ *
+ * @param limit Maximum count. Defaults to 6.
+ */
+```
+
+Give union members and interface fields a one-line comment each. For `null` or
+optional fields, say **when it's empty**.
+
+```ts
+/** `null` for flags that take no value. */
 value: string | null;
 ```
 
-## 예제
+## Examples
 
-인자가 여럿이거나, 결과 명령어를 보지 않고는 동작을 짐작하기 어려운 것에 `@example`
-을 단다. 빌더 메서드가 대표적이다 — **만들어지는 명령어를 주석으로** 적는다.
+Add `@example` to things with several parameters, or whose behavior is hard to
+guess without seeing the resulting command. Builder methods are the typical
+case — write **the command that gets built as a comment**.
 
 ````ts
 /**
- * @example 시간 구간
+ * @example Time range
  * ```ts
  * import { ytdlp } from 'ytstudio';
  *
@@ -71,53 +76,59 @@ value: string | null;
  */
 ````
 
-- 코드 블록은 **```ts 펜스**로 쓴다. 들여쓰기 코드 블록은 검사가 안 본다.
-- **`import` 를 넣는다.** 경로는 손님이 쓰는 이름(`'ytstudio'` ·
-  `'ytstudio/browser'`)이다. 상대 경로로 쓰면 안 된다.
-- `→` 같은 컴파일 안 되는 줄은 쓰지 않는다. 결과는 `// yt-dlp …` 주석으로 적는다.
-- 결과 주석은 **실제로 돌려서 나온 것**을 적는다(따옴표까지). 짐작해서 적은 것이
-  한 번 틀렸다.
-- 경우마다 예제 하나. `@example` 뒤의 제목은 짧게 쓴다 — 에디터에는 평범한 한
-  줄로 보인다.
-- 주석 안에서 `*/` 가 생기지 않게 한다. 셀렉터 `bv*/b` 가 그렇다.
+- Write code blocks as **```ts fences**. The check ignores indented code blocks.
+- **Include the `import`.** Use the path users use (`'ytstudio'`,
+  `'ytstudio/browser'`). Never a relative path.
+- Don't write lines that won't compile, like `→`. Put results in a
+  `// yt-dlp …` comment.
+- Result comments must be **what actually came out when run** (quotes
+  included). A guessed one was wrong once.
+- One example per case. Keep the title after `@example` short — the editor
+  shows it as a plain line.
+- Never let `*/` appear inside a comment. The selector `bv*/b` does that.
 
-## 빠짐없이
+## Coverage
 
-공개 표면의 선언 전부 — 함수 · 상수 · 클래스 · 인터페이스 · 타입 별칭 — 와,
-인터페이스 · 클래스의 멤버마다 JSDoc 을 단다. 오버로드는 시그니처마다 단다
-(에디터가 고른 시그니처의 주석만 보여 준다).
+Put JSDoc on every declaration of the public surface — functions, constants,
+classes, interfaces, type aliases — and on every member of interfaces and
+classes. Document each overload signature (the editor only shows the comment of
+the signature it picked).
 
-안 다는 것:
+Not required:
 
-- `private` 멤버 (손님이 못 부른다 — 달아도 되지만 검사는 안 본다)
-- `constructor` (공개 클래스 `Expr` · `Piece` · `Template` · `Ytdlp` 는 전부
-  **타입으로만** 나간다. 손님이 `new` 할 일이 없다)
-- 호출 · 인덱스 시그니처 (인터페이스 자신의 주석이 그 설명이다)
+- `private` members (users can't call them — fine to document, but the check
+  doesn't look)
+- `constructor` (the public classes `Expr`, `Piece`, `Template`, and `Ytdlp` all
+  ship **as types only**. Users never `new` them)
+- Call and index signatures (the interface's own comment describes them)
 
-주의할 자리 둘:
+Two places to watch:
 
-- **매개변수 프로퍼티**(`constructor(readonly p: X)`)는 생성자에 단 주석이
-  프로퍼티로 안 간다. 매개변수 자리에 단다.
+- For **parameter properties** (`constructor(readonly p: X)`), a comment on the
+  constructor doesn't carry over to the property. Put it on the parameter.
   ```ts
   constructor(
-    /** 감싼 필드 조각. */
+    /** The wrapped field piece. */
     readonly p: FieldPiece,
   ) {}
   ```
-- **선언 병합**(`interface Ytdlp` + `class Ytdlp`)은 한 곳에만 달면 된다.
+- **Declaration merges** (`interface Ytdlp` + `class Ytdlp`) need the comment
+  in only one place.
 
-**생성된 파일은 손으로 고치지 않는다.** `src/core/options.gen.ts` 의 주석은
-`gen_options.ts` 가 낸다 — 어휘 설명은 `format-grammar.ts` · `output-template.ts`
-의 표에서 온다. 거기를 고치고 `bun run gen:types` 를 돌린다.
+**Don't hand-edit generated files.** The comments in `src/core/options.gen.ts`
+come from `gen_options.ts` — vocabulary descriptions come from the tables in
+`format-grammar.ts` and `output-template.ts`. Edit those and run
+`bun run gen:types`.
 
-## 모듈 주석
+## Module comments
 
-입구 파일(`src/index.ts` · `src/browser.ts`) 맨 앞에 `@module` 주석을 둔다. 첫
-단락은 이 입구가 무엇인지 한 문장, 그리고 사용 `@example` 하나.
+Put an `@module` comment at the top of each entry file (`src/index.ts`,
+`src/browser.ts`). The first paragraph is one sentence on what the entry point
+is, followed by one usage `@example`.
 
 ```ts
 /**
- * 파일 시스템이 없는 곳에서 쓰는 입구 — 브라우저 · 엣지 런타임.
+ * The entry point for places without a file system — browsers and edge runtimes.
  *
  * …
  *
@@ -125,54 +136,57 @@ value: string | null;
  */
 ```
 
-이 주석은 `.d.ts` 에 안 남는다 — 입구의 첫 문장이 값 import 라서 `tsc` 가
-그 문장과 함께 버린다. 소스를 읽는 사람을 위한 것이다.
+This comment doesn't survive into the `.d.ts` — the entry file's first statement
+is a value import, and `tsc` drops the comment along with it. It's for people
+reading the source.
 
-`src/core/*` 의 파일 머리 주석은 모듈의 설계 이유를 적는 자리로 그대로 둔다.
-`@module` 은 안 붙인다.
+File header comments in `src/core/*` stay as the place to record a module's
+design rationale. They don't get `@module`.
 
-## 마크다운
+## Markdown
 
-본문은 마크다운으로 쓴다 — 굵게, 목록, 인라인 코드, 링크. 목록은 `-` 로 쓴다.
-(옛 주석의 `·` 목록과 들여쓰기 코드 블록은 고치는 김에 바꾼다.)
+Write bodies in Markdown — bold, lists, inline code, links. Use `-` for lists.
+(Convert old `·` lists and indented code blocks when you touch them.)
 
-## 심볼 링크
+## Symbol links
 
-같은 패키지의 다른 심볼은 `{@linkcode 이름}` 으로 가리킨다. 에디터 마우스오버에서
-눌러 이동할 수 있다. 멤버는 `{@linkcode LintResult.ok}` 처럼 쓴다.
+Point to other symbols in the package with `{@linkcode Name}`. It's clickable in
+editor hovers. For members, write `{@linkcode LintResult.ok}`.
 
 ```ts
-/** 항목마다 {@linkcode explainItem} 을 부른다. */
+/** Calls {@linkcode explainItem} for each item. */
 ```
 
-## 이 저장소에서 안 쓰는 것
+## Not used in this repo
 
-문서 사이트(JSR 등)가 없고 독자는 에디터 마우스오버뿐이다. 거기서 안 보이는 문법은
-쓰지 않는다.
+There is no docs site (JSR etc.); the only reader is the editor hover. Don't
+use syntax that doesn't show up there.
 
-- `> [!IMPORTANT]` 알림 블록
-- `@example` 제목 아래 설명을 따로 렌더링하는 것에 기대기 — 설명은 코드 블록 안
-  주석이나 본문 단락에 쓴다
-- 타입 매개변수는 `@template` 으로 쓴다(`@typeParam` 아님)
+- `> [!IMPORTANT]` alert blocks
+- Relying on the description under an `@example` title being rendered
+  separately — put explanations in comments inside the code block or in body
+  paragraphs
+- Type parameters use `@template` (not `@typeParam`)
 
-## 검사
+## Checks
 
-주석은 **코드와 같은 변경에서** 고친다. 확인은 셋이다.
+Update comments **in the same change as the code**. Three commands to verify.
 
 ```
-bun run build       # lib/ 를 새로 굽는다 — 검사가 이걸 읽는다
+bun run build       # rebuilds lib/ — the check reads it
 bun run test:docs   # tests/docs.test.ts
-bun run test        # 전부 (test:docs 포함)
+bun run test        # everything (includes test:docs)
 ```
 
-`tests/docs.test.ts` 가 보는 것:
+What `tests/docs.test.ts` checks:
 
-- 공개 선언 · 멤버에 JSDoc 이 빠진 곳 (`lib/**/*.d.ts` 기준)
-- 입구 소스 파일에 `@module` 이 있는가
-- `lib/` 의 모든 `@example` ```ts 블록을 파일마다 따로, `node_modules/ytstudio`
-  를 저장소로 링크한 임시 프로젝트에서 `tsc` 로 컴파일한다. `import` 를 빼먹으면
-  실패한다.
+- Public declarations and members missing JSDoc (based on `lib/**/*.d.ts`)
+- Whether the entry source files have `@module`
+- Every `@example` ```ts block in `lib/`, compiled with `tsc` one file each in a
+  temporary project with `node_modules/ytstudio` linked to the repo. A missing
+  `import` fails.
 
-TypeScript 7 에는 JS 컴파일러 API 가 없어서, 검사는 AST 가 아니라 `tsc` 가 내는
-`.d.ts` 의 줄 모양(최상위 0칸 · 멤버 4칸)을 읽는다. 검사가 "선언을 못 찾았다"로
-죽으면 규칙 위반이 아니라 검사의 줄 읽기가 낡은 것이다.
+TypeScript 7 has no JS compiler API, so the check reads the line shape of the
+`.d.ts` that `tsc` emits (top level at column 0, members at 4) rather than an
+AST. If the check dies with "couldn't find the declaration", that's not a rule
+violation — the check's line reading has gone stale.

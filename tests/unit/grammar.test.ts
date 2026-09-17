@@ -1,8 +1,8 @@
 /**
- * -f 포맷 셀렉터 문법.
+ * -f format selector grammar.
  *
- * 파서와 컴파일러가 한 쌍이라 왕복으로 검사한다 — 읽은 것을 다시 뱉으면
- * 같아야 하고, 괄호는 필요한 자리에만 붙어야 한다.
+ * Parser and compiler are a pair, so they are tested by round trip — emitting what
+ * was read must give the same thing, and parentheses must appear only where needed.
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -12,17 +12,17 @@ import type { FormatNode } from '../../src/core/format-grammar.js';
 const { PREC, parseFormat, emitTree, parseFilterBody, emitFilter } =
   await import('../../src/core/format-grammar.js');
 
-/** 읽고 다시 뱉는다. 왕복이 이 문법의 핵심 성질이다. */
+/** Read and emit again. The round trip is the core property of this grammar. */
 const round = (s: string): string => emitTree(parseFormat(s));
 
-/** 파싱 결과가 있다고 보고 꺼낸다. 없으면 그 자리에서 실패한다. */
+/** Takes the parse result assuming there is one. Fails right there if not. */
 const tree = (s: string): FormatNode => {
   const t = parseFormat(s);
   assert.ok(t, `${s} 를 못 읽었다`);
   return t;
 };
 
-/** 연산자 노드라고 보고 자식을 꺼낸다. */
+/** Takes the children assuming an operator node. */
 const kids = (n: FormatNode): FormatNode[] => {
   assert.notEqual(n.t, 'sel', '연산자 노드가 아니다');
   return (n as { kids: FormatNode[] }).kids;
@@ -72,7 +72,7 @@ test(', 가 가장 약하게 묶인다', () => {
 });
 
 test('우선순위가 낮은 자식에는 괄호가 자동으로 붙는다', () => {
-  // 파서를 안 거치고 트리를 손으로 세운다 — emitTree 만 따로 본다
+  // Build the tree by hand without the parser — look at emitTree alone
   const sel = (name: string): FormatNode => ({ t: 'sel', name, filters: [] });
   const hand: FormatNode = {
     t: 'merge',
@@ -106,14 +106,14 @@ test('그룹에도 필터가 붙는다 — yt-dlp 문서에 나오는 표현이�
 });
 
 test('필터가 붙은 그룹은 이미 괄호를 쓰므로 부모가 또 감싸지 않는다', () => {
-  // 필터가 없으면 우선순위대로 괄호가 붙는다
+  // Without a filter, parentheses follow precedence
   assert.equal(round('(bv,ba)+x'), '(bv,ba)+x');
-  // 필터가 있으면 그 괄호가 곧 그룹이다 — ((…))+x 가 되면 안 된다
+  // With a filter, those parentheses are the group — must not become ((…))+x
   assert.equal(round('(bv,ba)[fps>30]+x'), '(bv,ba)[fps>30]+x');
 });
 
 test('연산자가 하나면 괄호가 풀리고 필터만 남는다', () => {
-  // (bv)[height<480] 과 bv[height<480] 은 같은 뜻이다
+  // (bv)[height<480] and bv[height<480] mean the same thing
   assert.equal(round('(bv)[height<480]'), 'bv[height<480]');
   assert.equal(round('((bv+ba)[fps>30])[height<480]'), '(bv+ba)[fps>30][height<480]');
 });

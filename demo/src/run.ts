@@ -1,13 +1,13 @@
 /**
- * 손님이 쓴 코드 → 명령어 → 검사 → 설명.
+ * User code → command → check → explanation.
  *
- * 이 페이지에서 도는 것은 **진짜 라이브러리**다. `ytstudio/browser` 는 파일
- * 시스템을 안 보므로 그대로 브라우저에서 돌고, 스키마는 저장소의
- * `ytstudio.schema.json` 을 빌드 때 그대로 박은 것이다. 그래서 여기 뜨는
- * 명령어와 검사 결과는 같은 코드를 노드에서 돌린 것과 같다.
+ * What runs on this page is **the real library**. `ytstudio/browser` never looks at
+ * the file system, so it runs in the browser as-is, and the schema is the repo's
+ * `ytstudio.schema.json` baked in at build time. So the commands and check results
+ * shown here are the same as running the same code on node.
  *
- * 평가는 `new Function` 이다 — 손님 브라우저에서 손님이 쓴 코드가 도는 것이라
- * 새로 생기는 위험이 없다. 서버로 보내지 않는다.
+ * Evaluation is `new Function` — it is the user's own code running in the user's own
+ * browser, so no new risk arises. Nothing is sent to a server.
  */
 import {
   studio, previewFilename, tokenize, quote, distance, DEFAULT_OUTTMPL,
@@ -15,7 +15,7 @@ import {
 import type { LintResult, Explained, FilePreview } from 'ytstudio/browser';
 import raw from '../../ytstudio.schema.json';
 
-/** 데모가 대조하는 것 — 저장소가 배포하는 그 스키마 한 벌. */
+/** What the demo checks against — the very schema the repo ships. */
 export const yt = studio(raw as Parameters<typeof studio>[0]);
 
 export interface Result {
@@ -25,15 +25,15 @@ export interface Result {
   file: FilePreview;
 }
 
-/** 코드가 명령어까지 못 간 이유. 타입 오류와는 다르다 — 이건 돌리다 난 것이다. */
+/** Why the code did not make it to a command. Distinct from type errors — this happened while running. */
 export class RunError extends Error {}
 
 /**
- * 트랜스파일된 ESM 을 이 페이지에서 부를 수 있는 몸통으로 바꾼다.
+ * Turns transpiled ESM into a body this page can call.
  *
- * `import` 와 `export` 는 `new Function` 안에서 문법 오류다. 데모가 권하는
- * 모양이 정해져 있으므로(`import … from 'ytstudio'` 한 줄, `export default`
- * 한 번) 그 둘만 바꾼다. 다른 모양이면 아래 `evaluate` 가 그렇다고 말한다.
+ * `import` and `export` are syntax errors inside `new Function`. The shape the demo
+ * encourages is fixed (one `import … from 'ytstudio'` line, one `export default`), so
+ * only those two are rewritten. For any other shape, `evaluate` below says so.
  */
 function toBody(js: string): string {
   return js
@@ -42,15 +42,15 @@ function toBody(js: string): string {
     .replace(/^\s*export\s+default\s+/m, 'return ');
 }
 
-/** `.build()` 를 부를 수 있는 것인가. */
+/** Can `.build()` be called on it? */
 const buildable = (v: unknown): v is { build(): string } =>
   typeof (v as { build?: unknown } | null)?.build === 'function';
 
 /**
- * 명령어 하나를 뽑아낸다.
+ * Extracts one command.
  *
- * 빌더를 그대로 내도 되고(`export default ytdlp('…').extractAudio()`)
- * 이미 `.build()` 한 문자열을 내도 된다. 앞엣것이 짧아서 예제가 그 모양이다.
+ * Exporting the builder as-is is fine (`export default ytdlp('…').extractAudio()`), and so
+ * is a string that already called `.build()`. The former is shorter, so examples use it.
  */
 export function evaluate(js: string): Result {
   const body = toBody(js);
@@ -79,7 +79,7 @@ export function evaluate(js: string): Result {
   };
 }
 
-/** 손님 코드에 `ytstudio` 라는 이름으로 들어가는 것. */
+/** What enters user code under the name `ytstudio`. */
 const api = {
   ytdlp: (...urls: string[]) => yt.ytdlp(...urls),
   lintCommand: (text: string) => yt.lint(text),

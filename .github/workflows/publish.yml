@@ -1,16 +1,19 @@
-# npm 에 발행한다.
+# Publishes to npm.
 #
-# 흐름은 이렇다 — 손으로 `npm version <patch|minor|major>` 를 치면 package.json
-# 이 올라가고 `v0.1.1` 같은 태그가 같이 생긴다. 그걸 밀면 이 잡이 돈다.
+# The flow — run `npm version <patch|minor|major>` by hand, which bumps
+# package.json and creates a tag like `v0.1.1` along with it. Pushing that runs
+# this job.
 #
 #     npm version minor && git push --follow-tags
 #
-# 첫 발행만 손으로 했다. 이름 선점과 npm 페이지 확인이 걸려 있어서, 파이프라인을
-# 먼저 세워 두고 거기서 막히면 디버깅이 배로 든다.
+# Only the first publish was done by hand. It involved claiming the name and
+# checking the npm page, and building the pipeline first then getting stuck there
+# would double the debugging.
 #
-# provenance 를 붙인다 — "이 tarball 은 이 커밋의 이 워크플로가 만들었다"를 npm
-# 이 증명한다. Actions 에서 발행할 때만 공짜로 되는 것이라 안 쓸 이유가 없다.
-name: 발행
+# provenance is attached — npm certifies "this tarball was built by this workflow
+# at this commit". It's free only when publishing from Actions, so there's no
+# reason not to use it.
+name: Publish
 
 on:
   push:
@@ -23,14 +26,14 @@ jobs:
 
     permissions:
       contents: read
-      # provenance 서명에 필요하다. 이거 없이 --provenance 를 주면 실패한다.
+      # Needed for provenance signing. Passing --provenance without it fails.
       id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
-      # npm publish 를 npm 으로 해야 하므로 레지스트리 설정이 붙은 노드가 필요하다.
-      # 검사와 빌드는 여전히 bun 이 돌린다.
+      # npm publish has to be done with npm, so we need a Node with registry config.
+      # Checks and the build are still run by bun.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -40,21 +43,21 @@ jobs:
 
       - run: bun install --frozen-lockfile --ignore-scripts
 
-      # 태그가 가리키는 버전과 package.json 이 어긋나면 여기서 멈춘다.
-      # `npm version` 을 안 쓰고 태그만 손으로 밀었을 때 걸린다.
-      - name: 태그와 버전이 맞는가
+      # Stops here if the version the tag points to and package.json disagree.
+      # Catches pushing a tag by hand without using `npm version`.
+      - name: Tag matches version
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(node -p "require('./package.json').version")"
           if [ "$tag" != "$pkg" ]; then
-            echo "::error::태그 v$tag 와 package.json $pkg 이 다르다 — 'npm version' 으로 올릴 것"
+            echo "::error::Tag v$tag differs from package.json $pkg — bump with 'npm version'"
             exit 1
           fi
           echo "v$pkg"
 
-      # prepublishOnly 가 bun run test 를 다시 돌리므로 여기서는 안 돌린다.
-      # 검사 없이 발행되는 길을 하나도 안 남기는 게 그 훅의 목적이다.
-      - name: 발행
+      # prepublishOnly reruns bun run test, so it isn't run here.
+      # That hook's purpose is to leave no path to publishing without checks.
+      - name: Publish
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

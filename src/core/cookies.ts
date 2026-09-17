@@ -1,5 +1,5 @@
 /**
- * `--cookies-from-browser` 한 줄 읽기.
+ * Reading one `--cookies-from-browser` value.
  *
  *     BROWSER[+KEYRING][:PROFILE][::CONTAINER]
  *     firefox
@@ -7,22 +7,23 @@
  *     firefox:~/snap/firefox/common/.mozilla/firefox/default-release
  *     firefox::Personal
  *
- * `-f` · `-o` 처럼 값 자체가 구조라 손으로 적는 층이다. 다만 **어휘는 안 적는다** —
- * 브라우저 9개와 키링 5개는 스키마가 들고 온다(`opt.vocabs`). 이 저장소는 그
- * 둘을 한 파일에 두었다가 `-o` 종류 표가 조용히 갈린 적이 있다.
+ * Like `-f` · `-o`, the value itself is a structure, so this layer is written by
+ * hand. The **vocabulary is not** — the 9 browsers and 5 keyrings come with the
+ * schema (`opt.vocabs`). This repo once kept both in one file, and the `-o`
+ * type table quietly drifted.
  *
- * 문법은 yt-dlp 의 정규식을 그대로 옮겼다(`yt_dlp/__init__.py`).
+ * The grammar is yt-dlp's regex carried over as-is (`yt_dlp/__init__.py`).
  *
- *   · 브라우저는 `+` 와 `:` 를 못 쓴다      `[^+:]+`
- *   · 키링은 `:` 를 못 쓴다                `[^:]+`
- *   · 프로필은 `::` 앞에서 멈춘다          `(?!:)(.+?)`
- *   · 컨테이너는 나머지 전부              `(.+)`
+ * - the browser can't contain `+` or `:`      `[^+:]+`
+ * - the keyring can't contain `:`             `[^:]+`
+ * - the profile stops before `::`             `(?!:)(.+?)`
+ * - the container is everything left          `(.+)`
  *
- * 대소문자는 yt-dlp 가 정규화한다 — 브라우저는 소문자로, 키링은 대문자로.
- * 그러니 `Firefox` 도 `FIREFOX` 도 맞는 값이다.
+ * yt-dlp normalizes case — browsers to lower case, keyrings to upper case.
+ * So `Firefox` and `FIREFOX` are both valid.
  */
 
-/** 읽어 낸 네 자리. 안 준 자리는 `null`. */
+/** The four slots read out. Slots not given are `null`. */
 export interface CookieSource {
   browser: string;
   keyring: string | null;
@@ -30,7 +31,7 @@ export interface CookieSource {
   container: string | null;
 }
 
-/** 자리마다의 어휘. 스키마의 `opt.vocabs` 가 이 모양이다. */
+/** Vocabulary per slot. The schema's `opt.vocabs` has this shape. */
 export interface CookieVocabs {
   browser?: string[];
   keyring?: string[];
@@ -38,13 +39,13 @@ export interface CookieVocabs {
 
 const SHAPE = /^([^+:]+)(?:\s*\+\s*([^:]+))?(?:\s*:\s*(?!:)(.+?))?(?:\s*::\s*(.+))?$/;
 
-/** 값 하나가 못 읽히는 이유. 사람이 읽을 한국어 한 줄. */
+/** Why a value couldn't be read. One human-readable line, in Korean. */
 export class CookieError extends Error {}
 
 /**
- * 문자열 → 네 자리. 못 읽으면 `CookieError` 를 던진다.
+ * String → four slots. Throws `CookieError` when it can't be read.
  *
- * 어휘를 안 주면 모양만 본다 — 스키마 없이도 쓸 수 있어야 해서다.
+ * Without vocabularies only the shape is checked — it has to be usable without a schema.
  */
 export function parseCookieSource(value: string, vocabs: CookieVocabs = {}): CookieSource {
   const m = SHAPE.exec(String(value ?? '').trim());
@@ -70,7 +71,7 @@ export function parseCookieSource(value: string, vocabs: CookieVocabs = {}): Coo
   };
 }
 
-/** 네 자리 → 문자열. `parseCookieSource` 와 왕복한다. */
+/** Four slots → string. Round-trips with `parseCookieSource`. */
 export function emitCookieSource(s: CookieSource): string {
   return s.browser
     + (s.keyring ? `+${s.keyring}` : '')

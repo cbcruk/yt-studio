@@ -1,96 +1,116 @@
 /**
- * yt-dlp 출력 템플릿 문법.
+ * The yt-dlp output template grammar.
  *
- * `-o` 는 포맷 셀렉터처럼 트리는 아니지만, 리터럴과 필드 참조가 번갈아 놓인
- * 하나의 수열이다.
+ * `-o` is not a tree like the format selector, but a single sequence alternating
+ * literals and field references.
  *
- *   [TYPES:]  %(NAME[>STRF][|DEFAULT])[FMT]CONV  또는 리터럴
+ *   [TYPES:]  %(NAME[>STRF][|DEFAULT])[FMT]CONV  or a literal
  *
- * 파싱은 구조를 알아보는 데까지만 하고, 다시 뱉을 때는 읽은 그대로를 되돌린다.
- * 그래서 우리가 모르는 문법이 섞여 있어도 문자열이 상하지 않는다 — `|` 를 먼저,
- * 그다음 `>` 를 자르고 같은 순서로 붙이므로 무손실이다.
+ * Parsing goes only as far as recognizing the structure, and emitting gives back
+ * exactly what was read. So grammar we do not know survives intact — `|` is split
+ * first, then `>`, and they are rejoined in the same order, so it is lossless.
  */
 
+/** File types that can prefix `-o` and `-P`, with a one-line description. `''` is the default. */
 export const OUT_TYPES: [type: string, label: string][] = [
-  ['', '기본 (모든 파일)'],
-  ['chapter', 'chapter — 챕터별 분할 파일'],
-  ['subtitle', 'subtitle — 자막'],
-  ['thumbnail', 'thumbnail — 썸네일'],
-  ['description', 'description — 설명'],
-  ['annotation', 'annotation — 주석 (yt-dlp 가 받지만 유튜브가 없앤 기능이다)'],
-  ['infojson', 'infojson — 메타데이터 JSON'],
-  ['link', 'link — 인터넷 바로가기'],
-  ['pl_video', 'pl_video — 재생목록 항목'],
-  ['pl_thumbnail', 'pl_thumbnail — 재생목록 썸네일'],
-  ['pl_description', 'pl_description — 재생목록 설명'],
-  ['pl_infojson', 'pl_infojson — 재생목록 JSON'],
+  ['', 'default (all files)'],
+  ['chapter', 'chapter — per-chapter split files'],
+  ['subtitle', 'subtitle — subtitles'],
+  ['thumbnail', 'thumbnail — thumbnails'],
+  ['description', 'description — description'],
+  ['annotation', 'annotation — annotations (yt-dlp accepts it, but YouTube removed the feature)'],
+  ['infojson', 'infojson — metadata JSON'],
+  ['link', 'link — internet shortcut'],
+  ['pl_video', 'pl_video — playlist entry'],
+  ['pl_thumbnail', 'pl_thumbnail — playlist thumbnail'],
+  ['pl_description', 'pl_description — playlist description'],
+  ['pl_infojson', 'pl_infojson — playlist JSON'],
 ];
 
-export const FIELDS: [group: string, items: [field: string, label: string][]][] = [
-  ['영상', [
-    ['title', '제목'], ['fulltitle', '제목 (원본)'], ['id', '영상 ID'], ['ext', '확장자'],
-    ['upload_date', '업로드 날짜 (YYYYMMDD)'], ['timestamp', '업로드 시각 (epoch)'],
-    ['duration', '길이 (초)'], ['duration_string', '길이 (HH:MM:SS)'],
-    ['view_count', '조회수'], ['like_count', '좋아요 수'], ['webpage_url', '페이지 URL'],
-    ['is_live', '지금 생중계인가'], ['was_live', '생중계였던 것인가'],
-    ['live_status', '생중계 상태 (is_live · was_live · upcoming …)'],
-    ['availability', '공개 범위 (public · unlisted · subscriber_only …)'],
-    ['age_limit', '연령 제한'], ['license', '라이선스'],
+/**
+ * Output template fields, grouped.
+ *
+ * Each item carries two texts. `label` is the English description shown in
+ * autocomplete. `preview` is the Korean placeholder the filename preview prints
+ * (`‹제목›`) — that is runtime output, which is in Korean like the lint messages.
+ */
+export const FIELDS: [group: string, items: [field: string, label: string, preview: string][]][] = [
+  ['Video', [
+    ['title', 'title', '제목'], ['fulltitle', 'title (original)', '제목 (원본)'],
+    ['id', 'video id', '영상 ID'], ['ext', 'file extension', '확장자'],
+    ['upload_date', 'upload date (YYYYMMDD)', '업로드 날짜 (YYYYMMDD)'],
+    ['timestamp', 'upload time (epoch)', '업로드 시각 (epoch)'],
+    ['duration', 'length (seconds)', '길이 (초)'], ['duration_string', 'length (HH:MM:SS)', '길이 (HH:MM:SS)'],
+    ['view_count', 'view count', '조회수'], ['like_count', 'like count', '좋아요 수'],
+    ['webpage_url', 'page URL', '페이지 URL'],
+    ['is_live', 'whether it is live now', '지금 생중계인가'], ['was_live', 'whether it was a live stream', '생중계였던 것인가'],
+    ['live_status', 'live status (is_live · was_live · upcoming …)', '생중계 상태 (is_live · was_live · upcoming …)'],
+    ['availability', 'visibility (public · unlisted · subscriber_only …)', '공개 범위 (public · unlisted · subscriber_only …)'],
+    ['age_limit', 'age limit', '연령 제한'], ['license', 'license', '라이선스'],
   ]],
-  ['채널·사람', [
-    ['uploader', '업로더'], ['uploader_id', '업로더 ID'],
-    ['channel', '채널'], ['channel_id', '채널 ID'],
-    ['artist', '아티스트'], ['album', '앨범'], ['track', '트랙'],
+  ['Channel · people', [
+    ['uploader', 'uploader', '업로더'], ['uploader_id', 'uploader id', '업로더 ID'],
+    ['channel', 'channel', '채널'], ['channel_id', 'channel id', '채널 ID'],
+    ['artist', 'artist', '아티스트'], ['album', 'album', '앨범'], ['track', 'track', '트랙'],
   ]],
-  ['재생목록', [
-    ['playlist', '재생목록'], ['playlist_title', '재생목록 제목'], ['playlist_id', '재생목록 ID'],
-    ['playlist_index', '재생목록 번호'], ['playlist_count', '재생목록 개수'],
-    ['n_entries', '항목 수'], ['autonumber', '자동 번호'],
+  ['Playlist', [
+    ['playlist', 'playlist', '재생목록'], ['playlist_title', 'playlist title', '재생목록 제목'],
+    ['playlist_id', 'playlist id', '재생목록 ID'],
+    ['playlist_index', 'playlist index', '재생목록 번호'], ['playlist_count', 'playlist size', '재생목록 개수'],
+    ['n_entries', 'number of entries', '항목 수'], ['autonumber', 'auto number', '자동 번호'],
   ]],
-  ['포맷', [
-    ['format', '포맷'], ['format_id', '포맷 ID'], ['format_note', '포맷 노트'],
-    ['resolution', '해상도'], ['height', '세로'], ['width', '가로'], ['fps', '프레임'],
-    ['vcodec', '영상 코덱'], ['acodec', '음성 코덱'], ['filesize', '파일 크기'],
+  ['Format', [
+    ['format', 'format', '포맷'], ['format_id', 'format id', '포맷 ID'], ['format_note', 'format note', '포맷 노트'],
+    ['resolution', 'resolution', '해상도'], ['height', 'height', '세로'], ['width', 'width', '가로'],
+    ['fps', 'frame rate', '프레임'],
+    ['vcodec', 'video codec', '영상 코덱'], ['acodec', 'audio codec', '음성 코덱'], ['filesize', 'file size', '파일 크기'],
   ]],
-  ['구간', [
-    ['chapter', '챕터'], ['chapter_number', '챕터 번호'],
-    ['section_title', '구간 제목'], ['section_number', '구간 번호'],
-    ['section_start', '구간 시작'], ['section_end', '구간 끝'],
+  ['Section', [
+    ['chapter', 'chapter', '챕터'], ['chapter_number', 'chapter number', '챕터 번호'],
+    ['section_title', 'section title', '구간 제목'], ['section_number', 'section number', '구간 번호'],
+    ['section_start', 'section start', '구간 시작'], ['section_end', 'section end', '구간 끝'],
   ]],
-  ['기타', [
-    ['extractor', '추출기'], ['extractor_key', '추출기 키'], ['epoch', '현재 시각 (epoch)'],
+  ['Other', [
+    ['extractor', 'extractor', '추출기'], ['extractor_key', 'extractor key', '추출기 키'],
+    ['epoch', 'current time (epoch)', '현재 시각 (epoch)'],
   ]],
 ];
 
+/** Conversion characters at the end of a field, with a one-line description. */
 export const CONVERSIONS: [conv: string, label: string][] = [
-  ['s', 's — 문자열'], ['d', 'd — 정수'], ['f', 'f — 실수'],
-  ['B', 'B — 바이트'], ['j', 'j — JSON'], ['l', 'l — 목록(쉼표)'],
-  ['q', 'q — 셸 인용'], ['D', 'D — 1.05M 꼴'], ['S', 'S — 파일명 안전'],
-  ['U', 'U — 유니코드 정규화'], ['h', 'h — HTML 이스케이프'],
+  ['s', 's — string'], ['d', 'd — integer'], ['f', 'f — float'],
+  ['B', 'B — bytes'], ['j', 'j — JSON'], ['l', 'l — list (comma-separated)'],
+  ['q', 'q — shell-quoted'], ['D', 'D — like 1.05M'], ['S', 'S — filename-safe'],
+  ['U', 'U — Unicode-normalized'], ['h', 'h — HTML-escaped'],
 ];
 
 const TYPE_SET = new Set(OUT_TYPES.map(([v]) => v).filter(Boolean));
 
+/** Field → English description, for autocomplete. */
 export const FIELD_HELP: Record<string, string> =
-  Object.fromEntries(FIELDS.flatMap(([, items]) => items));
+  Object.fromEntries(FIELDS.flatMap(([, items]) => items.map(([f, label]) => [f, label])));
 
-/** 템플릿을 이루는 조각. 리터럴 아니면 필드 참조다. */
+/** Field → Korean placeholder, for the filename preview. */
+export const FIELD_PREVIEW: Record<string, string> =
+  Object.fromEntries(FIELDS.flatMap(([, items]) => items.map(([f, , preview]) => [f, preview])));
+
+/** A piece of a template: either a literal or a field reference. */
 export type Piece =
   | { t: 'text'; text: string }
   | {
       t: 'field';
       name: string;
-      /** `>` 뒤의 strftime 서식. */
+      /** The strftime format after `>`. */
       strf: string;
-      /** `|` 뒤의 없을 때 값. 없으면 null. */
+      /** The fallback value after `|`. null when absent. */
       fallback: string | null;
-      /** 괄호와 변환 글자 사이의 플래그·폭·정밀도 (`03` · `.40`). */
+      /** Flags, width and precision between the parenthesis and the conversion (`03`, `.40`). */
       fmt: string;
-      /** 맨 뒤 변환 글자 (`s` · `d` · `B` …). */
+      /** The trailing conversion character (`s`, `d`, `B`, …). */
       conv: string;
     };
 
-/** `[TYPES:]TEMPLATE` 에서 접두어를 떼어 낸다. 아는 종류일 때만 자른다. */
+/** Splits the prefix off `[TYPES:]TEMPLATE`. Only splits for known types. */
 export function splitType(src: string): { type: string; template: string } {
   const s = src || '';
   const i = s.indexOf(':');
@@ -103,7 +123,7 @@ export function splitType(src: string): { type: string; template: string } {
 
 type Body = { name: string; strf: string; fallback: string | null };
 
-/** 괄호 안쪽을 셋으로. 자른 순서 그대로 되붙이면 원문이 된다. */
+/** Splits the inside of the parentheses in three. Rejoining in the same order gives back the original. */
 function splitBody(body: string): Body {
   const bar = body.indexOf('|');
   const head = bar < 0 ? body : body.slice(0, bar);
@@ -119,7 +139,7 @@ function splitBody(body: string): Body {
 const joinBody = ({ name, strf, fallback }: Body): string =>
   name + (strf ? '>' + strf : '') + (fallback != null ? '|' + fallback : '');
 
-/** 템플릿 문자열 → 조각들. 못 읽으면 이유를 담아 던진다. */
+/** Template string → pieces. Throws with the reason when it cannot be read. */
 export function parseTemplate(src: string): Piece[] {
   const s = src || '';
   const out: Piece[] = [];
@@ -128,7 +148,7 @@ export function parseTemplate(src: string): Piece[] {
 
   for (let i = 0; i < s.length; i++) {
     if (s[i] !== '%') { text += s[i]; continue; }
-    if (s[i + 1] === '%') { text += '%'; i++; continue; }   // %% → 리터럴 %
+    if (s[i + 1] === '%') { text += '%'; i++; continue; }   // %% → literal %
     if (s[i + 1] !== '(') throw new Error(`'%' 뒤에 '(' 가 없다 (${i + 1}번째 글자)`);
 
     const close = s.indexOf(')', i + 2);
@@ -136,7 +156,7 @@ export function parseTemplate(src: string): Piece[] {
     const body = s.slice(i + 2, close);
     if (!body) throw new Error(`빈 필드 %() (${i + 1}번째 글자)`);
 
-    // 괄호 뒤: 플래그·폭·정밀도 다음에 변환 글자 하나.
+    // After the parenthesis: flags, width, precision, then one conversion character.
     let j = close + 1;
     while (j < s.length && /[#0\-+ .,\d]/.test(s[j])) j++;
     if (j >= s.length) throw new Error(`%(${body}) 뒤에 변환 글자가 없다`);
@@ -149,17 +169,17 @@ export function parseTemplate(src: string): Piece[] {
   return out;
 }
 
-/** 조각 하나 → 템플릿 문자열. 리터럴의 `%` 는 `%%` 로 되돌린다. */
+/** One piece → template string. `%` in literals goes back to `%%`. */
 export const emitPiece = (piece: Piece): string =>
   piece.t === 'text'
     ? String(piece.text || '').replace(/%/g, '%%')
     : '%(' + joinBody(piece) + ')' + (piece.fmt || '') + (piece.conv || 's');
 
-/** 사람이 읽을 미리보기. 값을 모르므로 필드는 자리표시자로 둔다. */
+/** A human-readable preview. Values are unknown, so fields become placeholders. */
 export function previewTemplate(pieces: Piece[]): string {
   return pieces.map(p => {
     if (p.t === 'text') return p.text;
     if (p.fallback != null && !p.name) return p.fallback;
-    return '‹' + (FIELD_HELP[p.name] || p.name || '?') + '›';
+    return '‹' + (FIELD_PREVIEW[p.name] || p.name || '?') + '›';
   }).join('');
 }

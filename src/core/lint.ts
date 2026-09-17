@@ -1,18 +1,20 @@
 /**
- * 명령어 진단.
+ * Command diagnostics.
  *
- * 이 도구의 중심이다. LLM 은 yt-dlp 명령어를 그럴듯하게 쓰지만 **틀린 줄을
- * 모른다** — 학습 시점에 있던 플래그를 쓰고, `-f` · `-o` 값을 문법이 아니라
- * 기억으로 만든다. 여기서는 기억이 아니라 실물을 본다.
+ * This is the center of the tool. LLMs write plausible yt-dlp commands but
+ * **cannot tell when they are wrong** — they use flags that existed at training
+ * time and build `-f` / `-o` values from memory rather than grammar. Here we look
+ * at the real thing, not memory.
  *
- *   · 플래그가 이 yt-dlp 버전에 있는가          리플렉션한 스키마
- *   · 값이 필요한 자리에 값이 있는가             opt.kind
- *   · 고를 수 있는 값 중 하나인가                opt.choices
- *   · -f · -o 가 문법에 맞는가                   진짜 파서를 돌린다
- *   · -P 에 같은 종류가 두 번 오지 않는가
- *   · 서로 어긋나는 옵션을 같이 주지 않았는가
+ * - Does the flag exist in this yt-dlp version?     the reflected schema
+ * - Is there a value where one is required?         opt.kind
+ * - Is it one of the allowed values?                opt.choices
+ * - Do -f and -o follow their grammar?              runs the real parsers
+ * - Does -P avoid giving the same type twice?
+ * - Are options that contradict each other given together?
  *
- * DOM 도 앱 상태도 모른다. 문자열 하나가 들어가고 진단 목록이 나온다.
+ * Knows nothing of the DOM or app state. One string goes in, a list of
+ * diagnostics comes out.
  */
 
 import { scanCommand } from './command.js';
@@ -24,51 +26,51 @@ import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Piece } from './output-template.js';
 
-/** error 는 그대로 돌리면 안 되는 것, warn 은 의도와 다를 수 있는 것, info 는 참고. */
+/** `error` must not be run as is, `warn` may not do what was intended, `info` is for reference. */
 export const LEVELS = ['error', 'warn', 'info'] as const;
-/** 진단의 심각도. 순서는 {@linkcode LEVELS} 를 따른다. */
+/** Severity of a diagnostic. Ordered as in {@linkcode LEVELS}. */
 export type Level = (typeof LEVELS)[number];
 const rank = (l: Level): number => LEVELS.indexOf(l);
 
-/** 검증기가 잡은 것 하나. `fixes` 는 없는 플래그일 때 가까운 후보 셋. */
+/** One thing the checker caught. `fixes` holds up to three close candidates for an unknown flag. */
 export interface Issue {
-  /** 심각도. `error` 가 하나라도 있으면 {@linkcode LintResult.ok} 가 거짓이다. */
+  /** Severity. A single `error` makes {@linkcode LintResult.ok} false. */
   level: Level;
-  /** 사람이 읽을 한 줄. 한국어다. */
+  /** One line for humans. It is in Korean. */
   msg: string;
-  /** 문제가 난 플래그를 명령어에 쓰인 그대로. 특정 플래그가 아니면 없다. */
+  /** The offending flag as written in the command. Absent when no single flag is at fault. */
   flag?: string;
-  /** 문제가 난 옵션의 id (`write-subs`). 스키마가 모르는 플래그면 없다. */
+  /** Id of the offending option (`write-subs`). Absent when the schema does not know the flag. */
   opt?: string;
-  /** 대신 쓸 만한 플래그. 없는 플래그일 때 가까운 것부터 셋까지. */
+  /** Flags to use instead. For an unknown flag, up to three, closest first. */
   fixes?: string[];
 }
 
-/** 옵션 id → 읽어 낸 값. 플래그는 boolean, repeatable 은 배열이다. */
+/** Option id → value read. Flags are booleans, repeatables are arrays. */
 export type Values = Record<string, string | boolean | (string | null)[] | null>;
 
-/** 명령어 문자열 하나를 검사한 결과. */
+/** The result of checking one command string. */
 export interface LintResult {
-  /** 명령어를 읽어 낸 항목들. 원문 순서 그대로다. */
+  /** Items read from the command, in their original order. */
   items: Item[];
-  /** 옵션이 아닌 토큰 — 받을 대상. */
+  /** Tokens that are not options — what to download. */
   urls: string[];
-  /** 옵션 id → 읽어 낸 값. {@linkcode previewFilename} 이 이걸 먹는다. */
+  /** Option id → value read. {@linkcode previewFilename} consumes this. */
   values: Values;
-  /** 잡은 것 전부. 심각한 것부터 온다. */
+  /** Everything caught, most severe first. */
   issues: Issue[];
-  /** 오류가 하나도 없으면 참. 경고는 여기 안 센다. */
+  /** True when there are no errors. Warnings do not count here. */
   ok: boolean;
   /**
-   * 한 줄 요약에 쓰는 수.
+   * Counts for a one-line summary.
    *
-   * `opts` 는 이 명령어가 쓴 서로 다른 옵션 수, `total` 은 대조한 스키마의
-   * 옵션 수다.
+   * `opts` is the number of distinct options this command uses, `total` the
+   * number of options in the schema it was checked against.
    */
   counts: { error: number; warn: number; info: number; opts: number; total: number };
 }
 
-/** 편집거리. 후보가 200개 남짓이라 단순 DP 로 충분하다. */
+/** Edit distance. With about 200 candidates, a plain DP is enough. */
 export function distance(a: string, b: string): number {
   if (a === b) return 0;
   const m = a.length, n = b.length;
@@ -85,16 +87,17 @@ export function distance(a: string, b: string): number {
 }
 
 /**
- * 모르는 플래그와 가까운 것들.
+ * Flags close to an unknown one.
  *
- * 거리로만 고르면 `--foo` 에 엉뚱한 세 글자짜리가 붙는다. 길이에 비례한
- * 문턱을 두고, 그래도 없으면 부분 문자열로 한 번 더 본다.
+ * Picking by distance alone pairs `--foo` with some unrelated three-letter flag.
+ * The threshold scales with length, and if nothing is left we try substrings once
+ * more.
  */
 export function nearestFlags(schema: Schema, flag: string, limit = 3): string[] {
   const q = String(flag || '').replace(/^-+/, '').toLowerCase();
   if (!q) return [];
-  // 앞이 같으면 가깝게 본다. 거리만 보면 --embed-subtitle 에 엉뚱한 짧은
-  // 플래그가 붙는다 — 사람이 틀리는 자리는 대개 뒤쪽이다.
+  // A shared prefix counts as closer. By distance alone --embed-subtitle gets
+  // some unrelated short flag — people usually get the tail wrong.
   const scored = Object.keys(schema.byFlag).filter(f => f.startsWith('--')).map(f => {
     const name = f.replace(/^-+/, '').toLowerCase();
     let p = 0;
@@ -111,16 +114,17 @@ export function nearestFlags(schema: Schema, flag: string, limit = 3): string[] 
 }
 
 /**
- * `--fixup never` 처럼 고를 수 있는 값이 정해진 옵션.
+ * Options whose values come from a fixed set, like `--fixup never`.
  *
- * 목록은 yt-dlp 를 리플렉션한 것이라 닫혀 있다 — 없는 값을 주면 yt-dlp 도
- * 거절한다. 다만 **거절하지 말아야 할 두 가지**가 있다.
+ * The list is reflected from yt-dlp, so it is closed — yt-dlp rejects values
+ * outside it too. But there are **two forms we must not reject**.
  *
- *   · 쉼표로 여러 개 (`--sponsorblock-remove sponsor,intro`)
- *   · 앞에 `-` 를 붙여 빼기 (`--compat-options all,-multistreams`)
+ * - several, comma-separated (`--sponsorblock-remove sponsor,intro`)
+ * - removal with a leading `-` (`--compat-options all,-multistreams`)
  *
- * 둘 다 `_set_from_options_callback` 이 진짜로 받는 형태다. 안 봐주면 멀쩡한
- * 명령어가 오류로 잡히는데, 이 도구에서 그건 못 잡는 것보다 나쁘다.
+ * Both are forms `_set_from_options_callback` really accepts. Without allowing
+ * them a valid command is flagged as an error, which for this tool is worse than
+ * missing one.
  */
 function checkChoice(opt: Opt, value: string | null): string | null {
   const { choices } = opt;
@@ -134,14 +138,15 @@ function checkChoice(opt: Opt, value: string | null): string | null {
 }
 
 /**
- * `--recode-video "aac>mp3/mkv"` 처럼 어휘 위의 문법인 값.
+ * Values that are a grammar over a vocabulary, like `--recode-video "aac>mp3/mkv"`.
  *
- * yt-dlp 의 `FFmpeg*PP.FORMAT_RE` 와 같은 것을 본다 — `/` 로 이은 선호 순서에
- * 각 칸이 `[원본>]대상` 이고, **대상만** 어휘에 있어야 한다. 원본은 "이
- * 확장자일 때만"이라 아무 확장자나 온다.
+ * Checks the same thing as yt-dlp's `FFmpeg*PP.FORMAT_RE` — a `/`-joined order
+ * of preference where each slot is `[source>]target`, and **only the target**
+ * must be in the vocabulary. The source means "only for this extension", so any
+ * extension goes.
  *
- * 타입은 이 문법을 못 막는다(막으면 멀쩡한 값이 오류가 된다). 그래서 닫는
- * 일은 여기서 한다.
+ * Types cannot enforce this grammar (doing so would turn valid values into
+ * errors), so closing it happens here.
  */
 function checkRule(opt: Opt, value: string | null): string | null {
   const { rule } = opt;
@@ -162,14 +167,15 @@ function checkRule(opt: Opt, value: string | null): string | null {
 }
 
 /**
- * `-o thumbnail:%(id)s` 처럼 값 앞에 붙는 종류.
+ * A type prefixed to the value, like `-o thumbnail:%(id)s`.
  *
- * 모르는 종류를 줘도 yt-dlp 는 **거절하지 않는다** — 종류가 아닌 것으로 보고
- * 값 전체를 기본 자리에 넣는다. 그래서 `-o nope:%(id)s.%(ext)s` 는 오류 없이
- * `nope:` 로 시작하는 파일을 만든다. 조용히 어긋나는 쪽이라 여기서 말해 준다.
+ * yt-dlp **does not reject** an unknown type — it treats it as not a type and
+ * puts the whole value in the default slot. So `-o nope:%(id)s.%(ext)s` quietly
+ * produces a file starting with `nope:`. It goes wrong silently, so we say so here.
  *
- * 경고다 — 값에 그냥 콜론이 든 것일 수도 있어서다(`--exec "sed s/a:b/c/ …"`).
- * 그래서 **종류처럼 생겼을 때만** 본다: 콜론 앞이 낱말 하나일 때.
+ * It is a warning — the value may simply contain a colon
+ * (`--exec "sed s/a:b/c/ …"`). So we only look **when it looks like a type**: a
+ * single word before the colon.
  */
 function checkKeys(opt: Opt, value: string | null): string | null {
   if (!opt.keys?.length || !value) return null;
@@ -180,10 +186,11 @@ function checkKeys(opt: Opt, value: string | null): string | null {
 }
 
 /**
- * `--cookies-from-browser` 를 진짜 파서에 넣어 본다.
+ * Runs `--cookies-from-browser` through the real parser.
  *
- * 브라우저 이름 하나만 보는 게 아니다 — `firefox::Personal` 처럼 자리가 넷인
- * 구조라, 모양이 틀린 것과 어휘가 틀린 것을 갈라서 말해야 한다.
+ * It is not just a browser name — it is a four-slot structure like
+ * `firefox::Personal`, so a wrong shape and a wrong vocabulary word must be
+ * reported separately.
  */
 function checkCookies(opt: Opt, value: string | null): string | null {
   if (!opt.vocabs || value == null || value === '') return null;
@@ -191,7 +198,7 @@ function checkCookies(opt: Opt, value: string | null): string | null {
   catch (e) { return `${opt.flag} — ${(e as Error).message}`; }
 }
 
-/** `-f` 를 진짜 파서에 넣어 본다. 못 읽으면 파서가 한 말을 그대로 돌려준다. */
+/** Runs `-f` through the real parser. If it cannot be read, returns what the parser said. */
 function checkFormat(value: string): string | null {
   try { parseFormat(value); return null; }
   catch (e) { return (e as Error).message; }
@@ -219,8 +226,8 @@ function checkPaths(values: string[]): string[] {
 }
 
 /**
- * 문법은 맞지만 의도와 어긋나는 조합. 확실한 것만 둔다 —
- * 애매한 규칙을 늘리면 경고가 흔해지고, 흔한 경고는 안 읽힌다.
+ * Combinations that are grammatical but miss the intent. Only certain ones are
+ * kept — adding vague rules makes warnings common, and common warnings go unread.
  */
 function crossChecks(has: (id: string) => boolean, val: (id: string) => string | null): Issue[] {
   const out: Issue[] = [];
@@ -254,15 +261,15 @@ function crossChecks(has: (id: string) => boolean, val: (id: string) => string |
 }
 
 /**
- * 명령어 문자열 → { items, urls, values, issues, ok }.
+ * Command string → { items, urls, values, issues, ok }.
  *
- * issues: { level, msg, flag?, opt?, fixes? } — 심각한 것부터.
+ * issues: { level, msg, flag?, opt?, fixes? } — most severe first.
  */
 export function lintCommand(schema: Schema, text: string): LintResult {
   const { items } = scanCommand(schema, text);
   const issues: Issue[] = [];
   const urls = items.filter(i => i.kind === 'url').map(i => i.raw);
-  const values: Values = {};               // optId → 값 (repeatable 은 배열)
+  const values: Values = {};               // optId → value (arrays for repeatable)
   const count: Record<string, number> = {};
 
   for (const it of items) {

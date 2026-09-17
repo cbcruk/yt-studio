@@ -1,25 +1,26 @@
 /**
  * ytstudio.schema.json → src/core/options.gen.ts
  *
- * gen_schema.py 가 설치된 yt-dlp 를 리플렉션해서 ytstudio.schema.json 을
- * 떨구고, 이 파일이 그걸 **타입**으로 옮긴다. 그래서 자동완성에 뜨는 옵션 =
- * 이 저장소를 구울 때의 yt-dlp 옵션이다. 모델의 기억에서 나온 게 아니다.
+ * gen_schema.py reflects the installed yt-dlp and drops ytstudio.schema.json,
+ * and this file turns that into **types**. So the options in autocomplete =
+ * the options of the yt-dlp this repo was built with. They don't come from a
+ * model's memory.
  *
- * 검증기는 런타임에 로컬 스키마를 집을 수 있지만(src/index.ts) 타입은 못
- * 바꾼다 — 여기서 나온 파일이 그대로 .d.ts 가 되어 배포된다.
+ * The checker can pick up a local schema at runtime (src/index.ts), but it
+ * can't change the types — the file produced here ships as the .d.ts as is.
  *
- * 검증기가 런타임에 하던 일의 절반이 여기서 컴파일 타임으로 올라간다 —
- * 없는 플래그는 없는 메서드가 되고, choices 는 유니온이 된다.
+ * Half of what the checker did at runtime moves up to compile time here —
+ * nonexistent flags become nonexistent methods, and choices become unions.
  *
- * 내는 것은 타입뿐이다. 런타임 메서드는 build.ts 가 같은 스키마에서 기른다.
- * 한 곳(ytstudio.schema.json)에서 둘이 같이 나오므로 어긋날 수가 없다.
+ * It emits types only. The runtime methods are grown by build.ts from the same
+ * schema. Both come from one place (ytstudio.schema.json), so they can't drift.
  *
  *   bun gen_options.ts
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
-// 이름 규칙 · JSDoc 이스케이프 · 메서드 시그니처는 여기 한 벌만 있다.
-// `ytstudio types` 도 같은 것을 쓴다 — 두 생성기가 같은 모양을 내야 한다.
+// Naming rules, JSDoc escaping, and method signatures exist in exactly one copy.
+// `ytstudio types` uses the same ones — both generators must emit the same shape.
 import { HAND_WRITTEN, doc, optionMethod, selMethod, union } from './src/core/env-types.js';
 import { FKEYS, SELECTORS, SEL_HELP } from './src/core/format-grammar.js';
 import { CONVERSIONS, FIELDS, FIELD_HELP, OUT_TYPES } from './src/core/output-template.js';
@@ -30,10 +31,10 @@ const SCHEMA: RawSchema = JSON.parse(
 );
 
 
-// 어휘 표들은 손으로 적는 층이다(format-grammar.ts · output-template.ts).
-// 자동완성에 뜨는 한국어 설명이 전부 거기서 나온다.
-/** 스키마가 들고 온 자리별 어휘. 없으면 그 자리에서 죽는다 — 조용히 빈 유니온이
- * 되면 `Browser` 가 `never` 가 되고, 멀쩡한 코드가 전부 타입 오류가 된다. */
+// The vocabulary tables are the hand-written layer (format-grammar.ts, output-template.ts).
+// Every description shown in autocomplete comes from there.
+/** Per-slot vocabulary carried by the schema. Dies on the spot if missing — silently
+ * becoming an empty union would turn `Browser` into `never` and every valid call into a type error. */
 const vocabOf = (id: string, slot: string): string[] => {
   const v = SCHEMA.options.find(o => o.id === id)?.vocabs?.[slot];
   if (!v?.length) throw new Error(`스키마에 ${id} 의 ${slot} 어휘가 없다`);
@@ -44,17 +45,17 @@ const SELS = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const OUT_FIELDS = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 const TYPES = OUT_TYPES.map(([v]) => v).filter(Boolean);
 
-// NumCond · StrCond 의 키. 연산자 표(build.ts)와 같은 순서다.
+// Keys of NumCond and StrCond. Same order as the operator table (build.ts).
 const NUM_CONDS: [key: string, doc: string][] = [
-  ['lt', '`<` — 보다 작다'], ['lte', '`<=` — 이하'], ['gt', '`>` — 보다 크다'],
-  ['gte', '`>=` — 이상'], ['eq', '`=` — 같다'], ['ne', '`!=` — 다르다'],
+  ['lt', '`<` — less than'], ['lte', '`<=` — at most'], ['gt', '`>` — greater than'],
+  ['gte', '`>=` — at least'], ['eq', '`=` — equal'], ['ne', '`!=` — not equal'],
 ];
 const STR_CONDS: [key: string, doc: string][] = [
-  ['eq', '`=` — 같다'], ['ne', '`!=` — 다르다'],
-  ['startsWith', '`^=` — 이것으로 시작한다'], ['endsWith', '`$=` — 이것으로 끝난다'],
-  ['includes', '`*=` — 이것을 품는다'], ['matches', '`~=` — 정규식에 맞는다'],
-  ['notStartsWith', '`!^=` — 이것으로 시작하지 않는다'], ['notEndsWith', '`!$=` — 이것으로 끝나지 않는다'],
-  ['notIncludes', '`!*=` — 이것을 품지 않는다'], ['notMatches', '`!~=` — 정규식에 맞지 않는다'],
+  ['eq', '`=` — equal'], ['ne', '`!=` — not equal'],
+  ['startsWith', '`^=` — starts with'], ['endsWith', '`$=` — ends with'],
+  ['includes', '`*=` — contains'], ['matches', '`~=` — matches the regex'],
+  ['notStartsWith', '`!^=` — does not start with'], ['notEndsWith', '`!$=` — does not end with'],
+  ['notIncludes', '`!*=` — does not contain'], ['notMatches', '`!~=` — does not match the regex'],
 ];
 
 const fkeyDoc = (k: string): string => doc((FKEYS.find(([n]) => n === k) || ['', ''])[1]);
@@ -62,93 +63,94 @@ const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
 ).join('\n');
 
-// --match-filters 는 -o 필드를 -f 연산자로 비교한다. 숫자 필드인지 아닌지를
-// 우리가 모르므로 양쪽을 다 받는다 — yt-dlp 도 값을 보고 정한다.
+// --match-filters compares -o fields with -f operators. We don't know whether a
+// field is numeric, so both are accepted — yt-dlp also decides by looking at the value.
 const matchProps = OUT_FIELDS.map(f =>
   `  /** \`${f}\` — ${doc(FIELD_HELP[f])} */\n  ${f}?: number | NumCond | string | StrCond | boolean;`,
 ).join('\n');
 
-// map 에 그대로 넘기면 안 된다 — optionMethod 의 둘째 인자에 인덱스가 꽂힌다.
+// Don't pass it to map directly — the index would land in optionMethod's second argument.
 const optionMethods = SCHEMA.options
   .filter(o => !HAND_WRITTEN.has(o.id))
   .map(o => optionMethod(o)).join('\n\n');
 
-const out = `// 이 파일은 gen_options.ts 가 ytstudio.schema.json 에서 만든다. 손으로 고치지 말 것.
+const out = `// Generated by gen_options.ts from ytstudio.schema.json. Do not edit by hand.
 //
-//   yt-dlp ${SCHEMA.ytdlp_version} · 옵션 ${SCHEMA.options.length}개
+//   yt-dlp ${SCHEMA.ytdlp_version} · ${SCHEMA.options.length} options
 //   bun gen_options.ts
 
-/** 이 타입들이 나온 yt-dlp 버전. */
+/** The yt-dlp version these types came from. */
 export type Version = '${SCHEMA.ytdlp_version}';
 
 /**
- * 같은 것을 **값으로도** 낸다.
+ * The same thing, **as a value** too.
  *
- * 타입만으로는 런타임에 "자동완성이 어느 버전에서 나왔나"에 답할 수가 없다.
- * 예전에는 그 답을 패키지에 실린 스키마 파일을 읽어서 냈는데, 그러면 파일
- * 시스템이 없는 곳(브라우저)에서는 물어볼 수조차 없었다. 생성된 값이라
- * 위의 타입과 어긋날 수가 없다.
+ * Types alone can't answer "which version did autocomplete come from?" at
+ * runtime. That answer used to come from reading the schema file shipped with
+ * the package, which meant places without a file system (browsers) couldn't
+ * even ask. Being generated, it can't drift from the type above.
  */
 export const TYPES_VERSION: Version = '${SCHEMA.ytdlp_version}';
 
-/** 값을 받는 옵션에 줄 수 있는 것. */
+/** What can be passed to an option that takes a value. */
 export type Arg = string | number;
 
 /**
- * 바이트 수. \`50K\` · \`44.6M\` 처럼 단위를 붙여도 되고 그냥 수여도 된다.
+ * A byte count. May carry a unit like \`50K\` or \`44.6M\`, or be a plain number.
  *
- * yt-dlp 의 \`parse_bytes\` 를 그대로 옮긴 것이라 \`50KB\` 는 **안 된다** —
- * 표에 없는 단위다. 대소문자는 안 가린다.
+ * Ported directly from yt-dlp's \`parse_bytes\`, so \`50KB\` is **not
+ * accepted** — that unit isn't in the table. Case-insensitive.
  */
 export type Size = number | \`\${number}\${'K' | 'M' | 'G' | 'T' | 'P' | 'E' | 'Z' | 'Y'
   | 'k' | 'm' | 'g' | 't' | 'p' | 'e' | 'z' | 'y'}\`;
 
-/** 다시 시도할 횟수. 수 아니면 \`infinite\`. */
+/** Number of retries. A number or \`infinite\`. */
 export type Retries = number | 'infinite';
 
-/** \`--cookies-from-browser\` 가 쿠키를 읽을 수 있는 브라우저. */
+/** Browsers \`--cookies-from-browser\` can read cookies from. */
 export type Browser = ${union(vocabOf('cookies-from-browser', 'browser'))};
 
-/** 리눅스에서 크로미움 계열 쿠키를 푸는 키체인. */
+/** Keyring used to decrypt Chromium-family cookies on Linux. */
 export type Keyring = ${union(vocabOf('cookies-from-browser', 'keyring'))};
 
-/** \`-f\` 가 받는 셀렉터. 빌더에서는 \`f.bv()\` 처럼 메서드가 된다. */
+/** Selectors \`-f\` accepts. In the builder they become methods like \`f.bv()\`. */
 export type Selector = ${union(SELS)};
 
-/** 셀렉터 팩토리의 메서드 이름. \`*\` 는 \`Star\` 로 옮긴다. */
+/** Method names of the selector factory. \`*\` becomes \`Star\`. */
 export type SelMethod = ${union(SELS.map(selMethod))};
 
 /**
- * 셀렉터 팩토리.
+ * The selector factory.
  *
- * 식 타입을 인자로 받는다 — build.ts 의 \`Expr\` 를 여기서 import 하면 순환이
- * 되고, 매핑 타입(\`{ [K in SelMethod]: … }\`)으로 쓰면 셀렉터마다 붙은 설명이
- * 사라진다. 그 설명이 에디터에 뜨라고 만든 파일이므로 한 줄씩 편다.
+ * Takes the expression type as a parameter — importing build.ts's \`Expr\` here
+ * would be circular, and a mapped type (\`{ [K in SelMethod]: … }\`) would lose
+ * the per-selector descriptions. This file exists so those descriptions show up
+ * in the editor, so each one is spelled out on its own line.
  */
 export interface FormatFactory<E> {
 ${SELS.map(s => `  /** \`${s}\` — ${doc(SEL_HELP[s])} */\n  ${selMethod(s)}(filters?: Filters): E;`).join('\n')}
-  /** 문법을 벗어나야 할 때. 검사 없이 그대로 나간다. */
+  /** When you need to step outside the grammar. Goes out as is, unchecked. */
   raw(selector: string): E;
 }
 
-/** 숫자 필드 비교. \`loose\` 는 그 값이 없는 포맷도 통과시킨다 (\`height<=?1080\`). */
+/** Numeric field comparison. \`loose\` also lets through formats missing the value (\`height<=?1080\`). */
 export interface NumCond {
 ${NUM_CONDS.map(([k, d]) => `  /** ${d} */\n  ${k}?: number;`).join('\n')}
-  /** 그 필드가 없는 포맷도 통과시킨다 — \`?\` 가 붙는다. */
+  /** Also lets through formats missing the field — adds \`?\`. */
   loose?: boolean;
 }
 
-/** 문자 필드 비교. 여러 개를 주면 전부 걸린다. */
+/** String field comparison. Given several, all of them apply. */
 export interface StrCond {
 ${STR_CONDS.map(([k, d]) => `  /** ${d} */\n  ${k}?: string;`).join('\n')}
-  /** 그 필드가 없는 포맷도 통과시킨다 — \`?\` 가 붙는다. */
+  /** Also lets through formats missing the field — adds \`?\`. */
   loose?: boolean;
 }
 
 /**
- * 포맷 필터.
+ * Format filters.
  *
- * 값을 그냥 주면 \`=\` 비교이고, \`true\`/\`false\` 는 있음/없음이다.
+ * A plain value is an \`=\` comparison; \`true\`/\`false\` mean present/absent.
  *
  *     { height: { lte: 1080 }, ext: 'mp4', format_note: false }
  *     → [height<=1080][ext=mp4][!format_note]
@@ -158,49 +160,51 @@ ${filterProps}
 }
 
 /**
- * \`--match-filters\` 가 보는 필드. **연산자는 \`-f\` 필터와 같고 필드는 \`-o\`
- * 템플릿과 같다** — yt-dlp 가 그렇게 정의한다("Any OUTPUT TEMPLATE field").
+ * Fields \`--match-filters\` looks at. **Operators are the same as \`-f\` filters
+ * and fields the same as the \`-o\` template** — that is how yt-dlp defines it
+ * ("Any OUTPUT TEMPLATE field").
  *
- * **닫으면 안 된다.** yt-dlp 는 info dict 의 아무 키나 받으므로(추출기마다 다르다)
- * 여기 없는 필드를 막으면 멀쩡한 조건이 타입 오류가 된다. 그래서 아는 것은
- * 자동완성에 띄우고 나머지는 열어 둔다 — 대신 필드 이름 오타는 못 잡는다.
+ * **It must not be closed.** yt-dlp accepts any info dict key (it varies by
+ * extractor), so blocking fields not listed here would turn valid conditions
+ * into type errors. So known ones show up in autocomplete and the rest stay
+ * open — at the cost of not catching typos in field names.
  */
 export interface MatchFields {
 ${matchProps}
   [field: string]: number | NumCond | string | StrCond | boolean | undefined;
 }
 
-/** \`-o\` 템플릿에 자주 쓰는 필드. 나머지는 \`t.field('이름')\` 으로. */
+/** Fields commonly used in the \`-o\` template. For others, \`t.field('name')\`. */
 export type OutField = ${union(OUT_FIELDS)};
-/** \`-o\` · \`-P\` 앞에 붙는 파일 종류. 안 붙이면 받는 파일 전부다. */
+/** File type prefixed to \`-o\` and \`-P\`. Without one, it applies to every downloaded file. */
 export type OutType = ${union(TYPES)};
-/** \`-o\` 필드 맨 뒤의 변환 글자. \`%(title)S\` 의 \`S\`. */
+/** Conversion character at the end of an \`-o\` field. The \`S\` in \`%(title)S\`. */
 export type Conversion = ${union(CONVERSIONS.map(([c]) => c))};
 
 /**
- * 템플릿 태그에 달리는 필드 접근자.
+ * Field accessors attached to the template tag.
  *
- * 이름은 yt-dlp 것을 그대로 쓴다. camelCase 로 옮기면 예뻐지지만 yt-dlp
- * 문서에서 찾을 수 없는 이름이 된다.
+ * Names are yt-dlp's own. camelCase would look nicer but produce names you
+ * can't find in the yt-dlp docs.
  */
 export interface OutFields<P> {
 ${OUT_FIELDS.map(f => `  /** \`%(${f})s\` — ${doc(FIELD_HELP[f])} */\n  readonly ${f}: P;`).join('\n')}
 }
 
-/** \`-P\` 에 줄 수 있는 경로. \`home\` 만 접두어 없이 나간다. */
+/** Paths that can be given to \`-P\`. Only \`home\` goes out without a prefix. */
 export interface PathMap {
-  /** 받은 파일이 최종적으로 놓일 곳. */
+  /** Where downloaded files finally land. */
   home?: string;
-  /** 받는 동안 쓰는 임시 자리. */
+  /** Temporary location used while downloading. */
   temp?: string;
 ${OUT_TYPES.filter(([t]) => t).map(([t, label]) => `  /** ${doc(label)} */\n  ${t}?: string;`).join('\n')}
 }
 
 /**
- * 설치된 yt-dlp 의 옵션 전부.
+ * Every option of the installed yt-dlp.
  *
- * \`Ytdlp\` 클래스와 선언 병합된다 — 런타임 메서드는 build.ts 가 같은
- * ytstudio.schema.json 에서 기르므로 이 인터페이스와 늘 짝이 맞는다.
+ * Declaration-merged with the \`Ytdlp\` class — build.ts grows the runtime
+ * methods from the same ytstudio.schema.json, so they always match this interface.
  */
 export interface Options {
 ${optionMethods}

@@ -1,22 +1,23 @@
 /**
- * CLI 검사 — **프로세스가 있어야만 보이는 것들.**
+ * CLI tests — **what only shows up when there is a process.**
  *
- * 여기 남은 것은 함수를 불러서는 볼 수 없는 성질뿐이다. 무엇을 말하는지는
- * 단위 테스트가 보고(`unit/explain.test.ts` · `unit/lint.test.ts`), 여기서는
- * 프로세스로서 어떻게 행동하는지만 본다.
+ * What remains here are properties you cannot see by calling a function. What
+ * it says is covered by unit tests (`unit/explain.test.ts` · `unit/lint.test.ts`);
+ * here we only look at how it behaves as a process.
  *
- *   · 종료 코드로 말하는가 (스크립트와 CI 가 그걸 본다)
- *   · 표준 입력으로 흘려 넣어도 되는가 (파이프)
- *   · 색을 안 쓸 때 글자만 깨끗이 나오는가 (grep)
- *   · 배포하는 `lib/` 가 노드에서 실제로 도는가
+ * - Does it speak through the exit code? (scripts and CI read it)
+ * - Can input be piped in on stdin? (pipes)
+ * - Does it print clean text when color is off? (grep)
+ * - Does the shipped `lib/` actually run on node?
  *
- * **여기 스키마 해석 순서 검사가 다섯 개 있었다.** 스키마가 프로세스 전역이라
- * 경우마다 프로세스를 새로 띄우는 수밖에 없었기 때문이다. 그건 이 파일이 필요한
- * 이유가 아니라 `core/schema.ts` 가 잘못 생겼다는 증상이었다 — 검사가 인터페이스를
- * 우회하는 정도가 아니라 프로세스를 갈라야 했으니까.
+ * **There used to be five schema-resolution-order tests here.** The schema was
+ * process-global, so the only option was a fresh process per case. That was not
+ * a reason for this file to exist but a symptom that `core/schema.ts` was the
+ * wrong shape — the tests did not just bypass the interface, they had to fork
+ * processes.
  *
- * 스키마를 값으로 바꾸면서 그 다섯은 `unit/resolve.test.ts` 로 갔다. 여기 남은
- * 하나는 순서가 아니라 **CLI 가 그걸 화면에 말하는가**다.
+ * When the schema became a value, those five moved to `unit/resolve.test.ts`.
+ * The one left here is not about order but **whether the CLI says it on screen**.
  */
 import { beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -31,23 +32,23 @@ const CLI = path.join(ROOT, 'lib', 'cli.js');
 const SCHEMA_FILE = 'ytstudio.schema.json';
 
 beforeAll(() => {
-  // 이 검사는 소스가 아니라 **컴파일한 산출물**을 상대한다. 없으면 왜 없는지
-  // 말해 준다 — 안 그러면 "빌드를 안 했다"가 엉뚱한 실패로 보인다.
+  // This test targets the **compiled output**, not the source. If it is missing,
+  // say why — otherwise "didn't build" shows up as an unrelated failure.
   assert.ok(existsSync(CLI), `${CLI} 가 없다 — 'bun run build' 를 먼저 돌릴 것`);
 });
 
 interface Run { code: number; out: string }
 interface Env { cwd: string; env: Record<string, string> }
 
-// bun 이 이 파일을 돌려도 CLI 는 node 로 띄운다 — process.execPath 를 쓰면
-// 러너를 따라가는데, 우리가 배포하는 건 `#!/usr/bin/env node` 짜리다.
+// Even when bun runs this file, the CLI is launched with node — process.execPath
+// would follow the runner, but what we ship is a `#!/usr/bin/env node` script.
 const NODE = 'node';
 
 /**
- * CLI 를 돌리고 { code, out } 을 준다. NO_COLOR 로 색을 끈다.
+ * Runs the CLI and returns { code, out }. NO_COLOR turns color off.
  *
- * `cwd` 를 저장소 밖으로 돌리면 로컬 스키마 탐색을 피할 수 있다 — 스키마 해석
- * 순서를 보는 검사가 그걸 쓴다.
+ * Pointing `cwd` outside the repo avoids the local schema lookup — the
+ * schema-resolution-order test uses that.
  */
 function run(args: string[], stdin = '', extra: Partial<Env> = {}): Run {
   try {
@@ -58,7 +59,7 @@ function run(args: string[], stdin = '', extra: Partial<Env> = {}): Run {
     });
     return { code: 0, out };
   } catch (err) {
-    // execFileSync 는 종료 코드가 0 이 아니면 던진다 — 그게 우리가 볼 것이다
+    // execFileSync throws on a non-zero exit code — that is what we want to see
     const e = err as { status?: number; stdout?: string; stderr?: string };
     return { code: e.status ?? -1, out: (e.stdout || '') + (e.stderr || '') };
   }
@@ -93,9 +94,9 @@ test('색을 끄면 이스케이프가 안 남는다 — grep 에 걸리면 곤�
   assert.doesNotMatch(r.out, /\x1b\[/, '색코드가 남았다');
 });
 
-// 무슨 말을 하는지는 unit/explain.test.ts 가 본다. 여기서는 서브명령이 붙어
-// 있고 토큰 수만큼 낸다는 것까지다 — 화면 글자에 단언을 걸면 문구를 다듬을
-// 때마다 검사가 깨진다.
+// What it says is covered by unit/explain.test.ts. Here we only check that the
+// subcommand is wired up and emits one chunk per token — asserting on screen text
+// breaks the test every time the wording is polished.
 test('explain 은 토큰마다 한 덩이씩 낸다', () => {
   const r = run(['explain', 'yt-dlp -x --no-part https://youtu.be/abc']);
   assert.equal(r.code, 0, r.out);
@@ -107,9 +108,9 @@ test('version 은 첫 줄에 버전만 낸다 — 스크립트가 그걸 읽는�
   assert.match(r.out.split('\n')[0]!.trim(), /^\d{4}\.\d{2}\.\d{2}$/);
 });
 
-// 해석 순서 자체는 unit/resolve.test.ts 가 본다 — 스키마가 값이 된 뒤로는
-// 프로세스를 안 갈라도 된다. 여기 남은 하나는 **CLI 가 그걸 화면에 말하는가**다.
-// 판정만 있고 무엇에 대조했는지가 없으면 판정을 읽을 수 없다.
+// The resolution order itself is covered by unit/resolve.test.ts — since the schema
+// became a value, no process fork is needed. The one left here is **whether the CLI
+// says it on screen**. A verdict without what it was checked against is unreadable.
 test('무엇에 대조했는지 판정 옆에 적는다', () => {
   const here = run(['lint', 'yt-dlp https://youtu.be/abc']);
   assert.ok(here.out.includes(path.join(ROOT, SCHEMA_FILE)), here.out);

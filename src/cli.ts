@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /**
- * 터미널에서 명령어를 검사한다.
+ * Checks commands from the terminal.
  *
- * 브라우저 앱이 하던 일 중 **라이브러리가 대신 못 하는 것**이 하나 있었다 —
- * 어디선가 주운 명령어를 검사하는 것. 블로그에서 봤든 동료가 붙여넣었든
- * LLM 이 줬든, 그건 문자열로 온다. 빌더는 빌더로 쓴 것만 본다.
+ * Of what the browser app used to do, there was one thing **the library can't
+ * do instead** — checking a command picked up from somewhere. Seen on a blog,
+ * pasted by a colleague, or handed over by an LLM, it arrives as a string. The
+ * builder only sees what was written with the builder.
  *
- * 그 일에는 화면이 필요 없었다. 파이프가 있으면 된다.
+ * That job never needed a screen. A pipe is enough.
  *
  *     ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
  *     pbpaste | ytstudio lint
  *
- * 종료 코드로 말한다 — 오류가 있으면 1. CI 나 스크립트에 그대로 걸린다.
+ * It speaks through the exit code — 1 if there are errors. It drops straight
+ * into CI or scripts.
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -23,10 +25,10 @@ import { emitEnvTypes } from './core/env-types.js';
 import { parseHelp } from './core/help-schema.js';
 import type { LintResult } from './index.js';
 
-// 스키마를 여기서 한 번 정한다. 이 프로세스가 무엇에 대조하는지가 이 한 줄이다.
+// The schema is decided once, here. What this process checks against is this one line.
 const yt = ytstudio();
 
-// 파이프로 넘길 때는 색을 끈다 — 색코드가 grep 에 걸리면 곤란하다.
+// Colors are off when piped — color codes getting caught by grep is a nuisance.
 const tty = process.stdout.isTTY && !process.env.NO_COLOR;
 const c = (n: number, s: string) => (tty ? `\x1b[${n}m${s}\x1b[0m` : s);
 const red = (s: string) => c(31, s);
@@ -59,17 +61,17 @@ const HELP = `ytstudio — 설치된 yt-dlp(${yt.source.version}) 에 명령어�
 작업 디렉터리의 ytstudio.schema.json 을 검증기가 먼저 본다. YTSTUDIO_SCHEMA 로
 다른 자리를 가리킬 수도 있다.`;
 
-/** 어느 스키마를 봤는지 한 줄. 이게 없으면 판정이 무엇에 대한 판정인지 모른다. */
+/** One line on which schema was used. Without it, nobody knows what the verdict is a verdict about. */
 function source(): string {
   const where = yt.source.from === 'bundled' ? '패키지 내장' : yt.source.path;
   return `${where} ${dim(`(yt-dlp ${yt.source.version})`)}`;
 }
 
 /**
- * 인자로 줬으면 그걸, 아니면 표준 입력을 통째로.
+ * The arguments if given, otherwise all of standard input.
  *
- * 파이프가 안 걸려 있으면 읽지 않는다 — 터미널에서 그냥 `ytstudio lint` 를
- * 치면 입력을 기다리며 멈춰 선다. 그건 고장으로 보인다.
+ * Without a pipe it doesn't read — typing a bare `ytstudio lint` in a terminal
+ * would stall waiting for input. That looks broken.
  */
 function input(args: string[]): string {
   if (args.length) return args.join(' ');
@@ -78,11 +80,12 @@ function input(args: string[]): string {
 }
 
 /**
- * 검사 결과를 사람이 읽는 순서로 낸다.
+ * Prints the check result in the order a person reads it.
  *
- * 심각한 것부터(lint.js 가 이미 그 순서로 준다), 그 다음 만들 파일명, 마지막에
- * 한 줄 판정. 오류가 있을 때는 다음 걸음을 안 권한다 — 틀린 것을 두고 더 얹으라고
- * 하면 소음이다.
+ * Most severe first (lint.js already returns them in that order), then the
+ * filename it will produce, and a one-line verdict last. With errors present it
+ * doesn't suggest next steps — telling someone to pile more onto something
+ * wrong is noise.
  */
 function report(r: LintResult): void {
   for (const i of r.issues) {
@@ -102,14 +105,14 @@ function report(r: LintResult): void {
   console.log(`${dim('판정')}      ${verdict} ${dim(`· 옵션 ${opts}개를 스키마 ${total}개와 대조`)}`);
   console.log(`${dim('스키마')}    ${source()}`);
 
-  // 오류가 없을 때만 다음 걸음을 권한다 — 틀린 걸 두고 권하면 소음이다
+  // Suggest next steps only when there are no errors — suggesting on top of something wrong is noise
   if (!error) {
     const next = yt.suggest(r.values).slice(0, 4);
     if (next.length) console.log(`${dim('이어서')}    ${next.map(s => s.opt.flag).join('  ')}`);
   }
 }
 
-/** 토큰마다 무슨 옵션인지. 검사는 안 하고 읽어 주기만 한다. */
+/** Which option each token is. No checking — it only reads it back. */
 function explain(r: LintResult): void {
   for (const row of yt.explain(r.items)) {
     const where = row.stageLabel ? dim(`  [${row.stageLabel}]`) : '';
@@ -118,10 +121,11 @@ function explain(r: LintResult): void {
 }
 
 /**
- * `parseArgs` 가 던진 것을 한국어로.
+ * What `parseArgs` throws, in Korean.
  *
- * 이 CLI 는 전부 한국어인데 노드가 던지는 문구만 영어로 새어 나온다. 코드로
- * 갈라 적고, 모르는 것은 원문을 그대로 낸다 — 지어내는 것보다 낫다.
+ * This CLI's output is all Korean, yet the messages Node throws leak out in
+ * English. Split them by code, and pass unknown ones through verbatim — better
+ * than making something up.
  */
 function argError(e: unknown): string {
   const code = (e as { code?: string }).code;
@@ -135,22 +139,23 @@ function argError(e: unknown): string {
 }
 
 /**
- * 손님이 깐 yt-dlp 를 리플렉션해 스키마와 타입을 다시 뽑는다.
+ * Reflects the yt-dlp users installed and regenerates the schema and types.
  *
- * 패키지에 실려 나가는 스키마는 **이 저장소를 구울 때의** yt-dlp 다. 손님 것이
- * 더 새로우면 새 플래그를 없는 것으로 잡고 exit 1 을 낸다 — CI 에 걸어 뒀으면
- * 남의 빌드를 깬다. 이 명령이 그걸 없앤다.
+ * The schema shipped with the package is the yt-dlp **this repo was built
+ * with**. If users' is newer, new flags are flagged as nonexistent with exit 1
+ * — wired into CI, that breaks someone else's build. This command removes that.
  *
- * 파이썬 리플렉션(`gen_schema.py`)을 안 쓰는 이유는 손님 환경에서 대체로 못
- * 돌기 때문이다. `brew` 도 독립 바이너리도 pipx 도 `import yt_dlp` 가 실패한다.
+ * It doesn't use the Python reflection (`gen_schema.py`) because that mostly
+ * can't run in users' environments. `brew`, standalone binaries, and pipx all
+ * fail on `import yt_dlp`.
  */
 function types(args: string[]): number {
   let bin: string;
   try {
-    // 인자를 손으로 훑던 것을 여기서만 그만뒀다. `indexOf('--yt-dlp')` 는
-    // `--yt-dlp=/경로` 를 못 찾아서 **손님이 지정한 경로를 조용히 버리고**
-    // PATH 를 봤다 — 이 저장소가 계속 잡아 온 바로 그 종류의 실패다.
-    // strict 라서 모르는 플래그도 여기서 걸린다.
+    // Scanning arguments by hand stopped here, and only here. `indexOf('--yt-dlp')`
+    // couldn't find `--yt-dlp=/path`, so it **silently dropped the path users
+    // gave** and looked at PATH — exactly the kind of failure this repo keeps
+    // catching. Being strict, unknown flags are caught here too.
     const { values } = parseArgs({
       args, strict: true, allowPositionals: false,
       options: { 'yt-dlp': { type: 'string' } },
@@ -170,7 +175,7 @@ function types(args: string[]): number {
     version = ask('--version').trim().split('\n')[0]!.trim();
     help = ask('--help');
   } catch {
-    // 조용히 번들로 떨어지면 성공한 척하면서 아무것도 안 바꾼 게 된다
+    // Silently falling back to the bundled one would pretend to succeed while changing nothing
     console.error(`${red('✗')} yt-dlp 를 실행하지 못했다: ${bin}`);
     console.error(dim('  PATH 에 없으면 --yt-dlp <경로> 로 가리킬 것.'));
     return 1;
@@ -178,8 +183,9 @@ function types(args: string[]): number {
 
   const r = parseHelp(help, version, BUNDLED);
 
-  // 도움말은 사람용 출력이라 서식이 바뀔 수 있다. 파서가 깨지면 몇 개만 뽑고
-  // 성공했다고 말하는데, 그러면 손님의 모든 플래그가 오탈자가 된다.
+  // Help is output meant for people, so its format can change. A broken parser
+  // extracts only a few and reports success — and then every one of users'
+  // flags becomes a typo.
   const gone = r.removed.length / BUNDLED.options.length;
   if (gone > 0.2) {
     console.error(`${red('✗')} 도움말에서 옵션 ${r.removed.length}개가 사라졌다 (번들 ${BUNDLED.options.length}개 중) — 파서가 이 서식을 못 읽는다`);
@@ -212,27 +218,29 @@ function types(args: string[]): number {
 }
 
 /**
- * 만든 `.d.ts` 가 손님 tsconfig 의 `include` 에 안 걸리면 **조용히 무시된다.**
+ * If the generated `.d.ts` isn't covered by `include` in users' tsconfig, it is
+ * **silently ignored.**
  *
- * 파일은 생겼는데 자동완성이 안 늘어난다. 손님은 이 도구가 고장 났다고 생각하지
- * 자기 `include` 를 의심하지 않는다 — 검증기가 처음부터 하던 일과 같은 종류라
- * 여기서도 말해 준다. 고쳐 주지는 않는다. 남의 빌드 설정이다.
+ * The file exists but autocomplete doesn't grow. Users think this tool is
+ * broken rather than suspecting their `include` — the same kind of thing the
+ * checker has done from the start, so it says so here too. It doesn't fix it.
+ * That is someone else's build config.
  */
 function tsconfigWarnings(dtsPath: string): string[] {
   const path = resolve(process.cwd(), 'tsconfig.json');
   let text: string;
   try { text = readFileSync(path, 'utf8'); } catch { return []; }
 
-  // include 가 없으면 tsc 의 기본값이 전부라 덮인다. 있으면 눈으로 본다 —
-  // 여기서 tsconfig 를 온전히 해석할 생각은 없다(주석·extends·확장 패턴).
+  // Without include, tsc's default covers everything. With one, eyeball it —
+  // there is no intent to fully interpret tsconfig here (comments, extends, glob patterns).
   if (!/"include"\s*:/.test(text)) return [];
   const name = basename(dtsPath);
   if (text.includes(name)) return [];
   return [`tsconfig.json 의 include 가 ${name} 을 안 덮는 것 같다 — 안 덮으면 조용히 무시된다. include 에 "${name}" 을 넣을 것`];
 }
 
-// 종료 코드가 셋이다 — 0 통과, 1 하려던 일이 안 됨, 2 이 CLI 를 잘못 불렀다.
-// 스크립트가 "대상이 틀렸다"와 "인자를 잘못 줬다"를 갈라 봐야 한다.
+// Three exit codes — 0 pass, 1 the intended job failed, 2 this CLI was called wrong.
+// Scripts need to tell "the target is wrong" apart from "the arguments were wrong".
 const [cmd, ...rest] = process.argv.slice(2);
 
 if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
@@ -240,7 +248,7 @@ if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
   process.exit(0);
 }
 if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
-  // 버전만 표준 출력으로 낸다 — 스크립트가 이걸 그대로 읽는다.
+  // Only the version goes to stdout — scripts read it as is.
   console.log(yt.source.version);
   console.error(dim(`스키마  ${source()}`));
   process.exit(0);

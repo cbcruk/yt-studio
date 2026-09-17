@@ -1,12 +1,12 @@
 /**
- * `-P` 항목 한 줄 읽기.
+ * Reading one `-P` entry.
  *
- * `-P` 는 `[TYPES:]PATH` 다. 종류가 앞에 붙는데 윈도 경로(`C:/dl`)를 종류로
- * 오인하면 안 되므로, **아는 종류일 때만** 자른다.
+ * `-P` is `[TYPES:]PATH`. The type comes first, but a Windows path (`C:/dl`)
+ * must not be mistaken for a type, so it splits **only on a known type**.
  */
 import { OUT_TYPES } from './output-template.js';
 
-/** `-P` 가 받는 종류. `-o` 의 종류에 저장 전용인 home·temp 가 더 붙는다. */
+/** Types `-P` accepts: the `-o` types plus the storage-only home · temp. */
 const PATH_TYPES = ['home', 'temp', ...OUT_TYPES.map(([v]) => v).filter(Boolean)];
 const PATH_TYPE_SET = new Set(PATH_TYPES);
 

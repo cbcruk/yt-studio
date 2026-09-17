@@ -1,12 +1,13 @@
 /**
- * 명령어를 사람 말로 되돌리는 층.
+ * The layer that turns a command back into plain language.
  *
- * 한동안 이 모듈의 유일한 검사가 `tests/cli.test.ts` 의 출력 문자열 단언이었다.
- * 즉 로직이 아니라 **CLI 가 그린 화면**을 보고 있었고, 규칙 하나가 틀려도
- * 줄바꿈만 맞으면 통과할 수 있었다. 여기로 옮긴다.
+ * For a while this module's only test was an output-string assertion in
+ * `tests/cli.test.ts`. That is, it looked at **the screen the CLI drew**, not the
+ * logic, and could pass with a wrong rule as long as the line breaks matched.
+ * Moved here.
  *
- * 값을 모르는 채로 파일명을 미리 그리는 게 이 층의 어려운 부분이다 —
- * 필드는 자리표시자로 두고 `-P home` 만 앞에 붙인다.
+ * The hard part of this layer is drawing the filename without knowing the values —
+ * fields stay as placeholders and only `-P home` is prepended.
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -15,8 +16,8 @@ const {
   DEFAULT_OUTTMPL, previewFilename, explainCommand, explainItem, suggestNext, lintCommand,
 } = await import('../../src/index.js');
 
-// 값 표와 항목 수열은 lintCommand 가 이미 만든다. 여기서 흉내 내면 진짜 흐름과
-// 어긋난 것을 검사하게 된다 — CLI 도 이 둘을 그대로 받아 쓴다.
+// The value table and item sequence are already built by lintCommand. Imitating them
+// here would test something that diverged from the real flow — the CLI takes these two as-is.
 const valuesOf = (cmd: string) => lintCommand(cmd).values;
 const itemsOf = (cmd: string) => lintCommand(cmd).items;
 
@@ -34,7 +35,7 @@ test('필드는 자리표시자로 둔다 — 값을 모르니까', () => {
   assert.equal(f.dflt, false, '-o 를 줬으면 기본값이 아니다');
 });
 
-// "어디에 무엇이 놓이는가"가 한 줄로 보여야 한다.
+// "What lands where" must be visible in one line.
 test('-P home 을 앞에 붙인다 — 구분자는 한 번만', () => {
   const one = previewFilename(valuesOf('yt-dlp -P /dl -o "%(title)s.%(ext)s" https://y.be/a'));
   assert.equal(one.text, '/dl/‹제목›.‹확장자›');
@@ -54,7 +55,7 @@ test('종류별 -o 는 종류를 따로 들고 있는다', () => {
   assert.equal(f.text, '‹영상 ID›.‹확장자›');
 });
 
-// 문법이 깨졌으면 지어내지 않는다 — 원문을 그대로 돌려주고 ok 를 내린다.
+// If the grammar is broken, do not make things up — return the original and lower ok.
 test('-o 를 못 읽으면 원문을 그대로 돌려준다', () => {
   const f = previewFilename(valuesOf('yt-dlp -o "%(title)" https://y.be/a'));
   assert.equal(f.ok, false);
@@ -74,8 +75,8 @@ test('토큰마다 무슨 옵션이고 어느 단계인지 말한다', () => {
   assert.equal(rows.at(-1)!.ko, '받을 대상');
 });
 
-// 부정형은 "끈 것"이라고 말해야 한다. --no-part 를 "part 를 쓴다"로 읽으면
-// 정반대를 설명하는 셈이다.
+// A negated form must say it is "turned off". Reading --no-part as "use part" would
+// describe the exact opposite.
 test('부정형은 끈 것이라고 말한다', () => {
   const [row] = explainCommand(itemsOf('yt-dlp --no-part https://y.be/a'));
   assert.match(row!.ko, /끄기$/);
@@ -93,7 +94,7 @@ test('explainCommand 는 explainItem 을 순서대로 편 것이다', () => {
   assert.deepEqual(explainCommand(items), items.map(explainItem));
 });
 
-// 191개 중 아무거나가 아니라 지금 명령어가 부르는 것만 낸다.
+// Not any of the 191, only what the current command calls for.
 test('다음 걸음은 지금 조합에서 따라오는 것만 낸다', () => {
   const ids = suggestNext(valuesOf('yt-dlp -x https://y.be/a')).map(s => s.opt.id);
   assert.ok(ids.includes('audio-format'), ids.join(' '));
@@ -111,7 +112,7 @@ test('-f 에 + 가 있으면 합칠 컨테이너를 권한다', () => {
   assert.ok(ids.includes('merge-output-format'), ids.join(' '));
 });
 
-// 아무 규칙도 안 걸릴 때 빈손으로 두면 처음 만든 명령어에 다음 걸음이 없다.
+// Leaving it empty when no rule matches would give a freshly written command no next step.
 test('아무 규칙도 안 걸리면 시작 옵션을 낸다', () => {
   const s = suggestNext(valuesOf('yt-dlp https://y.be/a'));
   assert.ok(s.length > 0);

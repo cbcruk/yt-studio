@@ -1,13 +1,13 @@
 /**
- * 브라우저 입구가 정말 순수한가.
+ * Is the browser entry point really pure?
  *
- * `ytstudio/browser` 의 약속은 하나다 — **파일 시스템을 안 본다.** 그건
- * 함수를 불러 보는 것으로는 확인이 안 된다. `readFileSync` 를 부르지 않는
- * 경로만 밟아도 통과해 버리니까. 확인하는 방법은 하나뿐이다: 브라우저용으로
- * **묶어 보고** 노드 빌트인이 하나라도 딸려 오는지 본다.
+ * `ytstudio/browser` makes one promise — **it never touches the file system.**
+ * Calling functions cannot confirm that; a test that only walks paths not calling
+ * `readFileSync` would pass anyway. There is only one way to confirm it: **bundle
+ * it** for the browser and see whether any node builtin comes along.
  *
- * 이 검사가 없으면 `src/browser.ts` 어딘가에 `node:path` 하나가 스며들어도
- * 노드에서 도는 검사는 전부 통과하고, 데모 페이지를 띄울 때에야 깨진다.
+ * Without this test, a single `node:path` sneaking into `src/browser.ts` would
+ * pass every test running on node and only break when the demo page loads.
  */
 import { expect, test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -36,8 +36,8 @@ test('노드 빌트인이 하나도 안 딸려 온다', async () => {
   assert.deepEqual(found, [], `브라우저 입구에 노드 빌트인이 샜다: ${found.join(' ')}`);
 });
 
-// 데모 페이지가 통째로 받아 가는 것이라 크기가 곧 사용자가 기다리는 시간이다.
-// 정확한 수는 중요하지 않고, 자릿수가 바뀌면 알아야 한다.
+// The demo page downloads this whole, so its size is the time users wait.
+// The exact number does not matter; we need to know when the order of magnitude changes.
 test('묶은 것이 작다 — 50KB 아래', async () => {
   const js = await bundle.outputs[0]!.text();
   expect(js.length).toBeLessThan(50_000);
@@ -52,8 +52,8 @@ test('스키마를 직접 주면 손잡이가 된다', async () => {
   assert.equal(yt.lint('yt-dlp --write-sub https://youtu.be/abc').counts.error, 1);
 });
 
-// 자동완성이 어느 버전에서 나왔는지는 브라우저에서도 답할 수 있어야 한다 —
-// 예전에는 그 답이 패키지에 실린 **파일**에만 있었다.
+// Which version autocomplete came from must be answerable in the browser too —
+// the answer used to live only in a **file** shipped with the package.
 test('타입 버전을 파일 없이 안다', async () => {
   const { studio, TYPES_VERSION } = await import('../../src/browser.js');
   assert.equal(TYPES_VERSION, RAW.ytdlp_version);

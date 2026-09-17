@@ -1,24 +1,25 @@
 /**
- * 실물 yt-dlp 와 벌어졌는지 본다.
+ * Checks whether we have drifted from the real yt-dlp.
  *
- * 나머지 검사는 전부 **2026.07.04 스냅샷 안에서** 돈다 — 커밋된 스키마,
- * 커밋된 도움말, 그 도움말을 `cat` 하는 껍데기 yt-dlp. 그래서 결정적이고,
- * 내 변경이 뭘 깼는지 정확히 말한다. 대신 **바깥에서 오는 변화는 못 본다.**
+ * Every other test runs **inside the 2026.07.04 snapshot** — the committed schema,
+ * the committed help, and a stub yt-dlp that `cat`s that help. So they are
+ * deterministic and say exactly what my change broke. In exchange **they cannot
+ * see change coming from outside.**
  *
- * 이 저장소가 내건 문장이 "기억이 아니라 실물을 본다"인데 검사가 기억만 보고
- * 있으면 앞뒤가 안 맞는다. 여기서 진짜 yt-dlp 를 깔고 묻는다.
+ * This repo's claim is "look at the real thing, not memory"; tests that only look
+ * at memory would contradict it. Here we install the real yt-dlp and ask.
  *
- *   · 도움말 파서가 **지금** yt-dlp 의 서식을 읽는가
- *   · `gen_schema.py` 가 **지금** yt-dlp 에서 도는가
- *   · `ytstudio types` 가 실물을 상대로 끝까지 가는가
+ * - Does the help parser read **today's** yt-dlp format?
+ * - Does `gen_schema.py` run on **today's** yt-dlp?
+ * - Does `ytstudio types` go all the way against the real thing?
  *
- * PR 마다 돌리지 않는다. yt-dlp 릴리스 때문에 남의 PR 이 빨개지면 그건 알림이
- * 아니라 방해다. 정기 잡(`.github/workflows/drift.yml`)이 yt-dlp 를 깔고
- * 돌린다. **yt-dlp 가 없으면 통째로 건너뛴다** — 그래야 `bun test` 를 그냥
- * 쳐도 안 깨진다.
+ * Not run on every PR. If a yt-dlp release turns someone else's PR red, that is
+ * not an alert but an obstruction. A scheduled job (`.github/workflows/drift.yml`)
+ * installs yt-dlp and runs it. **Without yt-dlp the whole file is skipped** — so
+ * a plain `bun test` does not break.
  *
- * 커밋된 스키마가 최신보다 낡은 것 자체는 실패가 아니다 — 그건 늘 그렇다.
- * 실패는 **기계가 고장 났을 때**뿐이다.
+ * The committed schema being older than the latest is not a failure in itself —
+ * that is always the case. It fails **only when the machinery is broken**.
  */
 import { afterAll, beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -39,7 +40,7 @@ const PYTHON = process.env.PYTHON_BIN || 'python3';
 
 const BASE: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'ytstudio.schema.json'), 'utf8'));
 
-/** yt-dlp 가 있나. skipIf 는 정의 시점에 읽히므로 모듈 최상단에서 정한다. */
+/** Is yt-dlp available? skipIf is read at definition time, so decide at module top level. */
 const version = ((): string | null => {
   try {
     return execFileSync(YTDLP, ['--version'], { encoding: 'utf8', stdio: 'pipe' })
@@ -56,7 +57,7 @@ let optparse: RawSchema;
 beforeAll(() => {
   if (skip) return;
   const help = execFileSync(YTDLP, ['--help'], { encoding: 'utf8', maxBuffer: 8 << 20 });
-  // 이게 깨지면 저장소가 다음 릴리스에 스키마를 못 뽑는다는 뜻이다
+  // If this breaks, the repo cannot extract a schema at the next release
   optparse = JSON.parse(execFileSync(PYTHON, [path.join(ROOT, 'gen_schema.py')],
     { encoding: 'utf8', maxBuffer: 32 << 20 }));
   parsed = parseHelp(help, version!, BASE);
@@ -71,8 +72,8 @@ live('도움말 파서가 optparse 와 같은 개수를 읽는다', () => {
   assert.equal(parsed.schema.options.length, optparse.options.length);
 });
 
-// 아는 옵션은 한 글자도 달라선 안 된다. 새 옵션은 도움말이 못 주는 것
-// (choices · 숨은 별칭 · repeatable 여부)을 물려받을 데가 없으므로 뺀다.
+// Known options must not differ by a single character. New options are excluded:
+// what help cannot give (choices · hidden aliases · repeatable) has nowhere to inherit from.
 const FULL: Array<keyof Opt> =
   ['id', 'short', 'aliases', 'stage', 'group', 'kind', 'metavar', 'choices', 'negation', 'help'];
 const HELP_ONLY: Array<keyof Opt> = ['id', 'short', 'group', 'metavar', 'negation', 'help'];
@@ -108,7 +109,7 @@ live('ytstudio types 가 실물로 끝까지 간다', () => {
   }
 });
 
-// 커밋된 스키마가 뒤처진 것은 늘 그런 일이라 실패로 안 친다. 알리기만 한다.
+// The committed schema lagging behind is routine, so it is not a failure. Only report it.
 afterAll(() => {
   if (skip) {
     console.log(`  · yt-dlp 가 없어 건너뛰었다 (${YTDLP}) — 정기 잡에서 깔고 돌린다`);

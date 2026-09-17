@@ -1,69 +1,69 @@
 /**
- * yt-dlp 포맷 셀렉터 문법.
+ * The yt-dlp format selector grammar.
  *
- * `-f` 는 평평한 값이 아니라 표현식이다. 이 파일이 그 문법의 전부다.
+ * `-f` is not a flat value but an expression. This file is the whole grammar.
  *
- *   atom     := (셀렉터 | '(' expr ')') 필터*   bv*[height<=1080] · (mp4,webm)[height<480]
- *   merge    := atom ('+' atom)*                bv+ba
- *   fallback := merge ('/' merge)*              bv+ba/b   ==   (bv+ba)/b
- *   multi    := fallback (',' fallback)*        bv,ba
+ *   atom     := (selector | '(' expr ')') filter*   bv*[height<=1080] · (mp4,webm)[height<480]
+ *   merge    := atom ('+' atom)*                    bv+ba
+ *   fallback := merge ('/' merge)*                  bv+ba/b   ==   (bv+ba)/b
+ *   multi    := fallback (',' fallback)*            bv,ba
  */
 
-/** 연산자 우선순위. 자식이 부모보다 낮으면 괄호로 묶는다. */
+/** Operator precedence. A child lower than its parent gets parenthesized. */
 export const PREC = { multi: 0, fallback: 1, merge: 2, sel: 3 } as const;
 
-/** 표현식을 이루는 연산자. */
+/** Operators that make up an expression. */
 export type FormatOp = 'merge' | 'fallback' | 'multi';
 
 const OP_SEP: Record<FormatOp, string> = { merge: '+', fallback: '/', multi: ',' };
 
-/** `[height<=?1080]` 한 칸. `loose` 가 참이면 `?` 가 붙는다. */
+/** One `[height<=?1080]` slot. `?` is added when `loose` is true. */
 export interface Filter {
-  /** 포맷 필드 이름 (`height` · `ext`). */
+  /** Format field name (`height`, `ext`). */
   key: string;
-  /** 비교 연산자 (`<=` · `^=` · `!*=` …). 값 없이 이름만 쓰면 `has` · `hasnot`. */
+  /** Comparison operator (`<=`, `^=`, `!*=`, …). A bare name without a value gives `has` / `hasnot`. */
   op: string;
-  /** 참이면 그 필드가 없는 포맷도 통과시킨다 — `?` 가 붙는다. */
+  /** When true, formats missing the field also pass — adds `?`. */
   loose?: boolean;
-  /** 비교할 값. `has` · `hasnot` 이면 빈 문자열이다. */
+  /** The value to compare. Empty for `has` / `hasnot`. */
   value: string;
 }
 
 /**
- * 식 트리.
+ * The expression tree.
  *
- * 필터는 셀렉터에만 붙는 게 아니라 **연산자 노드에도 붙는다** —
- * `(mp4,webm)[height<480]` 은 yt-dlp 문서에 나오는 표현이다.
+ * Filters attach not only to selectors but **to operator nodes too** —
+ * `(mp4,webm)[height<480]` appears in the yt-dlp docs.
  */
 export type FormatNode =
   | { t: 'sel'; name: string; filters: Filter[] }
   | { t: FormatOp; kids: FormatNode[]; filters?: Filter[] };
 
 /**
- * 셀렉터 어휘 — 이름과 한 줄 설명.
+ * Selector vocabulary — names and one-line descriptions.
  *
- * 리플렉션이 못 주는 층이다. yt-dlp 는 `-f` 값을 그냥 문자열로 받으므로
- * optparse 트리에는 `b` · `bv` 가 무슨 뜻인지가 없다. 손으로 적는다.
- * 빌더의 메서드 이름과 자동완성 설명이 여기서 나온다.
+ * A layer reflection cannot provide. yt-dlp takes the `-f` value as a plain
+ * string, so the optparse tree says nothing about what `b` or `bv` mean. Written
+ * by hand. The builder's method names and autocomplete descriptions come from here.
  */
 export const SELECTORS: [group: string, items: [sel: string, help: string][]][] = [
-  ['영상 + 음성 (한 파일)', [
-    ['b',  'best — 영상·음성이 같이 든 것 중 최고'],
-    ['b*', 'best* — 종류 안 가리고 최고'],
-    ['w',  'worst — 같이 든 것 중 최저'],
-    ['w*', 'worst* — 종류 안 가리고 최저'],
+  ['Video + audio (one file)', [
+    ['b',  'best — best of files with both video and audio'],
+    ['b*', 'best* — best of any kind'],
+    ['w',  'worst — worst of files with both'],
+    ['w*', 'worst* — worst of any kind'],
   ]],
-  ['영상만', [
-    ['bv',  'bestvideo — 영상만 든 것 중 최고'],
-    ['bv*', 'bestvideo* — 영상이 든 것 중 최고 (음성 동봉 허용)'],
-    ['wv',  'worstvideo — 영상만 든 것 중 최저'],
-    ['wv*', 'worstvideo* — 영상이 든 것 중 최저'],
+  ['Video only', [
+    ['bv',  'bestvideo — best of video-only files'],
+    ['bv*', 'bestvideo* — best of files with video (audio allowed)'],
+    ['wv',  'worstvideo — worst of video-only files'],
+    ['wv*', 'worstvideo* — worst of files with video'],
   ]],
-  ['음성만', [
-    ['ba',  'bestaudio — 음성만 든 것 중 최고'],
-    ['ba*', 'bestaudio* — 음성이 든 것 중 최고 (영상 동봉 허용)'],
-    ['wa',  'worstaudio — 음성만 든 것 중 최저'],
-    ['wa*', 'worstaudio* — 음성이 든 것 중 최저'],
+  ['Audio only', [
+    ['ba',  'bestaudio — best of audio-only files'],
+    ['ba*', 'bestaudio* — best of files with audio (video allowed)'],
+    ['wa',  'worstaudio — worst of audio-only files'],
+    ['wa*', 'worstaudio* — worst of files with audio'],
   ]],
 ];
 
@@ -71,22 +71,23 @@ export const SEL_HELP: Record<string, string> =
   Object.fromEntries(SELECTORS.flatMap(([, items]) => items));
 
 /**
- * 필터 필드. yt-dlp 문서에서 옮긴 것으로, `num`/`str` 에 따라 쓸 수 있는
- * 비교가 다르다. 이것도 손으로 적는 층이다 — 빌더의 `Filters` 타입이 여기서 난다.
+ * Filter fields. Taken from the yt-dlp docs; which comparisons are allowed depends
+ * on `num`/`str`. Also a hand-written layer — the builder's `Filters` type comes
+ * from here.
  */
 export const FKEYS: [key: string, label: string, type: 'num' | 'str'][] = [
-  ['height', '세로 해상도', 'num'], ['width', '가로 해상도', 'num'], ['fps', '프레임', 'num'],
-  ['tbr', '전체 비트레이트', 'num'], ['vbr', '영상 비트레이트', 'num'], ['abr', '음성 비트레이트', 'num'],
-  ['asr', '샘플레이트', 'num'], ['audio_channels', '음성 채널 수', 'num'],
-  ['filesize', '파일 크기', 'num'], ['filesize_approx', '대략 크기', 'num'],
-  ['aspect_ratio', '화면비', 'num'],
-  ['ext', '확장자', 'str'], ['vcodec', '영상 코덱', 'str'], ['acodec', '음성 코덱', 'str'],
-  ['container', '컨테이너', 'str'], ['protocol', '프로토콜', 'str'], ['format_id', '포맷 ID', 'str'],
-  ['format_note', '포맷 노트', 'str'], ['resolution', '해상도', 'str'], ['language', '언어', 'str'],
-  ['dynamic_range', '다이내믹 레인지', 'str'],
+  ['height', 'vertical resolution', 'num'], ['width', 'horizontal resolution', 'num'], ['fps', 'frame rate', 'num'],
+  ['tbr', 'total bitrate', 'num'], ['vbr', 'video bitrate', 'num'], ['abr', 'audio bitrate', 'num'],
+  ['asr', 'audio sample rate', 'num'], ['audio_channels', 'number of audio channels', 'num'],
+  ['filesize', 'file size', 'num'], ['filesize_approx', 'approximate file size', 'num'],
+  ['aspect_ratio', 'aspect ratio', 'num'],
+  ['ext', 'file extension', 'str'], ['vcodec', 'video codec', 'str'], ['acodec', 'audio codec', 'str'],
+  ['container', 'container', 'str'], ['protocol', 'protocol', 'str'], ['format_id', 'format id', 'str'],
+  ['format_note', 'format note', 'str'], ['resolution', 'resolution', 'str'], ['language', 'language', 'str'],
+  ['dynamic_range', 'dynamic range', 'str'],
 ];
 
-/** `height<=?1080` · `format_note` · `!format_note` 를 필터 한 칸으로. */
+/** `height<=?1080`, `format_note`, `!format_note` → one filter slot. */
 export function parseFilterBody(body: string): Filter {
   const b = body.trim();
   if (!b) throw new Error('빈 필터');
@@ -97,7 +98,7 @@ export function parseFilterBody(body: string): Filter {
   throw new Error(`필터를 읽지 못했다: [${body}]`);
 }
 
-/** 포맷 셀렉터 문자열 → 트리. 못 읽으면 이유를 담아 던진다. */
+/** Format selector string → tree. Throws with the reason when it cannot be read. */
 export function parseFormat(src: string): FormatNode | null {
   const s = (src || '').trim();
   if (!s) return null;
@@ -124,10 +125,10 @@ export function parseFormat(src: string): FormatNode | null {
   }
 
   /**
-   * atom := (셀렉터 | '(' expr ')') 필터*
+   * atom := (selector | '(' expr ')') filter*
    *
-   * 필터를 읽는 자리를 셀렉터 뒤가 아니라 atom 끝에 둔다 — 무엇이 왔든 그
-   * 노드에 단다. 그래야 그룹에 붙은 필터도 읽힌다.
+   * Filters are read at the end of the atom, not after the selector — they attach
+   * to whatever node came. That way filters on groups are read too.
    */
   function atom(): FormatNode {
     ws();
@@ -158,7 +159,7 @@ export function parseFormat(src: string): FormatNode | null {
   return tree;
 }
 
-/** 필터 하나 → `[height<=1080]`. `has`/`hasnot` 은 값 없이 이름만 쓴다. */
+/** One filter → `[height<=1080]`. `has`/`hasnot` write just the name, no value. */
 export function emitFilter(f: Filter): string {
   if (f.op === 'has') return '[' + f.key + ']';
   if (f.op === 'hasnot') return '[!' + f.key + ']';
@@ -166,22 +167,23 @@ export function emitFilter(f: Filter): string {
 }
 
 /**
- * 괄호를 붙일지 정할 때 쓰는 실효 우선순위.
+ * Effective precedence used to decide on parentheses.
  *
- * 필터가 달린 연산자는 이미 제 괄호를 쓰고 나온다(`(mp4,webm)[…]`). 그러면
- * 원자와 다를 바 없으므로 부모가 또 감싸지 않게 sel 취급한다.
+ * An operator with filters already comes out in its own parentheses
+ * (`(mp4,webm)[…]`). That makes it no different from an atom, so it is treated as
+ * sel and the parent does not wrap it again.
  */
 const effPrec = (n: FormatNode): number =>
   (n.t !== 'sel' && (n.filters || []).length) ? PREC.sel : PREC[n.t];
 
-/** 트리 → 포맷 셀렉터 문자열. 필요한 괄호만 붙인다. */
+/** Tree → format selector string. Adds only the parentheses needed. */
 export function emitTree(n: FormatNode | null): string {
   if (!n) return '';
   const filters = (n.filters || []).map(emitFilter).join('');
   if (n.t === 'sel') return n.name + filters;
   const body = n.kids.map(k => {
     const s = emitTree(k);
-    return effPrec(k) < PREC[n.t] ? '(' + s + ')' : s;   // 우선순위가 낮으면 괄호로
+    return effPrec(k) < PREC[n.t] ? '(' + s + ')' : s;   // parenthesize when lower precedence
   }).join(OP_SEP[n.t]);
   return filters ? '(' + body + ')' + filters : body;
 }

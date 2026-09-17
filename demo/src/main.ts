@@ -1,8 +1,8 @@
 /**
- * 페이지 조립 — 에디터 한 칸, 미리보기 한 칸.
+ * Page assembly — one pane of editor, one pane of preview.
  *
- * 글이 바뀌면 트랜스파일하고, 돌리고, 나온 명령어를 검사해서 네 칸을 다시
- * 그린다. 사람이 타자를 치는 동안 계속 도는 것이라 조금 눌러 둔다.
+ * When the text changes: transpile, run, check the resulting command, and redraw the
+ * four panes. It runs continuously while a person types, so it is throttled a little.
  */
 import { mount } from './editor.js';
 import { EXAMPLES } from './examples.js';
@@ -23,7 +23,7 @@ els.meta.textContent =
 
 const editor = mount($('editor'), EXAMPLES[0]!.code);
 
-// ── 예제 탭 ──
+// ── Example tabs ──
 EXAMPLES.forEach((ex, i) => {
   const b = document.createElement('button');
   b.type = 'button';
@@ -39,7 +39,7 @@ EXAMPLES.forEach((ex, i) => {
 });
 els.note.textContent = EXAMPLES[0]!.note;
 
-// ── 그리기 ──
+// ── Rendering ──
 const text = (tag: string, cls: string, s: string): HTMLElement => {
   const el = document.createElement(tag);
   el.className = cls;
@@ -60,7 +60,7 @@ async function render(): Promise<void> {
   try {
     out = evaluate(await editor.emit());
   } catch (e) {
-    // 타입 오류가 이미 떠 있으면 그게 원인이라 두 번 말하지 않는다.
+    // If a type error is already shown, that is the cause, so do not say it twice.
     if (!errors.length) {
       els.diags.hidden = false;
       fill(els.diags, [text('li', '', e instanceof RunError ? e.message : String(e))]);
@@ -98,7 +98,7 @@ async function render(): Promise<void> {
     : out.file.text;
 }
 
-// 타자마다 워커를 두드리면 화면이 덜컹거린다.
+// Hitting the worker on every keystroke makes the screen stutter.
 let timer: ReturnType<typeof setTimeout>;
 const schedule = (): void => {
   clearTimeout(timer);

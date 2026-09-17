@@ -1,168 +1,169 @@
 /**
- * yt-dlp 옵션 스키마.
+ * The yt-dlp option schema.
  *
- * 리플렉션한 raw JSON 하나에서 색인들을 만든다. **결과는 값이다** —
- * `buildSchema` 는 순수 함수이고 이 모듈에는 가변 상태가 없다.
+ * Builds indexes from one reflected raw JSON. **The result is a value** —
+ * `buildSchema` is a pure function and this module holds no mutable state.
  *
- * 한동안은 반대였다. `export let OPTS/BY_ID/…` 다섯에 `initSchema` 가 값을
- * 채워 넣는 모양이었는데, 그러면 호출자가 알아야 할 것이 시그니처에 안 적힌다.
+ * For a while it was the opposite. Five `export let OPTS/BY_ID/…` were filled in
+ * by `initSchema`, which left what callers need to know out of the signatures.
  *
- *   · `initSchema` 를 먼저 불러야 나머지가 유효하다
- *   · 두 번 부르면 **프로세스 안 모든 모듈**의 것이 다시 쓰인다
- *   · 스키마 둘을 동시에 들 방법이 없다
+ * - `initSchema` must be called first for the rest to be valid
+ * - calling it twice rewrites the state of **every module in the process**
+ * - there is no way to hold two schemas at once
  *
- * 마지막이 실제로 물었다. 가짜 스키마를 한 번 더 로드하면 앞서 로드한 쪽의
- * `lintCommand` 가 조용히 새 스키마를 보는데 `VERSION` 은 안 바뀐다 —
- * **모듈이 자기 상태에 대해 거짓말을 한다.** 그리고 검사가 그걸 우회하려고
- * 경우마다 프로세스를 새로 띄워야 했다. 이음매가 프로세스 시작에 있었다는 뜻이다.
+ * The last one actually bit. Loading a fake schema once more made the earlier
+ * `lintCommand` silently see the new schema while `VERSION` stayed the same —
+ * **the module lied about its own state.** And the tests had to spawn a fresh
+ * process per case to work around it, which means the seam was at process start.
  *
- * 지금은 값이라 이음매가 인자다. 스키마 둘을 나란히 들 수 있다.
+ * Now it is a value, so the seam is an argument. Two schemas can be held side by
+ * side.
  */
 
-/** 옵션 하나. `gen_schema.py` 가 optparse 트리에서 뽑은 그대로다. */
+/** One option, exactly as `gen_schema.py` extracted it from the optparse tree. */
 export interface Opt {
-  /** 긴 플래그에서 `--` 를 뗀 것 (`write-subs`). 이 저장소에서 옵션을 가리키는 이름이다. */
+  /** The long flag without `--` (`write-subs`). This repository refers to options by this name. */
   id: string;
-  /** 긴 플래그. 메서드 이름이 여기서 나온다. */
+  /** The long flag. Method names come from this. */
   flag: string;
-  /** 짧은 플래그. 명령어에 찍히는 건 있으면 이쪽이다. */
+  /** The short flag. When present, this is what gets written into commands. */
   short: string | null;
-  /** 같은 옵션의 다른 긴 플래그 (`--ies` → `use-extractors`). */
+  /** Other long flags for the same option (`--ies` → `use-extractors`). */
   aliases: string[];
-  /** 생애주기 단계 — `source` · `format` · `store` … */
+  /** Lifecycle stage — `source`, `format`, `store`, … */
   stage: string;
-  /** yt-dlp `--help` 의 묶음 이름. */
+  /** Group name in yt-dlp `--help`. */
   group: string;
-  /** optparse 가 값을 담는 속성 이름. 값을 안 담는 옵션이면 `null`. */
+  /** Attribute optparse stores the value in. `null` for options that store none. */
   dest: string | null;
-  /** 값을 받는 방식. */
+  /** How the option takes a value. */
   kind: OptKind;
-  /** 도움말에 찍히는 값 자리 이름 (`FORMAT` · `FILE`). 값을 안 받으면 `null`. */
+  /** Name of the value slot shown in help (`FORMAT`, `FILE`). `null` when no value is taken. */
   metavar: string | null;
-  /** 값 전체가 이 중 하나여야 한다. `--fixup never` */
+  /** The whole value must be one of these. `--fixup never` */
   choices: string[] | null;
   /**
-   * 값 **앞에** 붙는 종류의 목록. `-o thumbnail:%(id)s` 의 `thumbnail`.
+   * Types that go **in front of** the value. `thumbnail` in `-o thumbnail:%(id)s`.
    *
-   * 값 자체는 자유 문자열(경로 · 템플릿 · 명령어)이라 `choices` 가 아니다.
-   * 앞머리만 닫혀 있다.
+   * The value itself is a free string (path, template, command), so these are not
+   * `choices`. Only the prefix is closed.
    */
   keys: string[] | null;
   /**
-   * 값이 **어휘 위의 작은 문법**인 것. `--recode-video "aac>mp3/mkv"`
+   * A value that is **a small grammar over a vocabulary**. `--recode-video "aac>mp3/mkv"`
    *
-   * `choices` 로 쓰면 `aac>mp3` 가 오류로 잡힌다. 어휘는 자동완성이 쓰고,
-   * 문법은 검증기가 본다.
+   * As `choices`, `aac>mp3` would be flagged as an error. Autocomplete uses the
+   * vocabulary; the checker handles the grammar.
    */
   rule: OptRule | null;
   /**
-   * 값이 **자리 여럿인 구조**일 때, 자리마다의 어휘.
+   * When the value is **a structure with several slots**, the vocabulary per slot.
    *
-   * `--cookies-from-browser BROWSER[+KEYRING][:PROFILE][::CONTAINER]` 하나뿐이다.
-   * 문법은 `core/cookies.ts` 가 갖고 여기는 어휘만 온다.
+   * Only `--cookies-from-browser BROWSER[+KEYRING][:PROFILE][::CONTAINER]` has one.
+   * `core/cookies.ts` owns the grammar; only the vocabulary lives here.
    */
   vocabs: Record<string, string[]> | null;
   /**
-   * optparse 가 값을 무엇으로 읽나 — `'string'` · `'int'` · `'float'` · `'choice'`.
+   * What optparse reads the value as — `'string'`, `'int'`, `'float'`, `'choice'`.
    *
-   * 값을 안 받는 옵션은 `null`. `int`·`float` 는 진짜 수라서 타입도 `number` 가
-   * 된다. `string` 은 명령줄이 원래 다 문자열이라 별 뜻이 없다 —
-   * `--audio-quality 0` 도 `string` 이다.
+   * `null` for options that take no value. `int` and `float` are real numbers, so
+   * their type becomes `number`. `string` says little, since the command line is
+   * all strings anyway — `--audio-quality 0` is a `string` too.
    */
   valueType: 'string' | 'int' | 'float' | 'choice' | null;
-  /** optparse 의 기본값. 옵션마다 모양이 달라서 좁히지 않는다. */
+  /** optparse's default. Its shape varies per option, so it is not narrowed. */
   default: unknown;
-  /** yt-dlp `--help` 의 설명 한 단락. `%default` 는 이미 채워져 있다. */
+  /** The description paragraph from yt-dlp `--help`, with `%default` already filled in. */
   help: string;
-  /** `--no-part` 처럼 끄는 형태가 따로 있으면 그 플래그. */
+  /** The flag for the off form, when there is a separate one like `--no-part`. */
   negation: string | null;
 }
 
 /**
- * 옵션이 값을 받는 방식.
+ * How an option takes a value.
  *
- * `flag` 는 값 없음, `value` 는 값 하나, `choice` 는 정해진 값 중 하나,
- * `repeatable` 은 여러 번 줄 수 있다.
+ * `flag` takes none, `value` takes one, `choice` takes one of a fixed set, and
+ * `repeatable` can be given several times.
  */
 export type OptKind = 'flag' | 'value' | 'choice' | 'repeatable';
 
 /**
- * `[원본>]대상(/[원본>]대상)*` — yt-dlp 의 `FFmpeg*PP.FORMAT_RE` 를 옮긴 것.
+ * `[source>]target(/[source>]target)*` — a port of yt-dlp's `FFmpeg*PP.FORMAT_RE`.
  *
- * `/` 로 이은 것은 선호 순서다(앞엣것부터). `원본>` 은 "이 확장자일 때만"이라
- * 어휘가 아니라 아무 확장자나 온다.
+ * `/` joins an order of preference (first wins). `source>` means "only for this
+ * extension", so any extension goes there, not just the vocabulary.
  */
 export interface OptRule {
-  /** 대상으로 쓸 수 있는 확장자. */
+  /** Extensions allowed as the target. */
   vocab: string[];
-  /** `원본>대상` 형태를 받나. `--merge-output-format` 만 안 받는다. */
+  /** Whether the `source>target` form is accepted. Only `--merge-output-format` rejects it. */
   from: boolean;
 }
 
-/** 생애주기 단계. 사람이 읽을 이름을 붙이려고 손으로 채운 층이다. */
+/** A lifecycle stage. A hand-filled layer that gives stages human-readable names. */
 export interface Stage {
-  /** 단계 이름 (`run` · `format` …). {@linkcode Opt.stage} 가 이걸 가리킨다. */
+  /** Stage name (`run`, `format`, …). {@linkcode Opt.stage} points to this. */
   id: string;
-  /** 짧은 한국어 이름 (`실행`). */
+  /** Short Korean name (`실행`). */
   label: string;
-  /** 이 단계가 정하는 것 한 줄 (`한 번의 실행 전체가 어떻게 동작할지`). */
+  /** One line on what this stage decides, in Korean (`한 번의 실행 전체가 어떻게 동작할지`). */
   blurb: string;
-  /** 이 단계에 드는 yt-dlp `--help` 묶음 이름들. */
+  /** Names of the yt-dlp `--help` groups in this stage. */
   groups: string[];
 }
 
-/** 플래그 문자열 하나가 가리키는 것. 부정형이면 `negated` 가 참이다. */
+/** What a single flag string points to. `negated` is true for the negated form. */
 export interface FlagHit {
   opt: Opt;
   negated: boolean;
 }
 
 /**
- * 스키마가 어떤 리플렉션에서 나왔나.
+ * Which reflection the schema came from.
  *
- * `optparse` 는 `gen_schema.py` 가 yt-dlp 를 파이썬 모듈로 불러 옵션 객체를 직접
- * 읽은 것이고, `help` 는 `yt-dlp --help` 출력을 파싱한 것이다. 뒤엣것이 덜
- * 충실하다 — 별칭 일부와 `choices` 는 도움말에 글자로 안 나온다. 대신 어떤
- * 설치 형태에서도 된다.
+ * `optparse` means `gen_schema.py` imported yt-dlp as a Python module and read the
+ * option objects directly; `help` means `yt-dlp --help` output was parsed. The
+ * latter is less faithful — some aliases and `choices` never appear as text in the
+ * help. In exchange it works with any kind of install.
  */
 export type SchemaFrom = 'optparse' | 'help';
 
-/** `gen_schema.py` 가 내놓는 JSON 그대로. */
+/** The JSON exactly as `gen_schema.py` emits it. */
 export interface RawSchema {
-  /** 리플렉션한 yt-dlp 의 버전 (`2026.07.04`). */
+  /** Version of the reflected yt-dlp (`2026.07.04`). */
   ytdlp_version: string;
-  /** 없으면 `optparse` 다 — 이 필드가 생기기 전 스키마가 그것뿐이었다. */
+  /** `optparse` when absent — before this field existed, that was the only kind of schema. */
   source?: SchemaFrom;
-  /** 생애주기 단계. 순서가 명령어가 처리되는 순서다. */
+  /** Lifecycle stages, in the order a command is processed. */
   stages: Stage[];
-  /** 옵션 전부. `--help` 에서 숨긴 것은 없다. */
+  /** Every option. Those hidden from `--help` are not included. */
   options: Opt[];
 }
 
 /**
- * 색인까지 붙은 스키마 하나. 이 저장소에서 "스키마"는 이 값을 말한다.
+ * A schema with its indexes attached. In this repository, "schema" means this value.
  *
- * 읽기 전용으로 쓴다 — 만든 뒤에는 아무도 안 고친다. 그래서 여러 곳이 같은
- * 값을 나눠 가져도 서로를 오염시키지 않는다.
+ * Treated as read-only — nobody modifies it after it is built. So many places can
+ * share the same value without contaminating each other.
  */
 export interface Schema {
-  /** 이 스키마가 나온 yt-dlp 버전. */
+  /** The yt-dlp version this schema came from. */
   version: string;
-  /** 어떤 리플렉션에서 나왔나. */
+  /** Which reflection it came from. */
   from: SchemaFrom;
-  /** 옵션 전부. {@linkcode RawSchema.options} 와 같은 순서다. */
+  /** Every option, in the same order as {@linkcode RawSchema.options}. */
   opts: readonly Opt[];
-  /** 옵션 id → 옵션. */
+  /** Option id → option. */
   byId: Readonly<Record<string, Opt>>;
-  /** 단계 id → 단계. */
+  /** Stage id → stage. */
   stage: Readonly<Record<string, Stage>>;
-  /** 별칭·단축·부정형까지 전부. 검증기가 문자열을 되읽을 때 쓴다. */
+  /** Every flag, including aliases, short and negated forms. The checker uses it to read strings back. */
   byFlag: Readonly<Record<string, FlagHit>>;
-  /** 만들 때 받은 원본. `ytstudio types` 가 다시 써야 할 때 쓴다. */
+  /** The raw input it was built from. Used when `ytstudio types` has to write it out again. */
   raw: RawSchema;
 }
 
-/** raw JSON → 색인 붙은 스키마. 순수 함수다. */
+/** Raw JSON → indexed schema. A pure function. */
 export function buildSchema(raw: RawSchema): Schema {
   const opts = raw.options;
   const byFlag: Record<string, FlagHit> = {};

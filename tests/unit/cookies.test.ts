@@ -1,13 +1,14 @@
 /**
- * `--cookies-from-browser` — 자리가 넷인 값.
+ * `--cookies-from-browser` — a value with four slots.
  *
  *     BROWSER[+KEYRING][:PROFILE][::CONTAINER]
  *
- * `-f` · `-o` 처럼 값 자체가 구조라 손으로 적는 층인데, **어휘는 스키마가
- * 들고 온다.** 그 둘을 한 파일에 두었다가 `-o` 종류 표가 조용히 갈린 적이 있어서다.
+ * Like `-f` · `-o`, the value itself is a structure, so this is a hand-written layer,
+ * but **the vocabulary comes from the schema.** Grammar and vocabulary once lived in
+ * one file and the `-o` type table quietly diverged.
  *
- * 아래 문자열들은 진짜 yt-dlp(2026.07.04)의 정규식에 넣어 결과를 대조한 것이다.
- * `firefox::Personal`(프로필 없이 컨테이너만)이 특히 헷갈리는 자리다.
+ * The strings below were checked against the regex of the real yt-dlp (2026.07.04).
+ * `firefox::Personal` (a container without a profile) is the especially confusing case.
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -28,7 +29,7 @@ test('네 자리를 갈라 읽는다', () => {
   assert.deepEqual(parseCookieSource('chrome+GNOMEKEYRING', V),
     { browser: 'chrome', keyring: 'GNOMEKEYRING', profile: null, container: null });
 
-  // 프로필 없이 컨테이너만 — `:` 하나와 `::` 를 갈라야 한다
+  // A container without a profile — must tell a single `:` from `::`
   assert.deepEqual(parseCookieSource('firefox::Personal', V),
     { browser: 'firefox', keyring: null, profile: null, container: 'Personal' });
 
@@ -36,8 +37,8 @@ test('네 자리를 갈라 읽는다', () => {
     { browser: 'brave', keyring: null, profile: '/home/me/profile', container: 'Work' });
 });
 
-// yt-dlp 가 `.lower()` · `.upper()` 로 정규화한다. 안 따라가면 `Firefox` 가
-// 오류로 잡히는데, 그건 yt-dlp 가 받는 값이다.
+// yt-dlp normalizes with `.lower()` · `.upper()`. If we did not follow, `Firefox` would
+// be flagged as an error, yet yt-dlp accepts it.
 test('대소문자를 yt-dlp 와 같게 맞춘다', () => {
   assert.equal(parseCookieSource('Firefox', V).browser, 'firefox');
   assert.equal(parseCookieSource('chrome+gnomekeyring', V).keyring, 'GNOMEKEYRING');
@@ -49,7 +50,7 @@ test('어휘 밖은 자리마다 다르게 말한다', () => {
   assert.throws(() => parseCookieSource('chrom', V), CookieError);
 });
 
-// 어휘를 안 주면 모양만 본다 — 스키마 없이도 쓸 수 있어야 한다.
+// Without a vocabulary only the shape is checked — it must be usable without a schema.
 test('어휘 없이는 모양만 본다', () => {
   assert.equal(parseCookieSource('nosuchbrowser').browser, 'nosuchbrowser');
 });
@@ -71,8 +72,8 @@ test('검증기가 이걸로 본다', () => {
   assert.match(err('yt-dlp --cookies-from-browser firefox+NOPE https://x/y'), /NOPE 는/);
 });
 
-// 자리마다 이름을 붙인 이유가 이것이다 — 문자열로 이으면 `::` 와 `:` 를
-// 헷갈린다. 아래 넷은 진짜 yt-dlp 의 정규식으로 결과를 대조했다.
+// This is why every slot got a name — joining strings confuses `::` with `:`.
+// The four below were checked against the real yt-dlp regex.
 test('빌더가 자리를 제대로 잇는다', () => {
   const U = 'https://youtu.be/abc';
   const cmd = (c: { build(): string }): string => c.build().replace(`yt-dlp `, '').replace(` ${U}`, '');
@@ -84,16 +85,16 @@ test('빌더가 자리를 제대로 잇는다', () => {
     '--cookies-from-browser firefox::Personal');
   assert.equal(cmd(ytdlp(U).cookiesFromBrowser('brave', { profile: '/home/me/p', container: 'Work' })),
     '--cookies-from-browser brave:/home/me/p::Work');
-  // 셸이 건드릴 글자가 들어가면 따옴표가 붙는다 (`~` 는 홈으로 펴진다)
+  // Characters the shell would touch get quoted (`~` expands to home)
   assert.equal(cmd(ytdlp(U).cookiesFromBrowser('firefox', { profile: '~/.mozilla/firefox/x' })),
     '--cookies-from-browser "firefox:~/.mozilla/firefox/x"');
 
-  // 빌더가 낸 것을 제 검증기가 받아야 한다
+  // Its own checker must accept what the builder produced
   assert.equal(ytdlp(U).cookiesFromBrowser('firefox', { container: 'Personal' }).lint().ok, true);
 });
 
-// 어휘가 손으로 적혀 있었다면 yt-dlp 가 브라우저를 하나 더 지원할 때 조용히
-// 갈렸을 것이다. 스키마에서 온다는 것을 못 박는다.
+// Had the vocabulary been hand-written, it would have quietly diverged when yt-dlp
+// supported one more browser. Pin down that it comes from the schema.
 test('어휘는 스키마에서 온다', async () => {
   const { BUNDLED } = await import('../../src/index.js');
   const o = BUNDLED.options.find(x => x.id === 'cookies-from-browser')!;
