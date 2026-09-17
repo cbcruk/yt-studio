@@ -1,17 +1,17 @@
 /**
- * 스키마를 어디서 집는가.
+ * Where the schema is picked up from.
  *
- * 이 검사가 **여기 있다는 것 자체**가 이번 설계 변경의 요점이다.
+ * **The mere fact that this test lives here** is the point of this design change.
  *
- * 예전에는 `core/schema.ts` 가 `export let OPTS/BY_ID/…` 를 들고 `initSchema` 가
- * 그걸 채우는 모양이었다. 그래서 한 프로세스에서 스키마를 두 번 로드하면 앞엣것이
- * 오염됐고 — 그것도 `VERSION` 은 그대로 두고 동작만 바뀌었다 — 해석 순서를 보려면
- * **경우마다 프로세스를 새로 띄우는 수밖에** 없었다. `tests/cli.test.ts` 가 그 일을
- * 하고 있었다.
+ * `core/schema.ts` used to hold `export let OPTS/BY_ID/…` filled in by `initSchema`.
+ * So loading a schema twice in one process polluted the first one — and changed only
+ * behaviour while leaving `VERSION` as is — and checking resolution order left **no
+ * option but a fresh process per case**. `tests/cli.test.ts` was doing that.
  *
- * 지금은 스키마가 값이고 `resolveSchema` 가 순수 함수다. 작업 디렉터리와
- * 환경변수까지 인자로 받으므로 `process.chdir` 로 프로세스를 흔들 일도 없다 —
- * 그걸 했으면 같은 프로세스에서 도는 다른 검사 파일에 샜을 것이다.
+ * Now the schema is a value and `resolveSchema` is a pure function. It takes even the
+ * working directory and environment variables as arguments, so there is no need to
+ * shake the process with `process.chdir` — doing so would have leaked into other test
+ * files running in the same process.
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const TMP = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-resolve-'));
 const SCHEMA_FILE = 'ytstudio.schema.json';
 
-/** 버전만 바꾼 진짜 스키마 한 벌을 디렉터리에 놓는다. */
+/** Puts a copy of the real schema, with only the version changed, into a directory. */
 function dirWith(version: string, opts?: number): string {
   const dir = mkdtempSync(path.join(TMP, 'proj-'));
   writeFileSync(path.join(dir, SCHEMA_FILE), JSON.stringify({
@@ -39,7 +39,7 @@ function dirWith(version: string, opts?: number): string {
   return dir;
 }
 
-/** 이름만 같고 우리 것이 아닌 JSON. 남의 프로젝트 루트에 있을 수 있다. */
+/** JSON with the same name that is not ours. Could sit at the root of someone else's project. */
 const decoy = ((): string => {
   const dir = path.join(TMP, 'decoy');
   mkdirSync(dir, { recursive: true });
@@ -77,12 +77,12 @@ test('명시적으로 가리킨 것이 가장 세다 — 환경변수 > 작업 �
   assert.equal(source.version, '2030.12.31');
 });
 
-// 조용히 내장으로 떨어지면 엉뚱한 버전으로 검사해 놓고 통과했다고 말하게 된다.
+// Silently falling back to bundled would check against the wrong version and report a pass.
 test('가리킨 것이 헛다리면 던진다 — 조용히 안 넘어간다', () => {
   assert.throws(() => resolveSchema({ env: path.join(TMP, '없다.json') }), /읽지 못했다/);
 });
 
-// 작업 디렉터리 쪽은 반대로 조용히 넘어간다 — 남의 파일을 집은 것뿐이다.
+// The working-directory side, conversely, moves on quietly — it just picked up someone else's file.
 test('우리 것이 아닌 JSON 은 없는 것으로 친다', () => {
   assert.equal(resolveSchema({ cwd: decoy }).source.from, 'bundled');
 });
@@ -93,23 +93,23 @@ test('저장소 안에서 부르면 저장소 스키마를 집는다', () => {
   assert.equal(source.path, path.join(ROOT, SCHEMA_FILE));
 });
 
-// ── 여기부터가 예전에 불가능했던 것 ──
+// ── From here on: what used to be impossible ──
 
 test('손잡이 둘이 서로를 안 오염시킨다', () => {
-  const a = ytstudio({ cwd: empty });                     // 내장 191개
-  const b = ytstudio({ cwd: dirWith('9999.01.01', 5) });  // 5개짜리
+  const a = ytstudio({ cwd: empty });                     // bundled, 191
+  const b = ytstudio({ cwd: dirWith('9999.01.01', 5) });  // only 5
 
   assert.equal(a.schema.opts.length, BUNDLED.options.length);
   assert.equal(b.schema.opts.length, 5);
 
-  // b 를 만든 뒤에도 a 는 그대로다. 예전에는 여기서 a 가 b 의 스키마를 봤다.
+  // a is unchanged even after creating b. It used to see b's schema here.
   assert.equal(a.lint('yt-dlp --write-subs https://y.be/a').counts.error, 0);
   assert.equal(b.lint('yt-dlp --write-subs https://y.be/a').counts.error, 1);
   assert.equal(a.source.version, BUNDLED.ytdlp_version);
 });
 
-// 옵션 메서드는 프로토타입에 심긴다. 예전에는 Ytdlp.prototype 한 곳이라
-// 나중 스키마가 앞엣것을 덮었다 — 지금은 스키마마다 제 하위 클래스다.
+// Option methods are planted on the prototype. It used to be the single Ytdlp.prototype,
+// so a later schema overwrote the earlier one — now each schema gets its own subclass.
 test('빌더 메서드도 손잡이마다 다르다', () => {
   const a = ytstudio({ cwd: empty });
   const b = ytstudio({ cwd: dirWith('9999.01.01', 5) });

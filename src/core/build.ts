@@ -1,23 +1,26 @@
 /**
- * 코드로 쓰는 yt-dlp 명령어.
+ * yt-dlp commands written in code.
  *
- * 이 저장소는 입력을 세 번 바꿨다 — 노드 그래프, 프롬프트, 그리고 코드. 세 번
- * 다 살아남은 건 **리플렉션한 스키마와 진짜 파서**였고, 여기서는 그 둘을 그대로
- * 뒤집어 쓴다. 읽는 파서를 이미 갖고 있으니 쓰는 쪽은 컴파일러만 부르면 된다.
+ * This repo changed its input three times — node graph, prompt, and now code.
+ * What survived all three was **the reflected schema and real parsers**, and
+ * here both are simply turned around. The reading parser already exists, so the
+ * writing side only has to call the compiler.
  *
- *   parseFormat   문자열 → 트리   검증기가 쓴다
- *   emitTree      트리 → 문자열   빌더가 쓴다
+ *   parseFormat   string → tree   used by the checker
+ *   emitTree      tree → string   used by the builder
  *
- * 그래프가 안 맞았던 이유가 여기서 뒤집힌다. yt-dlp 명령어는 평평한 플래그
- * 목록이라 엣지가 할 일이 없었는데, 메서드 체인에는 애초에 엣지가 없다. 값이
- * 구조를 갖는 셋(`-f` 식 · `-o` 수열 · `-P` 집합)만 따로 문법을 준다.
- * 그 판단의 근거는 docs/builder.md 에 있다.
+ * The reason the graph didn't fit is inverted here. A yt-dlp command is a flat
+ * list of flags, so edges had nothing to do; a method chain has no edges to
+ * begin with. Only the three whose values have structure (`-f` expression ·
+ * `-o` sequence · `-P` set) get their own grammar. The reasoning is in
+ * docs/builder.md.
  *
- * 옵션 184개는 **스키마에서 자란다** — 손으로 적은 목록이 없다. 타입도 같은
- * 곳에서 나온다(gen_options.ts). 그래서 사용자가 깐 yt-dlp 에 없는 옵션은
- * 자동완성에 뜨지 않고, 런타임과 타입이 어긋날 수도 없다.
+ * The 184 options **grow from the schema** — there is no hand-written list. The
+ * types come from the same place (gen_options.ts). So options missing from the
+ * installed yt-dlp don't show in autocomplete, and runtime and types can't drift.
  *
- * DOM 도 파일 시스템도 모른다. 스키마는 인자로 받는다 — `makeYtdlp(schema)`.
+ * Knows nothing of the DOM or the file system. The schema is an argument —
+ * `makeYtdlp(schema)`.
  */
 
 import { SELECTORS, emitTree } from './format-grammar.js';
@@ -43,9 +46,9 @@ export type {
 } from './options.gen.js';
 
 /**
- * `--download-sections` 의 시간 구간.
+ * A time range for `--download-sections`.
  *
- * 초(`90`) 또는 `분:초`(`1:30`) 또는 `시:분:초`. 안 주면 처음부터/끝까지다.
+ * Seconds (`90`), `min:sec` (`1:30`) or `hr:min:sec`. Omitted ends mean from the start / to the end.
  */
 export interface Section {
   from?: number | string;
@@ -53,10 +56,10 @@ export interface Section {
 }
 
 /**
- * 필터 객체 → `--match-filters` 한 줄.
+ * Filter object → one `--match-filters` expression.
  *
- * `-f` 는 `[key=v][k2=v2]` 로 붙이고 이쪽은 ` & ` 로 잇는다. 있음/없음은
- * 대괄호 없이 `key` · `!key` 다.
+ * `-f` concatenates `[key=v][k2=v2]`; this joins with ` & `. Presence/absence is
+ * `key` · `!key`, without brackets.
  */
 function matchExpr(arg: MatchFields | string): string {
   if (typeof arg === 'string') return arg;
@@ -67,13 +70,13 @@ function matchExpr(arg: MatchFields | string): string {
   }).join(' & ');
 }
 
-/** `--cookies-from-browser` 의 브라우저 뒤 세 자리. 전부 안 줘도 된다. */
+/** The three slots after the browser in `--cookies-from-browser`. All optional. */
 export interface CookieFrom {
-  /** 리눅스에서 크로미움 계열 쿠키를 푸는 키체인. */
+  /** Keyring used to decrypt Chromium-based cookies on Linux. */
   keyring?: Keyring;
-  /** 프로필 이름이나 프로필 디렉터리 경로. */
+  /** Profile name or path to a profile directory. */
   profile?: string;
-  /** 파이어폭스 컨테이너 이름. */
+  /** Firefox container name. */
   container?: string;
 }
 export type { Filter, FormatNode } from './format-grammar.js';
@@ -82,17 +85,17 @@ export type { Issue } from './lint.js';
 const SEL_NAMES = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const FIELD_NAMES = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 
-// 이름 규칙은 생성기와 **같아야 한다**. 여기서 런타임 메서드 이름을, 저기서
-// 타입 이름을 만드는데 둘이 어긋나면 타입은 있고 메서드는 없는 칸이 생긴다.
-// 그래서 규칙 자체는 env-types.ts 에 한 벌만 두고 여기서는 내보내기만 한다.
+// The naming rule **must match** the generator's. Runtime method names are made
+// here and type names there; if they diverge you get slots with a type but no
+// method. So the rule lives once in env-types.ts and is only re-exported here.
 export { methodName, selMethod };
 
 /**
- * 명령어에 실제로 찍히는 형태.
+ * The form actually printed in the command.
  *
- * 짧은 게 있으면 짧은 것을 쓴다 — 사람이 손으로 쓰는 모양이 그쪽이고, 검사
- * 결과에 뜨는 플래그와도 같아야 눈으로 대조가 된다. 메서드 **이름**은 긴 쪽에서
- * 나온다(`-f` 가 아니라 `.format()`) — 코드는 읽으라고 있다.
+ * Uses the short flag when there is one — that's how people write it by hand, and
+ * it has to match the flags shown in check results to compare by eye. The method
+ * **name** comes from the long flag (`.format()`, not `-f`) — code is meant to be read.
  */
 const flagOf = (opt: Opt): string => opt.short || opt.flag;
 
@@ -104,17 +107,17 @@ const COND_OPS: Record<string, string> = {
 };
 
 /**
- * 필터 객체 → 필터 목록.
+ * Filter object → list of filters.
  *
- * 값을 그냥 주면 `=` 다. 문자열 비교가 열 가지라 매번 연산자를 적게 하면
- * 제일 흔한 경우(`ext: 'mp4'`)가 제일 시끄러워진다.
+ * A bare value means `=`. There are ten string comparisons; requiring an operator
+ * every time would make the most common case (`ext: 'mp4'`) the noisiest.
  */
 export function toFilters(spec?: Filters): Filter[] {
   const out: Filter[] = [];
   for (const [key, v] of Object.entries(spec || {})) {
     if (v == null) continue;
-    // `loose` 를 늘 채운다 — parseFilterBody 가 그렇게 낸다. 한 칸이라도
-    // 다르면 "빌더 트리 = 파서 트리"가 깨진다.
+    // Always fill in `loose` — parseFilterBody does. If a single slot differs,
+    // "builder tree = parser tree" breaks.
     if (v === true) { out.push({ key, op: 'has', loose: false, value: '' }); continue; }
     if (v === false) { out.push({ key, op: 'hasnot', loose: false, value: '' }); continue; }
     if (typeof v !== 'object') { out.push({ key, op: '=', loose: false, value: String(v) }); continue; }
@@ -130,51 +133,52 @@ export function toFilters(spec?: Filters): Filter[] {
 }
 
 /**
- * 식 노드 하나를 감싼 것.
+ * A wrapper around one expression node.
  *
- * 안에 든 트리가 `parseFormat` 이 내놓는 것과 **같은 모양**이다. 그래서 빌더로
- * 쓴 식과 문자열로 받은 식을 같은 자리에서 다룰 수 있다 — 읽기와 쓰기가 한
- * 문법을 공유한다는 뜻이고, 단위 테스트가 deepEqual 로 그걸 지킨다.
+ * The tree inside has **the same shape** as what `parseFormat` returns. So an
+ * expression written with the builder and one received as a string can be handled
+ * in the same place — reading and writing share one grammar, and unit tests guard
+ * that with deepEqual.
  */
 export class Expr {
   constructor(
-    /** 감싼 식 트리. `parseFormat` 이 내놓는 모양 그대로다. */
+    /** The wrapped expression tree, in exactly the shape `parseFormat` returns. */
     readonly node: FormatNode,
   ) {}
 
   private op(t: FormatOp, rest: Expr[]): Expr {
     const kids = [this.node, ...rest.map(r => r.node)];
-    // 같은 연산자가 이어지면 한 노드로 눕힌다 — a.plus(b).plus(c) 는
-    // ((a+b)+c) 가 아니라 a+b+c 로 나와야 손으로 쓴 것과 같아진다.
-    // 필터가 붙은 노드는 제 괄호를 쓰고 나오므로 안 눕힌다.
+    // Consecutive uses of the same operator flatten into one node — a.plus(b).plus(c)
+    // must come out as a+b+c, not ((a+b)+c), to match what a person would write.
+    // A node with filters emits its own parentheses, so it isn't flattened.
     const flat = this.node.t === t && !(this.node.filters || []).length
       ? [...(this.node as { kids: FormatNode[] }).kids, ...kids.slice(1)]
       : kids;
-    // 필터가 없으면 칸 자체를 안 만든다 — parseFormat 이 그렇게 낸다. 한 칸이라도
-    // 다르면 "빌더 트리 = 파서 트리"가 깨진다.
+    // With no filters, don't create the slot at all — parseFormat doesn't. If a
+    // single slot differs, "builder tree = parser tree" breaks.
     return new Expr({ t, kids: flat });
   }
 
-  /** `+` — 영상과 음성을 합친다. */
+  /** `+` — merges video and audio. */
   plus(...rest: Expr[]): Expr { return this.op('merge', rest); }
-  /** `/` — 앞엣것이 없으면 뒤엣것. */
+  /** `/` — the next one if the previous isn't available. */
   or(...rest: Expr[]): Expr { return this.op('fallback', rest); }
-  /** `,` — 둘 다 받는다. */
+  /** `,` — downloads both. */
   also(...rest: Expr[]): Expr { return this.op('multi', rest); }
 
-  /** 식 전체에 필터를 건다 — 괄호는 `emitTree` 가 알아서 붙인다. */
+  /** Applies filters to the whole expression — `emitTree` adds the parentheses. */
   where(spec: Filters): Expr {
     return new Expr({ ...this.node, filters: [...(this.node.filters || []), ...toFilters(spec)] });
   }
 
-  /** `-f` 에 줄 문자열 (`bv[height<=1080]+ba/b`). */
+  /** The string to pass to `-f` (`bv[height<=1080]+ba/b`). */
   toString(): string { return emitTree(this.node); }
 }
 
-/** `.format(f => …)` 의 `f`. 셀렉터마다 메서드가 하나씩 있다. */
+/** The `f` in `.format(f => …)`. One method per selector. */
 export interface FormatFactory extends GenFactory<Expr> {}
 
-/** 셀렉터마다 메서드 하나. 목록은 `SELECTORS` 에서 자란다. */
+/** One method per selector. The list grows from `SELECTORS`. */
 export function formatFactory(): FormatFactory {
   const f: Record<string, unknown> = {
     raw: (s: string) => new Expr({ t: 'sel', name: String(s), filters: [] }),
@@ -186,54 +190,54 @@ export function formatFactory(): FormatFactory {
   return f as unknown as FormatFactory;
 }
 
-/** `%(upload_date>%Y-%m-%d|Unknown)s` 한 칸. `output-template.ts` 의 필드 조각이다. */
+/** One `%(upload_date>%Y-%m-%d|Unknown)s` slot — the field piece from `output-template.ts`. */
 export type FieldPiece = Extract<OutNode, { t: 'field' }>;
 export type { OutNode };
 
 /**
- * `-o` 템플릿의 필드 한 칸 — `t.title` 이 주는 것.
+ * One field slot in a `-o` template — what `t.title` gives you.
  *
- * 메서드마다 새 조각을 돌려주므로 이어 붙여 쓴다(`t.upload_date.date('%Y').or('?')`).
+ * Each method returns a new piece, so calls chain (`t.upload_date.date('%Y').or('?')`).
  */
 export class Piece {
   constructor(
-    /** 감싼 필드 조각. `output-template.ts` 가 읽는 모양 그대로다. */
+    /** The wrapped field piece, in exactly the shape `output-template.ts` reads. */
     readonly p: FieldPiece,
   ) {}
   private with(patch: Partial<FieldPiece>): Piece { return new Piece({ ...this.p, ...patch }); }
 
-  /** `|` — 값이 없을 때 대신 쓸 것. */
+  /** `|` — what to use when the value is missing. */
   or(fallback: string): Piece { return this.with({ fallback: String(fallback) }); }
-  /** `>` — 날짜 서식 (`%Y-%m-%d`). */
+  /** `>` — date format (`%Y-%m-%d`). */
   date(strf: string): Piece { return this.with({ strf: String(strf) }); }
-  /** `.40S` — 자르고 파일명 안전하게. */
+  /** `.40S` — truncate and make filename-safe. */
   trunc(n: number): Piece { return this.with({ fmt: `.${n}`, conv: 'S' }); }
-  /** `%(playlist_index)03d` — 0으로 채운다. */
+  /** `%(playlist_index)03d` — zero-pad. */
   pad(n: number, conv: Conversion = 'd'): Piece { return this.with({ fmt: `0${n}`, conv }); }
-  /** 변환 글자를 직접. */
+  /** Set the conversion character directly. */
   as(conv: Conversion): Piece { return this.with({ conv }); }
 
-  /** 템플릿에 들어갈 문자열 (`%(title).40S`). */
+  /** The string that goes into the template (`%(title).40S`). */
   toString(): string { return emitPiece(this.p); }
 }
 
 const field = (name: string): Piece =>
   new Piece({ t: 'field', name, strf: '', fallback: null, fmt: '', conv: 's' });
 
-/** `` t`…` `` 태그가 만든 출력 템플릿 한 벌. */
+/** An output template produced by the `` t`…` `` tag. */
 export class Template {
   constructor(
-    /** 리터럴과 필드가 번갈아 놓인 조각들. */
+    /** Pieces alternating between literals and fields. */
     readonly pieces: OutNode[],
   ) {}
-  /** `-o` 에 줄 문자열 (`%(title)s [%(id)s].%(ext)s`). */
+  /** The string to pass to `-o` (`%(title)s [%(id)s].%(ext)s`). */
   toString(): string { return this.pieces.map(emitPiece).join(''); }
 }
 
-/** 태그드 템플릿 + 필드 접근자. `-o` 는 원래가 템플릿이라 이게 제일 맞는다. */
+/** Tagged template plus field accessors. `-o` is a template to begin with, so this fits best. */
 export interface OutTag extends OutFields<Piece> {
   (strings: TemplateStringsArray, ...values: (Piece | string | number)[]): Template;
-  /** 카탈로그에 없는 필드. */
+  /** A field not in the catalog. */
   field(name: string): Piece;
 }
 
@@ -258,24 +262,25 @@ export function outTag(): OutTag {
 
 interface Part { id: string; flag: string; value?: string }
 
-// -f · -o · -P · --cookies-from-browser 는 값 자체가 구조라 손으로 쓴 메서드가 맡는다.
+// -f · -o · -P · --cookies-from-browser take structured values, so hand-written methods handle them.
 const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser',
   'match-filters', 'break-match-filters', 'download-sections']);
 
 /**
- * 스키마에서 자란 184개 메서드가 여기 합쳐진다.
+ * The 184 methods grown from the schema are merged in here.
  *
- * 클래스와 인터페이스 선언 병합 — 런타임은 `grow()` 가 프로토타입에 심고,
- * 타입은 생성기가 낸다. 둘 다 스키마 한 곳에서 나오므로 어긋날 수 없다.
+ * Class and interface declaration merging — at runtime `grow()` plants them on the
+ * prototype, and the generator emits the types. Both come from the one schema, so
+ * they can't drift.
  */
 export interface Ytdlp extends Options {}
 
 export class Ytdlp {
-  /** 이 명령어가 대조하는 스키마. 인스턴스마다 제 것을 든다. */
+  /** The schema this command is checked against. Each instance holds its own. */
   readonly schema: Schema;
-  /** 받을 대상. 명령어 맨 끝에 붙는다. */
+  /** What to download. Appended at the very end of the command. */
   urls: string[] = [];
-  /** 놓인 플래그와 값. 쓴 순서 그대로 나간다. */
+  /** Placed flags and values, emitted in the order they were written. */
   parts: Part[] = [];
 
   constructor(schema: Schema, urls: string[] = []) {
@@ -283,21 +288,21 @@ export class Ytdlp {
     this.url(...urls);
   }
 
-  /** 옵션 하나를 스키마에서 꺼낸다. */
+  /** Looks up one option in the schema. */
   private opt(id: string): Opt { return this.schema.byId[id]!; }
 
-  /** URL 을 더한다. 늘 명령어 끝에 온다. */
+  /** Adds URLs. They always go at the end of the command. */
   url(...urls: string[]): this {
     for (const u of urls) if (u) this.urls.push(String(u));
     return this;
   }
 
   /**
-   * 플래그 하나를 자리에 놓는다.
+   * Places one flag.
    *
-   * 같은 옵션을 두 번 주면 **자리를 지키며 덮어쓴다.** 뒤에 붙이면 코드에서
-   * 고친 순서가 명령어 순서를 바꿔서, 한 줄 고쳤는데 diff 가 두 줄 난다.
-   * repeatable 만 쌓인다.
+   * Giving the same option twice **overwrites it in place.** Appending instead would
+   * let edit order in code reorder the command, so changing one line produces a
+   * two-line diff. Only repeatable options accumulate.
    */
   place(id: string, flag: string, value?: string): this {
     if (this.opt(id).kind !== 'repeatable') {
@@ -308,16 +313,16 @@ export class Ytdlp {
     return this;
   }
 
-  /** 옵션 id 로 놓인 플래그를 뺀다. 없으면 아무 일도 안 한다. */
+  /** Removes the flag placed for an option id. Does nothing if absent. */
   drop(id: string): this {
     this.parts = this.parts.filter(p => p.id !== id);
     return this;
   }
 
   /**
-   * `-f` — 포맷 셀렉터.
+   * `-f` — format selector.
    *
-   * @example 식으로
+   * @example As an expression
    * ```ts
    * import { ytdlp } from 'ytstudio';
    *
@@ -328,7 +333,7 @@ export class Ytdlp {
    * ```
    */
   format(build: (f: FormatFactory) => Expr): this;
-  /** `-f` 를 문자열로 직접. 문법은 `.lint()` 가 본다. */
+  /** `-f` as a raw string. `.lint()` checks the grammar. */
   format(selector: string): this;
   format(arg: string | ((f: FormatFactory) => Expr)): this {
     const v = typeof arg === 'function' ? String(arg(formatFactory())) : String(arg);
@@ -336,9 +341,9 @@ export class Ytdlp {
   }
 
   /**
-   * `-o` — 출력 템플릿.
+   * `-o` — output template.
    *
-   * @example 태그드 템플릿으로
+   * @example As a tagged template
    * ```ts
    * import { ytdlp } from 'ytstudio';
    *
@@ -349,9 +354,9 @@ export class Ytdlp {
    * ```
    */
   output(build: (t: OutTag) => Template): this;
-  /** 종류별 템플릿 (`thumbnail:…`). */
+  /** A template for one file type (`thumbnail:…`). */
   output(type: OutType, build: (t: OutTag) => Template): this;
-  /** `-o` 를 문자열로 직접. */
+  /** `-o` as a raw string. */
   output(template: string): this;
   output(a: unknown, b?: unknown): this {
     const [type, arg] = b === undefined ? ['', a] : [a as string, b];
@@ -361,7 +366,7 @@ export class Ytdlp {
     return this.place('output', flagOf(this.opt('output')), type ? `${type}:${text}` : text);
   }
 
-  /** `-P` — 종류별 저장 경로. */
+  /** `-P` — download paths per file type. */
   paths(map: PathMap): this {
     for (const [type, path] of Object.entries(map || {})) {
       if (path == null) continue;
@@ -371,13 +376,13 @@ export class Ytdlp {
   }
 
   /**
-   * `--cookies-from-browser` — 브라우저에서 쿠키를 읽어 온다.
+   * `--cookies-from-browser` — loads cookies from a browser.
    *
-   * 값이 `BROWSER[+KEYRING][:PROFILE][::CONTAINER]` 라 자리가 넷이다. 문자열로
-   * 이어 붙이면 `::` 와 `:` 를 헷갈리기 쉬워서 자리마다 이름을 붙였다 —
-   * 프로필 없이 컨테이너만 주는 형태(`firefox::Personal`)가 특히 그렇다.
+   * The value is `BROWSER[+KEYRING][:PROFILE][::CONTAINER]`, four slots. Joining
+   * them as a string makes it easy to mix up `::` and `:`, so each slot gets a
+   * name — especially for a container without a profile (`firefox::Personal`).
    *
-   * @example 자리마다 이름으로
+   * @example Slots by name
    * ```ts
    * import { ytdlp } from 'ytstudio';
    *
@@ -400,12 +405,13 @@ export class Ytdlp {
   }
 
   /**
-   * `--match-filters` — 조건에 맞는 영상만 받는다.
+   * `--match-filters` — downloads only videos matching the conditions.
    *
-   * **연산자는 `-f` 필터와 같고 필드는 `-o` 템플릿과 같다** — yt-dlp 가 그렇게
-   * 정의한다. 그래서 `toFilters` 를 그대로 쓴다. 여러 번 주면 OR 이다.
+   * **The operators are the same as `-f` filters and the fields the same as `-o`
+   * templates** — that's how yt-dlp defines it. So `toFilters` is reused as-is.
+   * Giving it multiple times means OR.
    *
-   * @example 객체로
+   * @example As an object
    * ```ts
    * import { ytdlp } from 'ytstudio';
    *
@@ -414,21 +420,21 @@ export class Ytdlp {
    * ```
    */
   matchFilters(spec: MatchFields): this;
-  /** 카탈로그 밖의 필드를 쓸 때. 여러 개를 주면 OR 이다 — yt-dlp 가 그렇게 읽는다. */
+  /** For fields outside the catalog. Several mean OR — that's how yt-dlp reads them. */
   matchFilters(...exprs: string[]): this;
   matchFilters(...args: [MatchFields] | string[]): this {
     return this.pushAll('match-filters', args);
   }
 
-  /** `--break-match-filters` — 위와 같은데, 걸리면 **거기서 멈춘다.** */
+  /** `--break-match-filters` — like the above, but **stops right there** on a non-match. */
   breakMatchFilters(spec: MatchFields): this;
-  /** 카탈로그 밖의 필드를 쓸 때. 걸리면 거기서 멈춘다. */
+  /** For fields outside the catalog. Stops right there on a non-match. */
   breakMatchFilters(...exprs: string[]): this;
   breakMatchFilters(...args: [MatchFields] | string[]): this {
     return this.pushAll('break-match-filters', args);
   }
 
-  /** 필터 인자들을 하나씩 쌓는다. repeatable 이라 `place` 가 밀어 넣는다. */
+  /** Stacks filter arguments one by one. The option is repeatable, so `place` appends. */
   private pushAll(id: string, args: [MatchFields] | string[]): this {
     const flag = flagOf(this.opt(id));
     for (const a of args) this.place(id, flag, matchExpr(a as MatchFields | string));
@@ -436,12 +442,12 @@ export class Ytdlp {
   }
 
   /**
-   * `--download-sections` — 영상의 일부만 받는다.
+   * `--download-sections` — downloads only part of a video.
    *
-   * 객체를 주면 시간 구간(`*시작-끝`)이고, 문자열을 주면 **챕터 제목 정규식**이다.
-   * 둘이 완전히 다른 뜻이라 별표를 손으로 붙이게 두지 않았다.
+   * An object is a time range (`*start-end`); a string is **a regex on chapter titles**.
+   * They mean entirely different things, so the asterisk isn't left to be added by hand.
    *
-   * @example 시간 구간
+   * @example Time range
    * ```ts
    * import { ytdlp } from 'ytstudio';
    *
@@ -452,16 +458,16 @@ export class Ytdlp {
    * // yt-dlp --download-sections "*60-inf" https://youtu.be/abc
    * ```
    *
-   * @example 챕터 제목
+   * @example Chapter title
    * ```ts
    * import { ytdlp } from 'ytstudio';
    *
-   * ytdlp('https://youtu.be/abc').downloadSections('인트로').build();
-   * // yt-dlp --download-sections "인트로" https://youtu.be/abc
+   * ytdlp('https://youtu.be/abc').downloadSections('Intro').build();
+   * // yt-dlp --download-sections Intro https://youtu.be/abc
    * ```
    */
   downloadSections(range: Section): this;
-  /** 제목이 이 정규식에 맞는 챕터만 받는다. */
+  /** Downloads only chapters whose title matches this regex. */
   downloadSections(chapter: string): this;
   downloadSections(arg: Section | string): this {
     const id = 'download-sections';
@@ -470,10 +476,10 @@ export class Ytdlp {
     return this.place(id, flagOf(this.opt(id)), v);
   }
 
-  /** 지금까지 쌓은 것을 그대로 복사한다. */
+  /** Copies everything built so far. */
   clone(): this {
-    // new Ytdlp() 로 만들면 자란 메서드가 없는 껍데기가 된다 — 옵션 메서드는
-    // 스키마마다 만든 하위 클래스의 프로토타입에 심겨 있다.
+    // new Ytdlp() would be a shell without the grown methods — option methods live
+    // on the prototype of the subclass made per schema.
     const Self = this.constructor as new (schema: Schema) => this;
     const c = new Self(this.schema);
     c.urls = [...this.urls];
@@ -482,16 +488,16 @@ export class Ytdlp {
   }
 
   /**
-   * 플래그와 값을 토큰으로.
+   * Flags and values as tokens.
    *
-   * 값이 `-` 로 시작하면 **붙여서** 낸다(`--compat-options=-multistreams`).
-   * 떼어 놓으면 optparse 는 받지만 — 다음 토큰을 그냥 값으로 삼는다 — 읽는
-   * 쪽에서는 플래그와 구분이 안 된다. 실제로 이 저장소의 검증기가 그걸
-   * "없는 플래그"로 잡았다. **빌더가 낸 것을 제 검증기가 거부하면** 그건
-   * 검증기가 아니라 빌더가 틀린 것이다.
+   * A value starting with `-` is emitted **attached** (`--compat-options=-multistreams`).
+   * Detached, optparse still accepts it — it just takes the next token as the value —
+   * but a reader can't tell it from a flag. This repo's checker actually flagged it
+   * as an "unknown flag". **If the builder's output is rejected by its own checker,**
+   * it's the builder that's wrong, not the checker.
    *
-   * `-` 로 빼는 형태는 `--compat-options all,-multistreams` 처럼 목록에서
-   * 빼는 옵션들에서 나온다.
+   * The `-` subtracting form comes from options that remove entries from a list,
+   * like `--compat-options all,-multistreams`.
    */
   private tokens(esc: (v: string) => string): string[] {
     const out: string[] = [];
@@ -504,41 +510,42 @@ export class Ytdlp {
     return out;
   }
 
-  /** `spawn` 에 넘길 argv. 따옴표를 안 붙인다 — 셸을 안 거치므로 붙이면 값에 남는다. */
+  /** argv to pass to `spawn`. No quotes — there's no shell, so quotes would stay in the value. */
   toArray(): string[] {
     return [...this.tokens(v => v), ...this.urls];
   }
 
-  /** 셸에 붙여넣을 한 줄. 공백이 든 값은 따옴표로 감싼다. */
+  /** One line to paste into a shell. Values containing spaces are quoted. */
   build(): string {
     return ['yt-dlp', ...this.tokens(quote), ...this.urls].join(' ');
   }
 
   /**
-   * 만든 명령어를 검증기에 돌린다.
+   * Runs the built command through the checker.
    *
-   * 타입이 이미 없는 플래그와 choices 를 막았으므로 여기 남는 건 **조합**이다 —
-   * `-x` 인데 `-f` 가 영상 전용이라든가, `--embed-subs` 만 있고 자막은 안 받는다든가.
-   * 타입이 못 보는 층이라 빌더가 있어도 검증기가 없어지지 않는다.
+   * Types already block unknown flags and choices, so what's left here is
+   * **combinations** — `-x` with a video-only `-f`, or `--embed-subs` without
+   * downloading subtitles. Types can't see this layer, which is why the checker
+   * doesn't go away just because there's a builder.
    */
   lint(): { ok: boolean; issues: Issue[] } {
     const { ok, issues } = lintCommand(this.schema, this.build());
     return { ok, issues };
   }
 
-  /** {@linkcode Ytdlp.build} 와 같다. */
+  /** Same as {@linkcode Ytdlp.build}. */
   toString(): string { return this.build(); }
 }
 
 /**
- * 184개 메서드를 스키마에서 길러 프로토타입에 심는다.
+ * Grows the 184 methods from the schema and plants them on a prototype.
  *
- * 손으로 적은 목록이 없다는 게 요점이다 — yt-dlp 가 옵션을 더하면
- * `gen_schema.py` 와 `gen_options.ts` 를 다시 돌리는 것만으로 메서드와 타입이
- * 같이 생긴다.
+ * The point is that there's no hand-written list — when yt-dlp adds an option,
+ * rerunning `gen_schema.py` and `gen_options.ts` is all it takes for the method and
+ * its type to appear together.
  *
- * **프로토타입을 인자로 받는다.** 스키마마다 옵션 목록이 다를 수 있으므로
- * `Ytdlp.prototype` 한 곳에 심으면 나중 스키마가 앞엣것을 덮는다.
+ * **Takes the prototype as an argument.** Option lists can differ per schema, so
+ * planting on `Ytdlp.prototype` alone would let a later schema overwrite an earlier one.
  */
 function grow(schema: Schema, proto: Record<string, unknown>): void {
   for (const opt of schema.opts) {
@@ -548,7 +555,7 @@ function grow(schema: Schema, proto: Record<string, unknown>): void {
       opt.kind === 'flag'
         ? function (this: Ytdlp, on = true) {
           if (on) return this.place(opt.id, flagOf(opt));
-          // 부정형이 있으면 명시적으로 끄고, 없으면 끄는 길이 "안 주는 것"뿐이다
+          // With a negated form, turn it off explicitly; otherwise "not passing it" is the only way off
           return opt.negation ? this.place(opt.id, opt.negation) : this.drop(opt.id);
         }
         : opt.kind === 'repeatable'
@@ -563,11 +570,11 @@ function grow(schema: Schema, proto: Record<string, unknown>): void {
 }
 
 /**
- * 스키마 하나에 묶인 `ytdlp()` 를 만든다.
+ * Creates a `ytdlp()` bound to one schema.
  *
- * 스키마마다 **제 하위 클래스**를 만들어 거기에 메서드를 심는다. 그래서 스키마
- * 둘을 나란히 들어도 서로의 메서드를 덮지 않는다 — 예전에는 `Ytdlp.prototype`
- * 한 곳에 심어서 나중 것이 이겼다.
+ * Each schema gets **its own subclass** with the methods planted there. So two
+ * schemas held side by side don't overwrite each other's methods — previously they
+ * were planted on `Ytdlp.prototype` alone and the later one won.
  */
 export function makeYtdlp(schema: Schema): (...urls: string[]) => Ytdlp {
   class Bound extends Ytdlp {}

@@ -1,14 +1,16 @@
 /**
- * 파일 시스템이 없는 곳에서 쓰는 입구 — 브라우저 · 엣지 런타임.
+ * The entry point for places without a file system — browsers and edge runtimes.
  *
- * `ytstudio` 본체(`index.ts`)가 하는 일 가운데 노드가 필요한 것은 **스키마를
- * 어디서 집을까**뿐이다 — 환경변수, 작업 디렉터리, 패키지에 실린 파일. 그
- * 한 겹만 걷어내면 나머지는 전부 순수하다. 그래서 이 파일이 진짜 알맹이고
- * `index.ts` 는 여기에 파일 읽기를 얹은 것이다.
+ * Of everything the main `ytstudio` entry (`index.ts`) does, the only part
+ * that needs Node is **where to pick the schema up from** — env var, working
+ * directory, the file shipped with the package. Peel off that one layer and
+ * the rest is pure. So this file is the real substance, and `index.ts` is file
+ * reading layered on top of it.
  *
- * 여기서는 스키마를 **직접 준다.** 찾아 줄 곳이 없으니 물어보지 않는다.
+ * Here you **pass the schema directly.** There is nowhere to look it up, so it
+ * doesn't ask.
  *
- * @example 스키마를 받아 와서
+ * @example Fetching the schema
  * ```ts
  * import { studio } from 'ytstudio/browser';
  *
@@ -30,72 +32,74 @@ import type { Item } from './core/command.js';
 import type { Explained, Suggestion } from './core/explain.js';
 import type { LintResult, Values } from './core/lint.js';
 
-/** 스키마를 어디서 읽었나. */
+/** Where the schema was read from. */
 export type SchemaOrigin =
-  /** `YTSTUDIO_SCHEMA` 가 가리킨 곳 */
+  /** Wherever `YTSTUDIO_SCHEMA` points */
   | 'env'
-  /** 작업 디렉터리의 `ytstudio.schema.json` */
+  /** `ytstudio.schema.json` in the working directory */
   | 'local'
-  /** 패키지에 같이 실려 온 것 */
+  /** The one shipped with the package */
   | 'bundled'
-  /** 손님이 손에 들고 넘긴 것 — 찾은 적이 없다 */
+  /** Handed over directly by users — never looked up */
   | 'given';
 
 /**
- * 지금 검증기가 무엇에 대조하고 있는지.
+ * What the checker is currently checking against.
  *
- * 이 패키지에는 층이 둘인데 **둘의 출처가 다를 수 있다.**
+ * This package has two layers, and **they may come from different sources.**
  *
- *   · **런타임** (`lint` · `ytdlp()` 메서드) 은 넘겨받은 스키마를 보므로
- *     당신이 깐 yt-dlp 를 볼 수 있다.
- *   · **타입** (`.d.ts` · 자동완성) 은 패키지를 구울 때 이미 박혔다. 바꿀 수 없다.
+ * - The **runtime** (`lint`, `ytdlp()` methods) looks at the schema it was
+ *   given, so it can see the yt-dlp you installed.
+ * - The **types** (`.d.ts`, autocomplete) were baked in when the package was
+ *   built. They can't change.
  *
- * `stale` 이 참이면 그 둘이 갈렸다는 뜻이다 — 검사 결과는 당신의 yt-dlp 기준으로
- * 맞지만, 에디터가 주는 목록은 `typesVersion` 기준이라 어긋난다.
+ * `stale` being true means the two have diverged — check results are right for
+ * your yt-dlp, but the list your editor offers is based on `typesVersion`.
  */
 export interface SchemaSource {
-  /** 스키마를 어디서 읽었나. */
+  /** Where the schema was read from. */
   from: SchemaOrigin;
-  /** 실제로 읽은 파일의 절대 경로. 직접 준 것이면 그렇다고 적힌다. */
+  /** Absolute path of the file actually read. If passed directly, it says so. */
   path: string;
-  /** 검증기가 대조하는 yt-dlp 버전. */
+  /** The yt-dlp version the checker checks against. */
   version: string;
-  /** 타입과 자동완성이 나온 yt-dlp 버전. 패키지에 박혀 있다. */
+  /** The yt-dlp version the types and autocomplete came from. Baked into the package. */
   typesVersion: string;
-  /** 둘이 다른가. 참이면 자동완성을 믿을 수 없다. */
+  /** Whether the two differ. If true, autocomplete can't be trusted. */
   stale: boolean;
 }
 
 /**
- * 스키마 하나에 묶인 손잡이. 이 패키지의 입구다.
+ * A handle bound to a single schema. The entry point of this package.
  *
- * 여기 있는 것 전부가 **같은 스키마**를 본다. 손잡이를 둘 만들면 스키마 둘을
- * 나란히 들 수 있고, 서로를 안 건드린다.
+ * Everything here sees **the same schema**. Build two handles and you can hold
+ * two schemas side by side without them touching each other.
  */
 export interface Ytstudio {
-  /** 어디서 왔든 명령어 문자열을 검사한다. */
+  /** Checks a command string, wherever it came from. */
   lint(text: string): LintResult;
-  /** 코드로 명령어를 만든다. */
+  /** Writes a command in code. */
   ytdlp(...urls: string[]): Ytdlp;
-  /** 명령어 문자열 → 항목 수열. */
+  /** Command string → sequence of items. */
   scan(text: string): { head: string | null; items: Item[] };
-  /** 토큰마다 무슨 옵션인지. */
+  /** Which option each token is. */
   explain(items: Item[]): Explained[];
-  /** 지금 조합에서 이어서 줄 만한 것. */
+  /** What would come next for the current combination. */
   suggest(values: Values, limit?: number): Suggestion[];
-  /** 오타라면 무엇을 쓰려던 건가. */
+  /** If it's a typo, what was meant. */
   nearest(flag: string, limit?: number): string[];
-  /** 이 손잡이가 무엇에 대조하는지. */
+  /** What this handle checks against. */
   readonly source: SchemaSource;
-  /** 색인까지 붙은 스키마. 직접 뒤져야 할 때만. */
+  /** The schema with its indexes. Only when you need to dig through it yourself. */
   readonly schema: Schema;
 }
 
 /**
- * 스키마 한 벌에 손잡이 하나.
+ * One handle per schema.
  *
- * 출처(`source`)를 같이 줄 수 있다 — `index.ts` 가 파일에서 찾아왔을 때
- * 어디서 찾았는지를 여기 얹는다. 안 주면 "직접 준 것"이다.
+ * You can pass the origin (`source`) along — when `index.ts` found the schema
+ * in a file, it attaches where it found it here. Omitted, it means "passed
+ * directly".
  */
 export function studio(raw: RawSchema, source?: SchemaSource): Ytstudio {
   const schema = buildSchema(raw);
@@ -113,7 +117,7 @@ export function studio(raw: RawSchema, source?: SchemaSource): Ytstudio {
   };
 }
 
-/** 찾은 적 없이 손에 들고 온 스키마의 출처. */
+/** The origin of a schema handed over directly, never looked up. */
 export const given = (raw: RawSchema): SchemaSource => ({
   from: 'given',
   path: '(직접 준 것)',
@@ -122,10 +126,10 @@ export const given = (raw: RawSchema): SchemaSource => ({
   stale: raw.ytdlp_version !== TYPES_VERSION,
 });
 
-/** 자동완성과 `.d.ts` 가 나온 yt-dlp 버전. 패키지를 구울 때 박힌다. */
+/** The yt-dlp version autocomplete and the `.d.ts` came from. Baked in when the package is built. */
 export { TYPES_VERSION } from './core/options.gen.js';
 
-/** 스키마를 안 보는 것들 — 문자열만 다룬다. */
+/** Things that don't look at the schema — they only handle strings. */
 export { tokenize, quote } from './core/command.js';
 export { distance, LEVELS } from './core/lint.js';
 export { previewFilename, DEFAULT_OUTTMPL } from './core/explain.js';
@@ -136,10 +140,11 @@ export type { Item, UnknownWhy } from './core/command.js';
 export type { Opt, OptKind, RawSchema, Schema, SchemaFrom, Stage } from './core/schema.js';
 
 /**
- * 식과 조각의 타입.
+ * Types of expressions and pieces.
  *
- * 값으로는 안 내보낸다 — `f.bv()` 와 `t.title` 이 이미 만들어서 주므로 손님이
- * `new` 할 일이 없다. 대신 헬퍼 함수 시그니처에 적을 일은 있어서 타입은 낸다.
+ * Not exported as values — `f.bv()` and `t.title` already build them, so users
+ * never need to `new` one. They do need to write them in helper function
+ * signatures, so the types go out.
  */
 export type { Expr, FormatFactory, OutTag, Piece, Template, Ytdlp } from './core/build.js';
 export type {

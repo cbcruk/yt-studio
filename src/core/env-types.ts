@@ -1,50 +1,54 @@
 /**
- * 스키마 → 옵션 메서드의 타입 선언.
+ * Schema → type declarations for option methods.
  *
- * 같은 일을 하는 자리가 둘이라 여기 모았다.
+ * Two places do the same job, so it lives here.
  *
- *   · `gen_options.ts` 가 저장소를 구울 때 — 옵션 191개 전부를 `Options` 로
- *   · `ytstudio types` 가 손님 환경에서 — **번들과 달라진 것만** 확장 선언으로
+ * - `gen_options.ts`, when this repo is built — all 191 options as `Options`
+ * - `ytstudio types`, in the user's environment — **only what differs from the
+ *   bundle**, as an augmentation
  *
- * 둘이 같은 이름과 같은 시그니처를 내야 한다. 규칙이 두 벌이면 타입은 있는데
- * 메서드는 없는 칸이 생긴다 — 그래서 `methodName` 도 여기 하나만 둔다.
+ * Both must emit the same names and the same signatures. With two sets of rules
+ * you get slots where the type exists but the method doesn't — so `methodName`
+ * also lives only here.
  *
- * 이 모듈은 아무것도 import 하지 않는다(타입만 빼고). 생성기가 이걸 쓰는데
- * 생성물에 기대면 `options.gen.ts` 가 없을 때 생성기가 못 돈다.
+ * This module imports nothing (types aside). The generator uses it, and if it
+ * relied on generated output, the generator couldn't run when `options.gen.ts`
+ * is missing.
  */
 import { argType } from './arg-types.js';
 import { NOTES } from './option-notes.js';
 import type { Opt } from './schema.js';
 
-/** `--embed-subs` → `embedSubs`. 짧은 플래그는 안 쓴다 — 코드는 읽으라고 있다. */
+/** `--embed-subs` → `embedSubs`. Short flags aren't used — code is meant to be read. */
 export const methodName = (flag: string): string =>
   String(flag).replace(/^--?/, '').replace(/-+([a-z0-9])/g, (_, c: string) => c.toUpperCase());
 
-/** `bv*` → `bvStar`. 새 이름을 지어내면 yt-dlp 문서와 대조가 안 된다. */
+/** `bv*` → `bvStar`. Inventing new names would make them impossible to look up in yt-dlp's docs. */
 export const selMethod = (sel: string): string => sel.replace('*', 'Star');
 
 /**
- * 도움말을 JSDoc 안에 안전하게 넣는다.
+ * Makes help text safe to put inside JSDoc.
  *
- * 닫는 기호가 그대로 들어오면 주석이 거기서 끝나 버린다 — 예전에 생성기가
- * 그것 때문에 한 번 깨졌다.
+ * If the closing marker comes through as-is, the comment ends right there — the
+ * generator broke on that once.
  */
 export const doc = (s: string): string =>
   String(s || '').replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
 
 export const union = (xs: readonly string[]): string => xs.map(x => `'${x}'`).join(' | ');
 
-/** `-f` · `-o` · `-P` · `--cookies-from-browser` 는 값 자체가 구조라 `build.ts` 가
- * 손으로 쓴 시그니처를 갖는다. 다만 어휘는 스키마에서 온다. */
+/** `-f` · `-o` · `-P` · `--cookies-from-browser` take structured values, so their
+ * signatures are hand-written in `build.ts`. The vocabulary still comes from the schema. */
 export const HAND_WRITTEN = new Set(['format', 'output', 'paths', 'cookies-from-browser',
   'match-filters', 'break-match-filters', 'download-sections']);
 
-/** 옵션 하나의 메서드 선언. JSDoc 까지 붙는다 — 자동완성에 뜨는 도움말이 이것이다. */
+/** Method declaration for one option, JSDoc included — this is the help autocomplete shows. */
 export function optionMethod(o: Opt, extra?: string): string {
   const name = methodName(o.flag);
   const alias = [o.short, ...(o.aliases || [])].filter(Boolean);
-  // 한국어 한 줄이 있으면 앞에 세우고 yt-dlp 의 말을 뒤에 둔다. 원문이 진실이고
-  // 우리 것은 길잡이라서 순서가 그렇다. 없으면 지금까지처럼 원문만 뜬다.
+  // If we have a short guide line, it goes first and yt-dlp's own text follows. The
+  // original is the truth and ours is a signpost, hence the order. Without one,
+  // only the original shows, as before.
   const note = NOTES[o.id];
   const head = `\`${o.flag}\`${alias.length ? ` (${alias.join(' · ')})` : ''}`;
   const lines = note
@@ -60,21 +64,22 @@ export function optionMethod(o: Opt, extra?: string): string {
 }
 
 /**
- * 받는 값의 타입.
+ * Type of the value taken.
  *
- * 고를 수 있는 값이 정해져 있으면 `Arg` 대신 그 유니온이다 — 목록은 yt-dlp 를
- * 리플렉션한 것이라(`gen_schema.py`) 지어낸 것이 아니다.
+ * When the allowed values are fixed, it's that union instead of `Arg` — the list
+ * is reflected from yt-dlp (`gen_schema.py`), not made up.
  *
- * `repeatable` 이면서 목록이 있는 것들(`--compat-options` · `--sponsorblock-*`)은
- * **앞에 `-` 를 붙여 뺄 수 있다** — `all` 로 다 켠 다음 몇 개를 빼는 게 흔한
- * 쓰임이라서다. 그래서 유니온에 뺀 형태를 같이 낸다.
+ * `repeatable` options that have a list (`--compat-options` · `--sponsorblock-*`)
+ * **can subtract an entry with a leading `-`** — turning everything on with `all`
+ * and then removing a few is common usage. So the union includes the subtracted
+ * forms too.
  */
 function signature(o: Opt): string {
   if (o.kind === 'flag') return 'on?: boolean';
 
-  // 어휘 위의 문법(`aac>mp3/best`)은 유니온으로 닫으면 안 된다 — 멀쩡한 값이
-  // 타입 오류가 된다. `| (string & {})` 는 아무 문자열이나 받으면서도 **어휘는
-  // 자동완성에 띄운다**. 문법 자체는 검증기가 본다.
+  // A grammar over a vocabulary (`aac>mp3/best`) must not be closed into a union — valid
+  // values would become type errors. `| (string & {})` accepts any string while
+  // **still surfacing the vocabulary in autocomplete**. The checker handles the grammar.
   if (o.rule) return `value: ${union(o.rule.vocab)} | (string & {})`;
 
   const one = o.choices?.length ? union(o.choices) : (argType(o) ?? 'Arg');
@@ -84,37 +89,38 @@ function signature(o: Opt): string {
 }
 
 export interface EnvTypes {
-  /** 손님이 깐 yt-dlp 버전. */
+  /** Version of the yt-dlp the user installed. */
   version: string;
-  /** 번들에 없던 옵션 — 이것들이 메서드로 생긴다. */
+  /** Options not in the bundle — these become methods. */
   added: Opt[];
-  /** 번들에 있었는데 사라진 옵션 — 지울 수는 없어서 취소선만 긋는다. */
+  /** Options in the bundle that are gone — they can't be removed, so they only get struck through. */
   removed: Opt[];
 }
 
 /**
- * 프로젝트 루트에 놓을 `ytstudio-env.d.ts` 한 장.
+ * The `ytstudio-env.d.ts` file to drop in the project root.
  *
- * **맨 위 `import 'ytstudio'` 가 없으면 안 된다.** 그게 없으면 이 파일이 모듈이
- * 아니라서 `declare module` 이 확장이 아니라 **앰비언트 선언**이 되고, 진짜
- * 패키지를 통째로 가려 버린다(`has no exported member 'ytdlp'`).
+ * **The `import 'ytstudio'` at the top is mandatory.** Without it the file isn't a
+ * module, so `declare module` becomes an **ambient declaration** rather than an
+ * augmentation, and shadows the real package entirely
+ * (`has no exported member 'ytdlp'`).
  *
- * 확장은 **더하기만** 된다. 사라진 옵션을 지울 방법은 없으므로 같은 시그니처로
- * 다시 선언하면서 `@deprecated` 를 붙인다 — 에디터가 취소선을 긋는다.
+ * Augmentation **only adds**. There's no way to delete a removed option, so it is
+ * redeclared with the same signature plus `@deprecated` — the editor strikes it through.
  */
 export function emitEnvTypes(e: EnvTypes): string {
-  // optionMethod 는 최상위 인터페이스(Options)용이라 2칸이다. 여기서는 확장
-  // 블록 안이라 한 단계 더 들어간다.
+  // optionMethod is indented 2 spaces for the top-level interface (Options). Here
+  // it sits inside the augmentation block, one level deeper.
   const body = [
     ...e.added.filter(o => !HAND_WRITTEN.has(o.id)).map(o => optionMethod(o)),
     ...e.removed.filter(o => !HAND_WRITTEN.has(o.id)).map(o =>
-      optionMethod(o, `@deprecated yt-dlp ${e.version} 에 없는 옵션이다`)),
+      optionMethod(o, `@deprecated not an option in yt-dlp ${e.version}`)),
   ].map(m => m.split('\n').map(l => `  ${l}`).join('\n'));
 
-  return `// 이 파일은 \`ytstudio types\` 가 만든다. 손으로 고치지 말 것.
-// yt-dlp ${e.version} · --help 리플렉션 · 새로 ${e.added.length} · 사라짐 ${e.removed.length}
+  return `// Generated by \`ytstudio types\`. Do not edit by hand.
+// yt-dlp ${e.version} · reflected from --help · added ${e.added.length} · removed ${e.removed.length}
 //
-// tsconfig.json 의 include 가 이 파일을 덮어야 먹는다. 안 덮으면 조용히 무시된다.
+// tsconfig.json's include must cover this file, or it is silently ignored.
 import 'ytstudio';
 
 declare module 'ytstudio' {

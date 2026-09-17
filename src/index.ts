@@ -1,27 +1,30 @@
 /**
- * 설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.
+ * A typed builder and command checker built by reflecting the installed yt-dlp.
  *
- * 내보내는 것이 둘이다.
+ * It exports two things.
  *
- * - **빌더** — 코드로 명령어를 만든다. 타입이 옵션 카탈로그다.
- * - **검증기** — 어디서 왔든 명령어 문자열을 검사한다.
+ * - **Builder** — writes commands in code. The types are the option catalog.
+ * - **Checker** — checks a command string, wherever it came from.
  *
- * 둘째가 빠지면 안 된다. 빌더는 빌더로 쓴 것만 보지만, 블로그에서 주웠거나
- * 동료가 붙여넣었거나 LLM 이 준 명령어는 문자열로 온다. 그걸 설치된 yt-dlp 에
- * 대조하는 게 이 패키지가 하는 유일무이한 일이다.
+ * The second one must not go missing. The builder only sees what was written
+ * with the builder, but commands picked up from a blog, pasted by a colleague,
+ * or handed over by an LLM arrive as strings. Checking those against the
+ * installed yt-dlp is the one thing only this package does.
  *
- * **이 파일이 얹는 것은 스키마를 어디서 집을까 한 겹뿐이다.** 알맹이는
- * `browser.ts` 에 있고 여기서 전부 다시 내보낸다 — 그쪽은 파일 시스템을 모르므로
- * 브라우저에서도 돈다(`ytstudio/browser`).
+ * **All this file adds is one layer: where to pick the schema up from.** The
+ * substance lives in `browser.ts` and is re-exported here in full — that side
+ * knows nothing of the file system, so it runs in the browser too
+ * (`ytstudio/browser`).
  *
- * **로컬 우선**이다 — 작업 디렉터리에 `ytstudio.schema.json` 이 있으면 그걸 보고,
- * 없으면 패키지에 실려 온 것을 본다. 자세한 것은 `SchemaSource`.
+ * **Local first** — if the working directory has `ytstudio.schema.json`, that
+ * is used; otherwise the one shipped with the package. See `SchemaSource`.
  *
- * 스키마는 **값**이라 손잡이(`ytstudio()`)가 들고 다닌다. 평평한 함수들
- * (`lintCommand` 등)은 게으르게 만든 기본 손잡이에 얹혀 있다 — 편의일 뿐
- * 특별한 것이 아니라서, 손잡이를 직접 만들면 스키마 둘을 나란히 들 수 있다.
+ * The schema is a **value**, so a handle (`ytstudio()`) carries it around. The
+ * flat functions (`lintCommand` etc.) sit on a lazily built default handle —
+ * that is a convenience, nothing special, so building handles yourself lets
+ * you hold two schemas side by side.
  *
- * @example 만들고 검사하기
+ * @example Build and check
  * ```ts
  * import { ytdlp, lintCommand } from 'ytstudio';
  *
@@ -51,32 +54,32 @@ import type { LintResult, Values } from './core/lint.js';
 export * from './browser.js';
 
 /**
- * 로컬 스키마 파일 이름.
+ * File name of the local schema.
  *
- * 그냥 `schema.json` 이면 남의 프로젝트 루트에서 JSON Schema 와 부딪힌다 —
- * 흔한 이름이다. 이름에 패키지를 박아 두면 그 자리에 있는 이유가 파일 이름에
- * 적혀 있다.
+ * Plain `schema.json` would collide with JSON Schema files at the root of other
+ * people's projects — it is a common name. Baking the package into the name
+ * means the file name itself says why it is there.
  */
 const SCHEMA_FILE = 'ytstudio.schema.json';
 
 /**
- * 그럴듯한 JSON 이 전부 우리 스키마는 아니다.
+ * Not every plausible JSON is our schema.
  *
- * 작업 디렉터리를 뒤지는 이상 남의 파일을 집을 수 있으므로, 모양을 보고
- * 아니면 없는 것으로 친다. 못 읽는 것과 우리 것이 아닌 것을 갈라 볼 이유가
- * 없다 — 둘 다 "여기엔 없다"다.
+ * Since we search the working directory, we may pick up someone else's file,
+ * so we check the shape and treat a mismatch as absent. There is no reason to
+ * tell "unreadable" apart from "not ours" — both mean "not here".
  */
 function readSchema(path: string): RawSchema | null {
   try {
     const v = JSON.parse(readFileSync(path, 'utf8'));
     if (v && typeof v.ytdlp_version === 'string' && Array.isArray(v.options)) return v;
-  } catch { /* 없거나 깨졌거나 남의 것이다 */ }
+  } catch { /* missing, broken, or someone else's */ }
   return null;
 }
 
 const bundledPath = fileURLToPath(new URL(`../${SCHEMA_FILE}`, import.meta.url));
 
-/** 패키지에 실려 온 것. 이게 없으면 타입도 없다는 뜻이라 살릴 방법이 없다. */
+/** The one shipped with the package. If it is missing the types are too, so there is no recovering. */
 function readBundled(): RawSchema {
   const raw = readSchema(bundledPath);
   if (!raw) throw new Error(`패키지에 ${SCHEMA_FILE} 이 없다 — 설치가 깨졌다`);
@@ -84,31 +87,34 @@ function readBundled(): RawSchema {
 }
 
 /**
- * 패키지에 실려 온 스키마 그대로.
+ * The schema shipped with the package, as is.
  *
- * **타입이 나온 자리**라서 `ytstudio types` 가 기준선으로 쓴다 — 만드는 `.d.ts`
- * 가 이걸 확장하므로, "새 옵션"은 늘 이것 대비여야 한다. 지금 켜진 스키마를
- * 기준으로 잡으면 두 번째 실행부터 어긋난다.
+ * **It is where the types came from**, so `ytstudio types` uses it as the
+ * baseline — the `.d.ts` it writes extends this, so "new options" must always
+ * be relative to it. Using the currently active schema as the baseline would
+ * drift from the second run on.
  */
 export const BUNDLED: RawSchema = readBundled();
 
-/** 스키마를 어디서 찾을지. 안 주면 프로세스의 것을 쓴다. */
+/** Where to look for the schema. Anything omitted falls back to the process's own. */
 export interface Where {
-  /** `ytstudio.schema.json` 을 찾을 디렉터리. */
+  /** Directory to look for `ytstudio.schema.json` in. */
   cwd?: string;
-  /** `YTSTUDIO_SCHEMA` 대신 쓸 경로. */
+  /** Path to use instead of `YTSTUDIO_SCHEMA`. */
   env?: string;
 }
 
 /**
- * 로컬 우선, 없으면 패키지에 실린 것.
+ * Local first, otherwise the one shipped with the package.
  *
- * 순서가 이런 이유는 검증기의 값어치가 **설치된 실물과 대조하는 것**에 있어서다.
- * 패키지에 실린 스키마는 이 저장소를 구울 때의 yt-dlp 이지 당신 것이 아니다.
+ * The order is this way because the checker's worth lies in **checking against
+ * what is actually installed**. The shipped schema is the yt-dlp this repo was
+ * built with, not yours.
  *
- * 순수 함수다 — 부르면 결과를 주고 아무것도 안 바꾼다. 그리고 **작업 디렉터리와
- * 환경변수를 인자로 받는다.** 안 주면 프로세스 것을 쓴다. 검사가 그 둘을 넘길
- * 수 있어야 `process.chdir` 로 프로세스 전체를 흔들지 않는다.
+ * Pure function — calling it returns a result and changes nothing. And it
+ * **takes the working directory and environment variable as arguments.**
+ * Omitted, it uses the process's own. Tests need to pass both so they don't
+ * shake the whole process with `process.chdir`.
  */
 export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawSchema } {
   const found = (from: SchemaOrigin, path: string, raw: RawSchema) => ({
@@ -123,8 +129,9 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
 
   const env = at.env ?? process.env.YTSTUDIO_SCHEMA;
   if (env) {
-    // 명시적으로 가리킨 것이 안 읽히면 조용히 넘어가지 않는다. 그건 오타이고,
-    // 조용히 넘어가면 엉뚱한 버전으로 검사해 놓고 통과했다고 말하게 된다.
+    // If something explicitly pointed to can't be read, don't move on silently.
+    // That is a typo, and moving on would check against the wrong version and
+    // then report a pass.
     const path = resolve(env);
     const raw = readSchema(path);
     if (!raw) throw new Error(`YTSTUDIO_SCHEMA 가 가리키는 스키마를 읽지 못했다: ${path}`);
@@ -139,18 +146,19 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
 }
 
 /**
- * 스키마 하나에 묶인 손잡이를 만든다.
+ * Creates a handle bound to a single schema.
  *
- * 인자가 없으면 {@linkcode resolveSchema} 로 찾는다(환경변수 → 작업 디렉터리 → 내장).
- * 스키마를 직접 주면 그걸 쓴다 — 검사가 그 길로 프로세스를 안 갈라도 된다.
+ * With no arguments it finds one via {@linkcode resolveSchema} (env var →
+ * working directory → bundled). Given a schema directly, it uses that — which
+ * lets tests avoid forking processes.
  *
- * @example 두 저장소를 나란히
+ * @example Two repos side by side
  * ```ts
  * import { ytstudio } from 'ytstudio';
  *
  * const mine = ytstudio();
  * const theirs = ytstudio({ cwd: '/other/repo' });
- * mine.source.version;    // 이 손잡이가 대조하는 yt-dlp 버전
+ * mine.source.version;    // the yt-dlp version this handle checks against
  * theirs.lint('yt-dlp -x https://youtu.be/abc').ok;
  * ```
  */
@@ -161,21 +169,23 @@ export function ytstudio(opts: Where & { raw?: RawSchema } = {}): Ytstudio {
 }
 
 /**
- * 기본 손잡이. 평평한 함수들이 여기 얹혀 있다.
+ * The default handle. The flat functions sit on it.
  *
- * **게으르다** — 처음 쓸 때 만든다. 모듈 본문에서 만들면 import 만 해도 파일
- * 시스템을 뒤지게 되고, 스키마를 직접 주려던 사람에게도 그 값을 물린다.
+ * **Lazy** — built on first use. Building it in the module body would make a
+ * bare import search the file system, and would charge that cost even to
+ * someone about to pass a schema directly.
  */
 let fallback: Ytstudio | null = null;
 const def = (): Ytstudio => (fallback ??= ytstudio());
 
 /**
- * 명령어 문자열을 설치된 yt-dlp 의 스키마와 문법에 대조한다.
+ * Checks a command string against the installed yt-dlp's schema and grammar.
  *
- * 빌더가 못 하는 일이다. 빌더는 빌더로 쓴 것만 보지만, 블로그에서 주웠거나
- * 동료가 붙여넣었거나 LLM 이 준 명령어는 문자열로 온다.
+ * This is what the builder can't do. The builder only sees what was written
+ * with the builder, but commands picked up from a blog, pasted by a colleague,
+ * or handed over by an LLM arrive as strings.
  *
- * @example 남이 준 명령어를 막기
+ * @example Stopping a command someone handed you
  * ```ts
  * import { lintCommand, previewFilename } from 'ytstudio';
  *
@@ -186,36 +196,37 @@ const def = (): Ytstudio => (fallback ??= ytstudio());
  */
 export const lintCommand = (text: string): LintResult => def().lint(text);
 
-/** 새 명령어를 시작한다. 메서드 184개는 스키마에서 자란다. */
+/** Starts a new command. Its 184 methods grow from the schema. */
 export const ytdlp = (...urls: string[]): Ytdlp => def().ytdlp(...urls);
 
-/** 명령어를 사람 말로 — 토큰별 설명 · 다음 걸음. */
+/** Reads a command back in plain words — per-token explanation. */
 export const explainCommand = (items: Item[]): Explained[] => def().explain(items);
 
 /**
- * 지금 옵션 조합에 이어서 줄 만한 옵션들.
+ * Options that would naturally come next for the current combination.
  *
- * @param values {@linkcode LintResult.values} 처럼 옵션 id → 값.
- * @param limit 최대 개수. 기본 6.
+ * @param values Option id → value, like {@linkcode LintResult.values}.
+ * @param limit Maximum count. Defaults to 6.
  */
 export const suggestNext = (values: Values, limit?: number): Suggestion[] =>
   def().suggest(values, limit);
 
-/** 명령어 문자열을 읽는 밑바닥. 직접 다뤄야 할 때만. */
+/** The bottom layer that reads a command string. Only when you need to handle it directly. */
 export const scanCommand = (text: string): { head: string | null; items: Item[] } =>
   def().scan(text);
 
-/** 오타라면 무엇을 쓰려던 건가. */
+/** If it's a typo, what was meant. */
 export const nearestFlags = (flag: string, limit?: number): string[] =>
   def().nearest(flag, limit);
 
 /**
- * 기본 손잡이가 무엇에 대조하는지.
+ * What the default handle checks against.
  *
- * 함수다 — 상수로 두면 import 만 해도 파일 시스템을 뒤지게 되고, 무엇보다
- * **어느 손잡이의 것이냐**에 답할 수가 없다. 손잡이를 만들었으면 `yt.source`.
+ * A function — as a constant, a bare import would search the file system, and
+ * above all it couldn't answer **which handle's** source it is. If you built a
+ * handle, use `yt.source`.
  */
 export const schemaSource = (): SchemaSource => def().source;
 
-/** 토큰 하나만 읽어 준다. 여럿이면 `explainCommand`. */
+/** Reads just one token. For several, use `explainCommand`. */
 export const explainItem = (item: Item): Explained => def().explain([item])[0]!;

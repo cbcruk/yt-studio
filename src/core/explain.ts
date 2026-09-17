@@ -1,13 +1,14 @@
 /**
- * 명령어를 사람 말로 되돌린다.
+ * Turns a command back into plain language.
  *
- * 검증기가 "틀렸다"를 말한다면 여기는 **"이게 무슨 뜻이다"** 를 말한다.
- * 프롬프트로 받은 명령어는 내가 쓴 것이 아니라 남이 준 것이라, 돌리기 전에
- * 읽을 수 있어야 한다. 그게 이 흐름에서 신뢰가 생기는 유일한 자리다.
+ * Where the checker says "this is wrong", this says **"this is what it means"**.
+ * A command from a prompt was not written by you but handed to you, so it has to
+ * be readable before it is run. That is the only place in this flow where trust
+ * is earned.
  *
- *   · 토큰마다 무슨 옵션이고 어느 단계에 속하는지
- *   · 이 명령어가 만들 **파일명**이 어떤 모양인지
- *   · 지금 옵션 조합에 이어서 줄 만한 것이 무엇인지
+ * - which option each token is and which stage it belongs to
+ * - what the **filename** this command produces looks like
+ * - what would naturally follow the current combination of options
  */
 
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
@@ -16,52 +17,52 @@ import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Values } from './lint.js';
 
-/** 이 명령어가 만들 파일명. `-o` 를 못 읽었으면 `ok` 가 거짓이고 원문이 그대로 온다. */
+/** The filename this command produces. If `-o` could not be read, `ok` is false and the original text comes back. */
 export interface FilePreview {
-  /** `-o` 를 읽었나. 거짓이면 `text` 가 원문이다. */
+  /** Whether `-o` was read. When false, `text` is the original text. */
   ok: boolean;
-  /** `-o` 앞에 붙은 종류 접두어(`thumbnail:` 의 `thumbnail`). */
+  /** The type prefix on `-o` (`thumbnail` in `thumbnail:`). */
   type: string;
-  /** 파일명. 필드는 `‹제목›` 같은 자리표시자이고, `-P home` 이 있으면 앞에 붙는다. */
+  /** The filename. Fields are placeholders like `‹제목›`, prefixed with `-P home` when given. */
   text: string;
-  /** `-o` 가 없어서 yt-dlp 기본 템플릿을 쓴 경우. */
+  /** True when there was no `-o` and yt-dlp's default template was used. */
   dflt?: boolean;
 }
 
-/** 토큰 하나를 한 줄로 읽은 것. */
+/** One token read as one line. */
 export interface Explained {
-  /** 토큰의 종류 — 옵션 · URL · 못 읽은 것. */
+  /** The kind of token — option, URL, or unreadable. */
   kind: Item['kind'];
-  /** 명령어에 쓰인 원문(다시 인용한 것). */
+  /** The text as written in the command (re-quoted). */
   text: string;
-  /** 한 줄 설명. 옵션이면 yt-dlp 도움말이고, 끄는 형태면 `— 끄기` 가 붙는다. */
+  /** One-line description. For an option it is yt-dlp's help, with `— 끄기` appended for the negated form. */
   ko: string;
-  /** 옵션 id. 옵션일 때만 있다. */
+  /** Option id. Present only for options. */
   id?: string;
-  /** 생애주기 단계 id (`format` · `store` …). 옵션일 때만 있다. */
+  /** Lifecycle stage id (`format`, `store`, …). Present only for options. */
   stage?: string;
-  /** 단계의 사람이 읽을 이름. */
+  /** Human-readable name of the stage. */
   stageLabel?: string;
-  /** 옵션에 준 값. 값을 받지 않는 플래그면 `null`. */
+  /** The value given to the option. `null` for flags that take no value. */
   value?: string | null;
 }
 
-/** 이어서 줄 만한 옵션 하나와 그 이유. */
+/** One option worth adding next, and why. */
 export interface Suggestion {
-  /** 제안하는 옵션. */
+  /** The suggested option. */
   opt: Opt;
-  /** 지금 명령어에 왜 이게 따라오나. 한 줄이다. */
+  /** Why it follows from the current command. One line. */
   why: string;
 }
 
-/** -o 를 안 주면 yt-dlp 가 쓰는 기본 출력 템플릿. */
+/** The output template yt-dlp uses when no -o is given. */
 export const DEFAULT_OUTTMPL = '%(title)s [%(id)s].%(ext)s';
 
 /**
- * 이 명령어가 만들 파일명.
+ * The filename this command produces.
  *
- * 값을 모르므로 필드는 ‹제목› 처럼 자리표시자로 둔다. -P home 이 있으면
- * 앞에 붙인다 — "어디에 무엇이 놓이는가"가 한 줄로 보여야 한다.
+ * Values are unknown, so fields become placeholders like ‹제목›. When -P home is
+ * given it is prepended — "what lands where" should read as one line.
  */
 export function previewFilename(values: Values): FilePreview {
   const rawOut = (Array.isArray(values.output) ? values.output[0] : values.output) as string | null;
@@ -81,7 +82,7 @@ export function previewFilename(values: Values): FilePreview {
   return { ok: true, type, text: home + sep + body, dflt: !rawOut };
 }
 
-/** 토큰 하나를 한 줄로 설명한다. */
+/** Describes one token in one line. */
 export function explainItem(schema: Schema, it: Item): Explained {
   if (it.kind === 'url') return { kind: 'url', text: it.raw, ko: '받을 대상' };
   if (it.kind === 'unknown') return { kind: 'unknown', text: it.raw, ko: '읽지 못한 토큰' };
@@ -98,16 +99,17 @@ export function explainItem(schema: Schema, it: Item): Explained {
   };
 }
 
-/** 항목마다 {@linkcode explainItem} 을 부른다. */
+/** Calls {@linkcode explainItem} for each item. */
 export const explainCommand = (schema: Schema, items: Item[]): Explained[] =>
   items.map(it => explainItem(schema, it));
 
 /**
- * 지금 조합에서 자연스럽게 따라오는 옵션들.
+ * Options that naturally follow the current combination.
  *
- * "191개 중 아무거나"가 아니라 **지금 명령어가 부르는 것**만 낸다. 목록을
- * 훑게 하는 대신 다음 한 걸음을 놓아 주는 쪽이 옵션이 많을 때 유일하게
- * 통한다. 규칙은 손으로 정한다 — 스키마에는 이런 이웃 관계가 없다.
+ * Not "any of the 191" but only **what the current command calls for**. With this
+ * many options, laying down the next step instead of making people scan a list is
+ * the only thing that works. The rules are written by hand — the schema has no
+ * such neighbor relations.
  */
 const RULES: { when: (v: Values) => unknown; ids: string[]; why: string }[] = [
   { when: v => v['extract-audio'], ids: ['audio-format', 'audio-quality', 'embed-thumbnail', 'embed-metadata'],
@@ -126,7 +128,7 @@ const RULES: { when: (v: Values) => unknown; ids: string[]; why: string }[] = [
     why: '표시 이름을 정한다' },
 ];
 
-/** 아무 규칙도 안 걸릴 때. 처음 만든 명령어에도 다음 걸음이 있어야 한다. */
+/** When no rule matches. A brand-new command should still have a next step. */
 const STARTERS = ['format', 'output', 'paths', 'download-archive', 'embed-metadata'];
 
 export function suggestNext(schema: Schema, values: Values, limit = 6): Suggestion[] {

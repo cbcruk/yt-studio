@@ -1,14 +1,14 @@
 /**
- * 명령어 진단.
+ * Command diagnostics.
  *
- * 이 도구가 LLM 보다 나은 이유가 전부 여기 있다 — 기억이 아니라 설치된
- * yt-dlp 를 리플렉션한 스키마와 진짜 파서를 본다. 그래서 검사도 "모델이
- * 만들 법한 그럴듯한 오답"을 상대로 한다.
+ * Everything that makes this tool better than an LLM is here — it looks at the real
+ * parsers and the schema reflected from the installed yt-dlp, not memory. So the
+ * tests also target "plausible wrong answers a model would write".
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
-// 소스를 직접 본다. bun 이 `./x.js` 를 x.ts 로 풀어 주므로 빌드를 안 거친다.
+// Reads the source directly. bun resolves `./x.js` to x.ts, so no build is involved.
 const { lintCommand, nearestFlags, distance, scanCommand } =
   await import('../../src/index.js');
 
@@ -55,20 +55,20 @@ test('값을 안 받는 플래그에 값을 주면 잡는다', () => {
 test('choices 를 벗어난 값을 잡는다', () => {
   assert.match(msgs('yt-dlp --fixup maybe https://x/y'), /고를 수 있는 값이 아니다/);
   assert.equal(lintCommand('yt-dlp --fixup never https://x/y').ok, true);
-  // 쉼표로 여러 개를 주는 옵션도 하나씩 본다
+  // Options that take several comma-separated values are checked one by one
   assert.match(msgs('yt-dlp --concat-playlist never,nope https://x/y'), /nope/);
 });
 
-// 목록을 넓히면 **틀린 것을 잡는 것보다 맞는 것을 안 잡는 게** 어려워진다.
-// yt-dlp 가 실제로 받는 형태를 여기 못 박는다 — 아래 넷은 진짜 yt-dlp 로
-// 확인한 것이다(optparse 를 통과한다).
+// Widening the lists makes **not flagging what is right** harder than catching what is wrong.
+// Pin down forms yt-dlp actually accepts — the four below were verified with the real
+// yt-dlp (they pass optparse).
 test('빼기와 별칭과 all 은 멀쩡한 값이다 — 목록이 넓어져도 오탐이 안 는다', () => {
   for (const cmd of [
-    'yt-dlp --compat-options youtube-dl https://x/y',      // 별칭
-    'yt-dlp --compat-options all,-multistreams https://x/y', // all 로 켜고 빼기
+    'yt-dlp --compat-options youtube-dl https://x/y',      // alias
+    'yt-dlp --compat-options all,-multistreams https://x/y', // enable all, then subtract
     'yt-dlp --sponsorblock-remove sponsor,intro https://x/y',
     'yt-dlp --sponsorblock-mark default https://x/y',
-    'yt-dlp --convert-subs none https://x/y',              // 목록에 없지만 끄는 값
+    'yt-dlp --convert-subs none https://x/y',              // not in the list, but the off value
   ]) {
     assert.equal(lintCommand(cmd).counts.error, 0, `${cmd}\n${msgs(cmd)}`);
   }
@@ -81,7 +81,7 @@ test('그래도 없는 값은 잡는다', () => {
   assert.match(msgs('yt-dlp --ap-mso Comcast https://x/y'), /Comcast/);
 });
 
-// 435개짜리 목록(--ap-mso)을 통째로 찍으면 판정을 읽을 수가 없다.
+// Printing a 435-entry list (--ap-mso) in full makes the verdict unreadable.
 test('목록이 길면 줄여서 보여 준다', () => {
   const m = msgs('yt-dlp --ap-mso Comcast https://x/y');
   assert.match(m, /… 435개/);
@@ -95,8 +95,8 @@ test('-f 는 진짜 파서로 본다', () => {
 });
 
 test('yt-dlp 가 받는 표현식에 거짓 오류를 내지 않는다', () => {
-  // 그룹에 붙은 필터는 yt-dlp 문서에 나오는 표현이다. 파서가 못 읽던 시절엔
-  // 멀쩡한 명령어에 오류가 떴다 — 검증기에서 이게 제일 나쁜 실패다.
+  // Filters on a group are an expression from the yt-dlp docs. Back when the parser
+  // could not read them, a valid command got an error — the worst failure for a checker.
   for (const f of ['(mp4,webm)[height<480]', '(bv+ba)[height<=720]']) {
     const r = lintCommand(`yt-dlp -f "${f}" --merge-output-format mp4 https://x/y`);
     assert.equal(r.counts.error, 0, `${f}: ${r.issues.map(i => i.msg).join(' | ')}`);
@@ -108,7 +108,7 @@ test('-o 는 문법과 확장자를 같이 본다', () => {
   assert.match(msgs('yt-dlp -o "%(uploader)s/%(title)s" https://x/y'), /%\(ext\)s 가 없다/);
   assert.match(msgs('yt-dlp -o "%(title)s.%(ext" https://x/y'), /-o 값을 읽지 못했다/);
   assert.equal(lintCommand('yt-dlp -o "%(title)s.%(ext)s" https://x/y').ok, true);
-  // 객체 순회로 꺼낸 확장자도 확장자다
+  // An extension pulled out by walking an object is still an extension
   assert.equal(lintCommand('yt-dlp -o "%(title)s.%(requested_downloads.-1.ext)s" https://x/y').ok, true);
 });
 
@@ -125,7 +125,7 @@ test('URL 이 없으면 오류다 — 다만 URL 이 필요 없는 옵션은 봐
 
 test('반복 안 되는 옵션을 두 번 주면 알린다', () => {
   assert.match(msgs('yt-dlp -f b -f w https://x/y'), /2번 줬다/);
-  // --paths 는 누적 옵션이라 두 번이 정상이다
+  // --paths accumulates, so twice is normal
   assert.doesNotMatch(msgs('yt-dlp -P home:/a -P temp:/b https://x/y'), /2번 줬다/);
 });
 
@@ -162,8 +162,8 @@ test('진단은 명령어 앞의 yt-dlp 가 없어도 돈다', () => {
 });
 
 test('스키마가 모르는 토큰도 원문 그대로 들고 있는다', () => {
-  // 우리가 모른다고 사용자가 쓴 것을 지우지 않는다. 새 yt-dlp 에서 생긴
-  // 플래그일 수도 있으므로 "모르겠다"고 말하되 글자는 그대로 넘긴다.
+  // Do not erase what the user wrote just because we do not know it. It may be a flag
+  // added in a newer yt-dlp, so say "unknown" but pass the text through untouched.
   const { items } = scanCommand('yt-dlp --future-flag --embed-subs https://x/y');
   const unknown = items.filter(i => i.kind === 'unknown');
   assert.deepEqual(unknown.map(i => i.raw), ['--future-flag']);
@@ -177,7 +177,7 @@ test('scanCommand 는 순서와 원문을 지킨다', () => {
   const { head, items } = scanCommand('yt-dlp -f "bv+ba" --embed-subs https://x/y');
   assert.equal(head, 'yt-dlp');
   assert.deepEqual(items.map(i => i.kind), ['opt', 'opt', 'url']);
-  // raw 는 원문이 아니라 다시 인용한 것이다 — 왕복이 안정되게
+  // raw is not the original but re-quoted — so the round trip is stable
   assert.equal(items[0].raw, '-f bv+ba');
   assert.equal(items[1].raw, '--embed-subs');
   assert.equal(items[2].raw, 'https://x/y');
@@ -194,8 +194,8 @@ test('부정형은 끈 것으로 읽는다', () => {
   assert.equal(r.values['embed-subs'], false);
 });
 
-// 값이 어휘 하나가 아니라 **어휘 위의 문법**인 것들. 타입은 이걸 못 막는다 —
-// 막으면 `aac>mp3/best` 가 오류가 되므로 일부러 열어 뒀다. 닫는 일은 여기다.
+// Values that are not one vocabulary word but **a grammar over a vocabulary**. Types cannot
+// block these — blocking would make `aac>mp3/best` an error, so they are left open on purpose. Closing happens here.
 test('[원본>]대상 을 / 로 이은 것을 읽는다', () => {
   for (const cmd of [
     'yt-dlp --audio-format mp3 https://x/y',
@@ -214,12 +214,12 @@ test('만들 수 없는 확장자는 잡는다', () => {
   assert.match(msgs('yt-dlp --audio-format mp4 https://x/y'), /mp4 는 --audio-format/);
   assert.match(msgs('yt-dlp --audio-format "aac>mp4" https://x/y'), /mp4 는/);
   assert.match(msgs('yt-dlp --convert-thumbnails gif https://x/y'), /gif 는/);
-  // 이쪽만 원본> 를 안 받는다 — yt-dlp 의 정규식이 `(ext)(/(ext))*` 하나뿐이다
+  // Only this one rejects source> — yt-dlp's regex is just `(ext)(/(ext))*`
   assert.match(msgs('yt-dlp --merge-output-format "mp4>mkv" https://x/y'), /mp4>mkv 는/);
 });
 
-// yt-dlp 는 모르는 종류를 **거절하지 않는다.** 종류가 아닌 것으로 보고 값에
-// 그대로 남긴다 — `-o nope:%(id)s.%(ext)s` 는 `nope:` 로 시작하는 파일이 된다.
+// yt-dlp **does not reject** unknown types. It treats them as not-a-type and leaves them in
+// the value — `-o nope:%(id)s.%(ext)s` produces a file starting with `nope:`.
 test('모르는 종류 접두어를 알려 준다 — 조용히 파일 이름이 된다', () => {
   const r = lintCommand('yt-dlp -o nope:%(title)s.%(ext)s https://x/y');
   assert.equal(r.counts.error, 0, '오류가 아니라 경고다');
@@ -229,9 +229,9 @@ test('모르는 종류 접두어를 알려 준다 — 조용히 파일 이름이
 
 test('값에 그냥 든 콜론은 안 건드린다', () => {
   for (const cmd of [
-    'yt-dlp -o annotation:%(title)s.%(ext)s https://x/y',   // 진짜 종류
+    'yt-dlp -o annotation:%(title)s.%(ext)s https://x/y',   // a real type
     'yt-dlp --exec after_move:echo\\ hi https://x/y',
-    'yt-dlp --exec "sed -i s/a:b/c/ %(filepath)q" https://x/y',  // 종류처럼 안 생겼다
+    'yt-dlp --exec "sed -i s/a:b/c/ %(filepath)q" https://x/y',  // does not look like a type
     'yt-dlp --retry-sleep fragment:exp=1:20 https://x/y',
     'yt-dlp --color stderr:never https://x/y',
   ]) {

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-yt-dlp 옵션 스키마 추출기.
+yt-dlp option schema extractor.
 
-yt-dlp의 optparse 트리를 그대로 리플렉션해서 JSON으로 떨군다.
-help 텍스트를 긁는 게 아니라 옵션 객체를 읽으므로, yt-dlp를 올리면
-스키마도 같이 따라온다. CI에서 릴리스마다 재실행할 것.
+Reflects yt-dlp's optparse tree as is and drops it as JSON.
+It reads option objects rather than scraping help text, so upgrading yt-dlp
+brings the schema along. Rerun in CI on every release.
 
     python gen_schema.py > ytstudio.schema.json
 """
@@ -17,8 +17,8 @@ import sys
 import yt_dlp
 import yt_dlp.options
 
-# optparse 그룹(16개) → 실행 생애주기 스테이지(9개).
-# 이 매핑만이 이 스크립트에서 유일하게 손으로 정한 부분이다.
+# optparse groups (16) → run lifecycle stages (9).
+# This mapping is the only hand-decided part of this script.
 STAGES = [
     ("run",      "실행",     "한 번의 실행 전체가 어떻게 동작할지",
      ["General Options"]),
@@ -42,53 +42,54 @@ STAGES = [
 
 GROUP_TO_STAGE = {g: s[0] for s in STAGES for g in s[3]}
 
-# yt-dlp 자신의 그룹 분류가 생애주기와 어긋나는 소수의 예외.
-# (쿠키는 "파일"이라 Filesystem에 들어가 있지만, 하는 일은 접속이다.)
+# The few exceptions where yt-dlp's own grouping disagrees with the lifecycle.
+# (Cookies are a "file" so they sit under Filesystem, but what they do is connecting.)
 STAGE_OVERRIDE = {
     "--cookies": "connect",
     "--cookies-from-browser": "connect",
 }
 
-# yt-dlp 가 TYPES 로 값을 모으는 옵션은 실제로 여러 번 준다.
+# Options where yt-dlp collects values by TYPES are really given several times.
 #     -P home:/a -P temp:/b
-# optparse 쪽은 callback 액션에 dict 기본값일 뿐이라 append 로 안 보인다.
-# --output·--progress-template 도 같은 성질이지만, 지금 UI 가 값 하나를
-# 전제하므로 건드리지 않는다. 그쪽을 열 때 여기 같이 추가할 것.
+# On the optparse side it's just a callback action with a dict default, so it
+# doesn't look like append. --output and --progress-template behave the same, but
+# the UI currently assumes a single value, so they're left alone. Add them here
+# when that opens up.
 #
-# allowed_values 를 쓰는 셋(아래 option_choices 참고)도 같은 성질이다 —
-# 값을 모아 집합을 만든다. 그쪽은 손으로 안 적고 리플렉션으로 붙인다.
+# The three using allowed_values (see option_choices below) behave the same too —
+# they collect values into a set. Those aren't written by hand; reflection attaches them.
 KIND_OVERRIDE = {
     "--paths": "repeatable",
 }
 
 
-# optparse 가 안 들고 있는 목록. yt-dlp 는 이 둘을 파싱한 **뒤에**
-# validate_in 으로 본다(yt_dlp/__init__.py) — 그래서 옵션 객체에는 안 남는다.
+# Lists optparse doesn't hold. yt-dlp checks these **after** parsing with
+# validate_in (yt_dlp/__init__.py) — so they don't remain on the option objects.
 #
-# 여기 손으로 적는 것은 **어디서 읽을지**뿐이고 값은 yt-dlp 가 준다. 그래서
-# 낡거나 지어낼 수가 없고, 상수가 사라지면 이 스크립트가 그 자리에서 죽는다 —
-# 조용히 빈 목록이 되는 것보다 낫다.
+# The only thing written by hand here is **where to read from**; the values come
+# from yt-dlp. So they can't go stale or be made up, and if a constant disappears
+# this script dies on the spot — better than silently becoming an empty list.
 def _validated_choices():
     from yt_dlp.extractor.adobepass import MSO_INFO
     from yt_dlp.options import _PRESET_ALIASES
     from yt_dlp.postprocessor import FFmpegSubtitlesConvertorPP
 
     return {
-        # "--convert-subs none" 으로 끄는 것이 문서에 있다. 목록에는 없다.
+        # Turning it off with "--convert-subs none" is documented. It isn't in the list.
         "--convert-subs": [*FFmpegSubtitlesConvertorPP.SUPPORTED_EXTS, "none"],
         "--ap-mso": sorted(MSO_INFO),
-        # 콜백이 쓰는 표가 모듈 전역이라 옵션 객체에는 안 붙어 있다.
+        # The table the callback uses is module-global, so it isn't attached to the option object.
         "--preset-alias": list(_PRESET_ALIASES),
     }
 
 
-# 값이 **어휘 하나가 아니라 어휘 위의 작은 문법**인 것들.
+# Values that are **not a single vocabulary but a small grammar over one**.
 #
 #     --recode-video "aac>mp3/mkv"
-#      └ 원본>대상 을 / 로 이어 선호 순서를 준다 (FFmpeg*PP.FORMAT_RE)
+#      └ source>target joined by / gives the order of preference (FFmpeg*PP.FORMAT_RE)
 #
-# 그래서 `choices` 로 못 쓴다 — 그렇게 쓰면 `aac>mp3` 가 오류로 잡힌다. 어휘는
-# 어휘대로 내고(자동완성이 그걸 쓴다) 문법은 검증기가 본다.
+# So they can't be `choices` — that would flag `aac>mp3` as an error. The
+# vocabulary goes out as vocabulary (autocomplete uses it) and the checker handles the grammar.
 def _format_rules():
     from yt_dlp.postprocessor import (
         FFmpegExtractAudioPP, FFmpegMergerPP, FFmpegThumbnailsConvertorPP,
@@ -96,25 +97,25 @@ def _format_rules():
     )
 
     return {
-        # 'best' 는 SUPPORTED_EXTS 에 없지만 FORMAT_RE 에는 있다 — 기본값이다.
+        # 'best' isn't in SUPPORTED_EXTS but is in FORMAT_RE — it's the default.
         "--audio-format": (["best", *FFmpegExtractAudioPP.SUPPORTED_EXTS], True),
         "--remux-video": (list(FFmpegVideoRemuxerPP.SUPPORTED_EXTS), True),
         "--recode-video": (list(FFmpegVideoConvertorPP.SUPPORTED_EXTS), True),
-        # "--convert-thumbnails none" 으로 끈다.
+        # Turned off with "--convert-thumbnails none".
         "--convert-thumbnails": ([*FFmpegThumbnailsConvertorPP.SUPPORTED_EXTS, "none"], True),
-        # 이쪽만 `원본>대상` 없이 `/` 목록이다 — yt_dlp/__init__.py 의 정규식이
-        # `(ext)(/(ext))*` 하나뿐이다.
+        # Only this one is a `/` list without `source>target` — the regex in
+        # yt_dlp/__init__.py is just `(ext)(/(ext))*`.
         "--merge-output-format": (list(FFmpegMergerPP.SUPPORTED_EXTS), False),
     }
 
 
-# 값이 한 덩이가 아니라 **자리 여럿인 구조**일 때, 자리마다의 어휘.
+# When a value isn't one lump but **a structure with several slots**, the vocabulary per slot.
 #
 #     --cookies-from-browser  BROWSER[+KEYRING][:PROFILE][::CONTAINER]
-#                             └ 목록   └ 목록      └ 자유    └ 자유
+#                             └ list   └ list      └ free    └ free
 #
-# 문법은 손으로 적는 층(`core/cookies.ts`)이 갖고, 어휘는 여기서 온다.
-# 그 둘을 한 파일에 두면 `-o` 종류 표가 그랬듯이 조용히 갈린다.
+# The grammar lives in the hand-written layer (`core/cookies.ts`); the vocabulary comes from here.
+# Keeping both in one file lets them silently diverge, as the `-o` type table did.
 def _value_vocabs():
     from yt_dlp.cookies import SUPPORTED_BROWSERS, SUPPORTED_KEYRINGS
 
@@ -127,18 +128,19 @@ def _value_vocabs():
 
 
 def option_choices(opt, validated):
-    """이 옵션이 받는 값이 정해져 있나. `(목록, 여러 개인가)` 또는 `None`.
+    """Whether this option's values are fixed. `(list, takes several)` or `None`.
 
-    세 군데서 나오는데 셋 다 yt-dlp 가 준 것이다.
+    They come from three places, all provided by yt-dlp.
 
-      1. optparse 의 `choices=` — `--fixup` 처럼 optparse 가 직접 거른다
-      2. `_set_from_options_callback` 의 `allowed_values` — `--compat-options`
-         처럼 **쉼표로 여러 개**를 받는다. `all` 과 별칭(`youtube-dl` 등)도
-         값이므로 같이 넣는다. 안 넣으면 멀쩡한 명령어가 오류로 잡힌다.
-      3. 파싱 뒤 `validate_in` — 위 표
+      1. optparse's `choices=` — optparse filters directly, like `--fixup`
+      2. `allowed_values` of `_set_from_options_callback` — takes **several,
+         comma-separated**, like `--compat-options`. `all` and aliases
+         (`youtube-dl` etc.) are values too, so they go in. Leaving them out
+         would flag valid commands as errors.
+      3. `validate_in` after parsing — the table above
 
-    `-` 를 앞에 붙여 빼는 형태(`all,-multistreams`)도 되는데, 그건 2번에서만
-    되므로 목록에 안 넣는다. "여러 개인가"가 곧 그 표시다.
+    The `-`-prefixed exclusion form (`all,-multistreams`) also works, but only
+    for case 2, so it isn't put in the list. "Takes several" is that marker.
     """
     if opt.choices:
         return list(opt.choices), False
@@ -154,7 +156,7 @@ def option_choices(opt, validated):
 
 
 def option_rule(long_opt, rules):
-    """어휘 위의 작은 문법인 값. `{"vocab": [...], "from": bool}` 또는 `None`."""
+    """A value that is a small grammar over a vocabulary. `{"vocab": [...], "from": bool}` or `None`."""
     hit = rules.get(long_opt)
     if not hit:
         return None
@@ -163,14 +165,14 @@ def option_rule(long_opt, rules):
 
 
 def option_keys(opt):
-    """`[TYPES:]PATH` 처럼 값 **앞에** 붙는 종류의 목록.
+    """The list of types prefixed **before** a value, like `[TYPES:]PATH`.
 
-    `_dict_from_options_callback` 이 `allowed_keys` 로 들고 있다. 값 자체는
-    자유 문자열(경로 · 템플릿 · 명령어)이라 `choices` 가 아니지만, 앞머리는
-    닫혀 있다 — `-o thumbnail:%(id)s` 의 `thumbnail`.
+    `_dict_from_options_callback` holds it as `allowed_keys`. The value itself
+    is a free string (path, template, command), so it isn't `choices`, but the
+    prefix is closed — the `thumbnail` in `-o thumbnail:%(id)s`.
 
-    정규식으로 적힌 것(`\\w+(?:\\+\\w+)?`)은 목록이 아니므로 안 가져온다.
-    갈래로만 적힌 것(`home|temp|…`)이 곧 목록이다.
+    Ones written as a regex (`\\w+(?:\\+\\w+)?`) aren't lists, so they're
+    skipped. Ones written purely as alternatives (`home|temp|…`) are the list.
     """
     keys = (getattr(opt, "callback_kwargs", None) or {}).get("allowed_keys")
     if not keys or not re.fullmatch(r"[\w|]+", keys):
@@ -179,7 +181,7 @@ def option_keys(opt):
 
 
 def clean_help(text, default):
-    """optparse의 %default 치환과 공백 정규화."""
+    """Substitute optparse's %default and normalize whitespace."""
     if not text:
         return ""
     text = text.replace("%default", str(default))
@@ -200,13 +202,13 @@ def jsonable(v):
 
 
 def control_kind(opt):
-    """옵션을 UI 컨트롤 종류로 분류.
+    """Classify an option into a UI control kind.
 
-    action 이름을 열거하면 계속 샌다 — store_const · version · help 처럼
-    인자를 안 받는 action 이 여럿이고, yt-dlp 는 그중 여러 개를 쓴다.
-    (그래서 --version · --write-thumbnail 이 한동안 값을 받는 옵션으로 잡혔다.)
-    optparse 가 이미 답을 갖고 있으니 그걸 묻는다 — takes_value() 는
-    type 이 붙어 있는지를 본다.
+    Enumerating action names keeps leaking — several actions take no argument,
+    like store_const, version, and help, and yt-dlp uses many of them.
+    (That's why --version and --write-thumbnail were treated as value-taking
+    options for a while.) optparse already has the answer, so ask it —
+    takes_value() checks whether a type is attached.
     """
     if opt.choices:
         return "choice"
@@ -248,8 +250,8 @@ def main():
             name, polarity = base_name(long_opt)
             found = option_choices(opt, validated)
             choices, many = found if found else (None, False)
-            # 목록이 있으면 종류는 그 목록이 정한다 — 여러 개면 repeatable,
-            # 하나면 choice. optparse 의 action 만 봐서는 둘 다 그냥 value 다.
+            # If there's a list, it decides the kind — repeatable if several,
+            # choice if one. Looking only at optparse's action, both are just value.
             kind = ("repeatable" if many else "choice") if choices else control_kind(opt)
             options.append({
                 "id": long_opt.lstrip("-"),
@@ -265,18 +267,18 @@ def main():
                 "keys": option_keys(opt),
                 "rule": option_rule(long_opt, rules),
                 "vocabs": vocabs.get(long_opt),
-                # optparse 가 값을 어떤 것으로 읽나. int·float 는 진짜 수다 —
-                # 지금까지 전부 `string | number` 였는데, 그러면 타입이
-                # `--socket-timeout '빠르게'` 를 못 막는다.
+                # What optparse reads the value as. int and float are real numbers —
+                # everything used to be `string | number`, and then the types
+                # couldn't stop `--socket-timeout 'fast'`.
                 "valueType": opt.type,
                 "default": jsonable(opt.default),
                 "help": clean_help(opt.help, jsonable(opt.default)),
-                # 부정 짝 병합용
+                # for merging negation pairs
                 "_base": name,
                 "_polarity": polarity,
             })
 
-    # --foo / --no-foo 를 하나의 컨트롤로 접는다.
+    # Fold --foo / --no-foo into a single control.
     by_base = {}
     for o in options:
         by_base.setdefault(o["_base"], []).append(o)
@@ -292,7 +294,7 @@ def main():
             head["negation"] = (negative or forced)[0]["flag"]
             merged.append(head)
         elif negative and forced:
-            # --no-playlist / --yes-playlist 처럼 양쪽 다 부정형인 경우
+            # When both sides are negated forms, like --no-playlist / --yes-playlist
             head = negative[0]
             head["negation"] = forced[0]["flag"]
             merged.append(head)

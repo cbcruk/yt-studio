@@ -1,19 +1,21 @@
 /**
- * 공개 표면의 JSDoc 검사 — `.claude/rules/jsdoc.md` 를 기계가 지키게 한다.
+ * JSDoc check for the public surface — makes the machine enforce `.claude/rules/jsdoc.md`.
  *
- * 손님이 에디터에서 보는 것은 소스가 아니라 **`tsc` 가 낸 `.d.ts`** 다. 그래서
- * 소스가 아니라 `lib/` 를 읽는다 — 주석이 선언 방출에서 떨어져 나갔다면 그것도
- * 여기서 잡혀야 한다.
+ * What users see in the editor is not the source but **the `.d.ts` that `tsc` emits**.
+ * So this reads `lib/`, not the source — if a comment fell off during declaration
+ * emit, that must be caught here too.
  *
- * 둘을 본다.
+ * Two things are checked.
  *
- * - **빠진 주석** — 입구(`ytstudio` · `ytstudio/browser`)에서 닿는 선언과, 그
- *   인터페이스 · 클래스의 멤버마다 JSDoc 이 붙었나.
- * - **예제** — `@example` 의 코드 블록이 손님 프로젝트에서 그대로 컴파일되나.
- *   `import` 를 빼먹은 예제는 읽기 불편한 게 아니라 **틀린** 것이다.
+ * - **Missing comments** — every declaration reachable from the entry points
+ *   (`ytstudio` · `ytstudio/browser`), and every member of those interfaces ·
+ *   classes, has JSDoc.
+ * - **Examples** — the code blocks in `@example` compile as-is in a user project.
+ *   An example missing its `import` is not merely awkward to read, it is **wrong**.
  *
- * TypeScript 7 은 JS 컴파일러 API 가 없어서 AST 대신 `.d.ts` 의 줄 모양을 본다.
- * `tsc` 가 내는 선언 파일은 모양이 늘 같다 — 최상위 선언은 0칸, 멤버는 4칸.
+ * TypeScript 7 has no JS compiler API, so instead of an AST this reads the line
+ * shape of the `.d.ts`. Declaration files emitted by `tsc` always look the same —
+ * top-level declarations at column 0, members indented 4.
  */
 import { beforeAll, expect, test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -27,7 +29,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIB = path.join(ROOT, 'lib');
 const TSC = path.join(ROOT, 'node_modules', '.bin', 'tsc');
 
-/** 손님이 import 하는 입구. `package.json` 의 `exports` 와 같다. */
+/** The entry points users import. Same as `exports` in `package.json`. */
 const ENTRIES = ['index.d.ts', 'browser.d.ts'];
 const SOURCES = ['src/index.ts', 'src/browser.ts'];
 
@@ -46,7 +48,7 @@ const linesOf = (file: string): string[] => {
 const dts = (from: string, spec: string): string =>
   path.resolve(path.dirname(from), spec.replace(/\.js$/, '.d.ts'));
 
-/** `{ a, b as c }` → `[['a','a'], ['b','c']]` (원래 이름, 보이는 이름) */
+/** `{ a, b as c }` → `[['a','a'], ['b','c']]` (original name, visible name) */
 const names = (list: string): [string, string][] =>
   list.split(',').map(s => s.trim()).filter(Boolean).map((s) => {
     const [orig, alias] = s.replace(/^type\s+/, '').split(/\s+as\s+/);
@@ -57,7 +59,7 @@ interface Decl { file: string; line: number; name: string; kind: string }
 
 const DECL = /^(?:export )?(?:declare )?(const|function|class|interface|type|enum) ([\w$]+)/;
 
-/** 파일 안에서 `name` 이 가리키는 선언을 따라간다. 재수출 · import 별칭까지. */
+/** Follows what `name` refers to inside a file, through re-exports · import aliases. */
 function resolve(file: string, name: string, seen = new Set<string>()): Decl[] {
   const key = `${file}#${name}`;
   if (seen.has(key)) return [];
@@ -82,7 +84,7 @@ function resolve(file: string, name: string, seen = new Set<string>()): Decl[] {
   return [];
 }
 
-/** 입구 파일이 내보내는 이름 전부. */
+/** Every name an entry file exports. */
 function exportsOf(file: string): string[] {
   const text = linesOf(file).join('\n');
   const out = new Set<string>();
@@ -95,15 +97,16 @@ function exportsOf(file: string): string[] {
 const documented = (lines: string[], i: number): boolean => lines[i - 1]?.trim().endsWith('*/') ?? false;
 
 /**
- * 멤버 줄. 4칸 들여쓰기에서 시작하는 것만 — 더 깊은 것은 멤버 타입의 안쪽이다.
+ * A member line. Only those starting at 4-space indent — anything deeper is inside a member's type.
  *
- * 안 보는 것: `private` (`.d.ts` 에 이름만 남고 손님이 못 부른다), `constructor`
- * (공개 클래스는 전부 타입으로만 나간다 — 손님이 `new` 할 일이 없다), 호출 ·
- * 인덱스 시그니처(인터페이스 자체의 주석이 그 설명이다).
+ * Not checked: `private` (only the name remains in `.d.ts` and users cannot call it),
+ * `constructor` (the public classes are all exported as types only — users have no
+ * reason to `new` them), call · index signatures (the interface's own comment
+ * describes them).
  */
 const MEMBER = /^ {4}(?:readonly |static )*([\w$]+)\??[(<:]/;
 
-/** 인터페이스 · 클래스의 멤버와, 그것이 확장하는 것의 멤버. */
+/** Members of an interface · class, plus members of what it extends. */
 function members(d: Decl, seen: Set<string>): { where: string; ok: boolean }[] {
   const lines = linesOf(d.file);
   const head = lines[d.line]!;
@@ -141,8 +144,8 @@ test('입구에서 닿는 선언과 멤버에 전부 JSDoc 이 있다', () => {
     for (const name of exportsOf(file)) {
       const decls = resolve(file, name);
       assert.ok(decls.length, `${entry} 의 ${name} 선언을 못 찾았다 — 검사의 줄 읽기가 낡았다`);
-      // 선언 병합(`interface Ytdlp` + `class Ytdlp`)은 에디터가 주석을 합쳐 보여
-      // 주므로 한 곳에만 있으면 된다.
+      // Declaration merging (`interface Ytdlp` + `class Ytdlp`) needs the comment in
+      // only one place, since the editor shows them combined.
       if (!decls.some(d => documented(linesOf(d.file), d.line))) {
         missing.push(`${path.relative(LIB, decls[0]!.file)}  ${name}`);
       }
@@ -167,9 +170,9 @@ test('입구에서 닿는 선언과 멤버에 전부 JSDoc 이 있다', () => {
 });
 
 /**
- * 여기만 `lib/` 가 아니라 소스를 본다. 파일 맨 앞 주석은 첫 문장에 붙는데,
- * 입구 파일의 첫 문장이 값 import 라서 `tsc` 가 선언 방출에서 그 문장과 함께
- * 주석을 버린다.
+ * Only this one reads the source instead of `lib/`. A file's leading comment attaches
+ * to its first statement, and the entry files' first statement is a value import,
+ * so `tsc` drops the comment together with that statement during declaration emit.
  */
 test('입구 파일마다 @module 주석이 있다', () => {
   for (const src of SOURCES) {
@@ -178,7 +181,7 @@ test('입구 파일마다 @module 주석이 있다', () => {
   }
 });
 
-/** `lib/` 의 모든 `.d.ts` 에서 `@example` 코드 블록을 뽑는다. */
+/** Extracts the `@example` code blocks from every `.d.ts` in `lib/`. */
 function examples(): { from: string; code: string }[] {
   const out: { from: string; code: string }[] = [];
   const walk = (dir: string): void => {
@@ -206,8 +209,8 @@ test('@example 이 손님 프로젝트에서 그대로 컴파일된다', () => {
   const found = examples();
   expect(found.length).toBeGreaterThan(0);
 
-  // types.test.ts 와 같은 모양 — 저장소를 node_modules/ytstudio 로 링크한다.
-  // 그래서 예제는 exports 를 지나 배포물(lib/)을 본다.
+  // Same shape as types.test.ts — link the repo as node_modules/ytstudio.
+  // So examples go through exports and see the shipped build (lib/).
   const dir = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-docs-'));
   mkdirSync(path.join(dir, 'node_modules'));
   symlinkSync(ROOT, path.join(dir, 'node_modules', 'ytstudio'), 'dir');
@@ -219,8 +222,8 @@ test('@example 이 손님 프로젝트에서 그대로 컴파일된다', () => {
       types: ['node'], strict: true, noEmit: true, skipLibCheck: true,
     },
   }));
-  // `export {}` 로 파일마다 모듈이 되게 한다 — 스크립트로 두면 예제끼리 전역을
-  // 나눠 써서, import 를 빼먹은 예제가 옆 예제 덕에 통과한다.
+  // `export {}` makes each file a module — as scripts, examples would share globals,
+  // and an example missing its import would pass thanks to its neighbour.
   found.forEach((ex, i) => writeFileSync(path.join(dir, `ex${i}.ts`), `${ex.code}\nexport {};\n`));
 
   try {

@@ -1,9 +1,10 @@
 /**
- * 예제.
+ * Examples.
  *
- * 고르는 기준은 "이 라이브러리가 아니면 못 하는 것"이다. 옵션 하나를 붙이는
- * 건 어느 빌더나 한다. `-f` 문법과 `-o` 템플릿이 **타입이 붙은 식**이 되는 것,
- * 그리고 남이 준 명령어를 **검사**하는 것 — 그 둘이 이 저장소의 이유다.
+ * The bar for picking them is "what you cannot do without this library". Adding an
+ * option is something every builder does. The `-f` grammar and the `-o` template
+ * becoming **typed expressions**, and **checking** a command someone else gave you —
+ * those two are why this repo exists.
  */
 export interface Example { name: string; note: string; code: string }
 

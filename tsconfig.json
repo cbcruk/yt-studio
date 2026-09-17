@@ -1,8 +1,9 @@
 {
-  // 저장소에 .js 가 없다. 소스도 테스트도 생성기도 전부 .ts 이고, bun 이 그걸
-  // 그대로 돌린다. 그래서 예전에 eslint 가 보던 둘(no-undef · no-unused-vars)을
-  // 여기서 본다 — tsc 가 선언 안 된 이름을 잡고, noUnusedLocals 가 죽은 지역
-  // 변수를 잡는다. 인자는 안 본다(옛 eslint 설정의 args:'none' 과 같게).
+  // There is no .js in the repo. Source, tests, and generators are all .ts, and bun
+  // runs them as is. So the two things eslint used to check (no-undef,
+  // no-unused-vars) are checked here — tsc catches undeclared names and
+  // noUnusedLocals catches dead locals. Parameters aren't checked (matching
+  // args:'none' in the old eslint config).
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
