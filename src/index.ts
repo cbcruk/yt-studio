@@ -39,11 +39,11 @@
  *
  * @module
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { studio, TYPES_VERSION } from './browser.js';
+import { checkRawSchema, SchemaError, studio, TYPES_VERSION } from './browser.js';
 import type { SchemaOrigin, SchemaSource, Ytstudio } from './browser.js';
 import type { RawSchema } from './core/schema.js';
 import type { Ytdlp } from './core/build.js';
@@ -63,18 +63,29 @@ export * from './browser.js';
 const SCHEMA_FILE = 'yt-studio.schema.json';
 
 /**
- * Not every plausible JSON is our schema.
+ * Reads a schema file: `null` when it isn't there or isn't ours, an error when it is ours but broken.
  *
- * Since we search the working directory, we may pick up someone else's file,
- * so we check the shape and treat a mismatch as absent. There is no reason to
- * tell "unreadable" apart from "not ours" — both mean "not here".
+ * Since we search the working directory, we may pick up someone else's JSON — one
+ * without `ytdlp_version` is treated as absent. But a file that **is** ours and can't
+ * be used must not be skipped silently: that would check against the bundled
+ * version and report a pass. That covers two cases.
+ *
+ * - not JSON at all — our file name, cut off mid-write (`yt-studio types` interrupted)
+ * - has `ytdlp_version` but a field is missing or wrong — {@linkcode checkRawSchema} lists them
+ *
+ * @throws {SchemaError} with the path in front.
  */
 function readSchema(path: string): RawSchema | null {
-  try {
-    const v = JSON.parse(readFileSync(path, 'utf8'));
-    if (v && typeof v.ytdlp_version === 'string' && Array.isArray(v.options)) return v;
-  } catch { /* missing, broken, or someone else's */ }
-  return null;
+  if (!existsSync(path)) return null;
+  let v: unknown;
+  try { v = JSON.parse(readFileSync(path, 'utf8')); }
+  catch (e) { throw new SchemaError([`${path} — JSON 으로 읽지 못했다 (${(e as Error).message})`]); }
+  if (typeof v !== 'object' || v === null || !('ytdlp_version' in v)) return null;
+  try { return checkRawSchema(v); }
+  catch (e) {
+    if (e instanceof SchemaError) throw new SchemaError(e.problems.map(p => `${path}: ${p}`));
+    throw e;
+  }
 }
 
 const bundledPath = fileURLToPath(new URL(`../${SCHEMA_FILE}`, import.meta.url));

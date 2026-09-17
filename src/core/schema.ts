@@ -207,6 +207,81 @@ export interface Schema {
   raw: RawSchema;
 }
 
+/** A schema JSON that claims to be ours but can't be used — says what is wrong. */
+export class SchemaError extends Error {
+  /** Each problem found, as a path and what was expected (`options[3].aliases — 문자열 배열이어야 한다`). */
+  readonly problems: string[];
+
+  constructor(problems: string[]) {
+    const shown = problems.slice(0, 5).join(' · ');
+    const more = problems.length > 5 ? ` … ${problems.length - 5}개 더` : '';
+    super(`스키마 모양이 맞지 않다 — ${shown}${more}`);
+    this.name = 'SchemaError';
+    this.problems = problems;
+  }
+}
+
+const KINDS: readonly string[] = ['flag', 'value', 'choice', 'repeatable'] satisfies OptKind[];
+const VALUE_TYPES: readonly unknown[] = ['string', 'int', 'float', 'choice', null];
+
+/**
+ * Checks that an unknown value has every field the code reads, and returns it as a {@linkcode RawSchema}.
+ *
+ * The code trusts the schema completely — `buildSchema` walks `aliases` and `stages`
+ * without asking. So a half-right file used to die later as a `TypeError` naming
+ * neither the file nor the field. Here every problem is collected at once.
+ *
+ * Fields added after the first schemas (`keys` · `rule` · `vocabs` · `valueType` ·
+ * `keyed`) may be missing and read as `null`; a wrong type is still a problem.
+ *
+ * @throws {SchemaError} listing every problem found.
+ */
+export function checkRawSchema(v: unknown): RawSchema {
+  const bad: string[] = [];
+  const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+  const isStrs = (x: unknown): boolean => Array.isArray(x) && x.every(s => typeof s === 'string');
+  const need = (ok: boolean, at: string, what: string): void => { if (!ok) bad.push(`${at} — ${what}`); };
+  const strOrNull = (x: unknown): boolean => x === null || typeof x === 'string';
+  const later = (o: Record<string, unknown>, k: string, ok: (x: unknown) => boolean, at: string, what: string): void => {
+    if (o[k] !== undefined) need(ok(o[k]), `${at}.${k}`, what);
+  };
+
+  if (!isObj(v)) throw new SchemaError(['(최상위) — 객체여야 한다']);
+  need(typeof v.ytdlp_version === 'string', 'ytdlp_version', '문자열이어야 한다');
+  need(v.source === undefined || v.source === 'optparse' || v.source === 'help', 'source', "'optparse' 나 'help' 여야 한다");
+
+  if (!Array.isArray(v.stages)) bad.push('stages — 배열이어야 한다');
+  else v.stages.forEach((s, i) => {
+    const at = `stages[${i}]`;
+    if (!isObj(s)) return void bad.push(`${at} — 객체여야 한다`);
+    for (const k of ['id', 'label', 'blurb']) need(typeof s[k] === 'string', `${at}.${k}`, '문자열이어야 한다');
+    need(isStrs(s.groups), `${at}.groups`, '문자열 배열이어야 한다');
+  });
+
+  if (!Array.isArray(v.options)) bad.push('options — 배열이어야 한다');
+  else v.options.forEach((o, i) => {
+    const at = `options[${i}]`;
+    if (!isObj(o)) return void bad.push(`${at} — 객체여야 한다`);
+    for (const k of ['id', 'flag', 'stage', 'group', 'help']) need(typeof o[k] === 'string', `${at}.${k}`, '문자열이어야 한다');
+    for (const k of ['short', 'dest', 'metavar', 'negation']) need(strOrNull(o[k]), `${at}.${k}`, '문자열이나 null 이어야 한다');
+    need(isStrs(o.aliases), `${at}.aliases`, '문자열 배열이어야 한다');
+    need(KINDS.includes(o.kind as string), `${at}.kind`, `${KINDS.join(' · ')} 중 하나여야 한다`);
+    need(o.choices === null || isStrs(o.choices), `${at}.choices`, '문자열 배열이나 null 이어야 한다');
+    later(o, 'keys', x => x === null || isStrs(x), at, '문자열 배열이나 null 이어야 한다');
+    later(o, 'rule', x => x === null || (isObj(x) && isStrs(x.vocab) && typeof x.from === 'boolean'), at,
+      '{ vocab: 문자열 배열, from: boolean } 이나 null 이어야 한다');
+    later(o, 'vocabs', x => x === null || (isObj(x) && Object.values(x).every(isStrs)), at,
+      '문자열 배열을 값으로 갖는 객체나 null 이어야 한다');
+    later(o, 'valueType', x => VALUE_TYPES.includes(x), at, "'string' · 'int' · 'float' · 'choice' · null 중 하나여야 한다");
+    later(o, 'keyed', x => x === null || (isObj(x) && typeof x.pattern === 'string'
+      && (x.defaults === null || isStrs(x.defaults)) && typeof x.multiple === 'boolean' && typeof x.append === 'boolean'), at,
+      '{ pattern, defaults, multiple, append } 나 null 이어야 한다');
+  });
+
+  if (bad.length) throw new SchemaError(bad);
+  return v as unknown as RawSchema;
+}
+
 /** Raw JSON → indexed schema. A pure function. */
 export function buildSchema(raw: RawSchema): Schema {
   const opts = raw.options;

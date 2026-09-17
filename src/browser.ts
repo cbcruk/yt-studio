@@ -20,7 +20,7 @@
  *
  * @module
  */
-import { buildSchema } from './core/schema.js';
+import { buildSchema, checkRawSchema } from './core/schema.js';
 import { lintCommand as lintWith, nearestFlags as nearestWith } from './core/lint.js';
 import { explainCommand as explainWith, suggestNext as suggestWith } from './core/explain.js';
 import { scanCommand as scanWith } from './core/command.js';
@@ -102,7 +102,8 @@ export interface Ytstudio {
  * directly".
  */
 export function studio(raw: RawSchema, source?: SchemaSource): Ytstudio {
-  const schema = buildSchema(raw);
+  // Typed as RawSchema, but it usually comes from `fetch(…).json()` — check what arrived.
+  const schema = buildSchema(checkRawSchema(raw));
   const ytdlpOf = makeYtdlp(schema);
 
   return {
@@ -133,6 +134,7 @@ export { TYPES_VERSION } from './core/options.gen.js';
 export { tokenize, quote } from './core/command.js';
 export { distance, LEVELS } from './core/lint.js';
 export { previewFilename, DEFAULT_OUTTMPL } from './core/explain.js';
+export { SchemaError, checkRawSchema } from './core/schema.js';
 
 export type { Issue, Level, LintResult, Values } from './core/lint.js';
 export type { FilePreview, Explained, Suggestion } from './core/explain.js';

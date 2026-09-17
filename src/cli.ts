@@ -16,7 +16,7 @@
  * into CI or scripts.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { basename, resolve } from 'node:path';
 
@@ -203,8 +203,14 @@ function types(args: string[]): number {
 
   const schemaPath = resolve(process.cwd(), 'yt-studio.schema.json');
   const dtsPath = resolve(process.cwd(), 'yt-studio-env.d.ts');
-  writeFileSync(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
-  writeFileSync(dtsPath, dts);
+  // Write beside the target, then rename. An interrupted write used to leave half a
+  // schema under our file name — now the old file stays until the new one is whole.
+  const put = (path: string, text: string): void => {
+    writeFileSync(`${path}.tmp`, text);
+    renameSync(`${path}.tmp`, path);
+  };
+  put(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
+  put(dtsPath, dts);
 
   console.log(`${dim('읽음')}      ${bin} ${dim(`(yt-dlp ${version}) · --help 파싱`)}`);
   console.log(`${dim('옵션')}      ${r.schema.options.length}개 ${dim(`· 새로 ${r.added.length} · 사라짐 ${r.removed.length} (번들 ${BUNDLED.options.length} 대비)`)}`);
