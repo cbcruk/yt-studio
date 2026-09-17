@@ -21,18 +21,23 @@
 
 /** 옵션 하나. `gen_schema.py` 가 optparse 트리에서 뽑은 그대로다. */
 export interface Opt {
+  /** 긴 플래그에서 `--` 를 뗀 것 (`write-subs`). 이 저장소에서 옵션을 가리키는 이름이다. */
   id: string;
   /** 긴 플래그. 메서드 이름이 여기서 나온다. */
   flag: string;
   /** 짧은 플래그. 명령어에 찍히는 건 있으면 이쪽이다. */
   short: string | null;
+  /** 같은 옵션의 다른 긴 플래그 (`--ies` → `use-extractors`). */
   aliases: string[];
   /** 생애주기 단계 — `source` · `format` · `store` … */
   stage: string;
   /** yt-dlp `--help` 의 묶음 이름. */
   group: string;
+  /** optparse 가 값을 담는 속성 이름. 값을 안 담는 옵션이면 `null`. */
   dest: string | null;
+  /** 값을 받는 방식. */
   kind: OptKind;
+  /** 도움말에 찍히는 값 자리 이름 (`FORMAT` · `FILE`). 값을 안 받으면 `null`. */
   metavar: string | null;
   /** 값 전체가 이 중 하나여야 한다. `--fixup never` */
   choices: string[] | null;
@@ -65,7 +70,9 @@ export interface Opt {
    * `--audio-quality 0` 도 `string` 이다.
    */
   valueType: 'string' | 'int' | 'float' | 'choice' | null;
+  /** optparse 의 기본값. 옵션마다 모양이 달라서 좁히지 않는다. */
   default: unknown;
+  /** yt-dlp `--help` 의 설명 한 단락. `%default` 는 이미 채워져 있다. */
   help: string;
   /** `--no-part` 처럼 끄는 형태가 따로 있으면 그 플래그. */
   negation: string | null;
@@ -94,9 +101,13 @@ export interface OptRule {
 
 /** 생애주기 단계. 사람이 읽을 이름을 붙이려고 손으로 채운 층이다. */
 export interface Stage {
+  /** 단계 이름 (`run` · `format` …). {@linkcode Opt.stage} 가 이걸 가리킨다. */
   id: string;
+  /** 짧은 한국어 이름 (`실행`). */
   label: string;
+  /** 이 단계가 정하는 것 한 줄 (`한 번의 실행 전체가 어떻게 동작할지`). */
   blurb: string;
+  /** 이 단계에 드는 yt-dlp `--help` 묶음 이름들. */
   groups: string[];
 }
 
@@ -118,10 +129,13 @@ export type SchemaFrom = 'optparse' | 'help';
 
 /** `gen_schema.py` 가 내놓는 JSON 그대로. */
 export interface RawSchema {
+  /** 리플렉션한 yt-dlp 의 버전 (`2026.07.04`). */
   ytdlp_version: string;
   /** 없으면 `optparse` 다 — 이 필드가 생기기 전 스키마가 그것뿐이었다. */
   source?: SchemaFrom;
+  /** 생애주기 단계. 순서가 명령어가 처리되는 순서다. */
   stages: Stage[];
+  /** 옵션 전부. `--help` 에서 숨긴 것은 없다. */
   options: Opt[];
 }
 
@@ -134,9 +148,13 @@ export interface RawSchema {
 export interface Schema {
   /** 이 스키마가 나온 yt-dlp 버전. */
   version: string;
+  /** 어떤 리플렉션에서 나왔나. */
   from: SchemaFrom;
+  /** 옵션 전부. {@linkcode RawSchema.options} 와 같은 순서다. */
   opts: readonly Opt[];
+  /** 옵션 id → 옵션. */
   byId: Readonly<Record<string, Opt>>;
+  /** 단계 id → 단계. */
   stage: Readonly<Record<string, Stage>>;
   /** 별칭·단축·부정형까지 전부. 검증기가 문자열을 되읽을 때 쓴다. */
   byFlag: Readonly<Record<string, FlagHit>>;

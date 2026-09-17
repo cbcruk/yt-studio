@@ -19,9 +19,13 @@ const OP_SEP: Record<FormatOp, string> = { merge: '+', fallback: '/', multi: ','
 
 /** `[height<=?1080]` 한 칸. `loose` 가 참이면 `?` 가 붙는다. */
 export interface Filter {
+  /** 포맷 필드 이름 (`height` · `ext`). */
   key: string;
+  /** 비교 연산자 (`<=` · `^=` · `!*=` …). 값 없이 이름만 쓰면 `has` · `hasnot`. */
   op: string;
+  /** 참이면 그 필드가 없는 포맷도 통과시킨다 — `?` 가 붙는다. */
   loose?: boolean;
+  /** 비교할 값. `has` · `hasnot` 이면 빈 문자열이다. */
   value: string;
 }
 

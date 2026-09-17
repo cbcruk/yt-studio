@@ -441,6 +441,7 @@ tests/               전부 bun:test. `bun test` 하나로 다 돈다
   unit/*.test.ts     순수 로직 (106개 — 스키마 해석 순서도 여기다)
   cli.test.ts        프로세스로서의 CLI — 종료 코드 · 파이프 · 스키마 해석 순서
   types.test.ts      ytstudio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
+  docs.test.ts       공개 선언의 JSDoc · @example 이 컴파일되는가 (.claude/rules/jsdoc.md)
   drift.test.ts      실물 yt-dlp 와 대조. yt-dlp 가 없으면 건너뛴다
   fixtures/          진짜 yt-dlp --help 한 판. 파서의 정답지가 스키마다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션한다               ← 유일한 비-TS

@@ -44,6 +44,19 @@ const SELS = SELECTORS.flatMap(([, items]) => items.map(([k]) => k));
 const OUT_FIELDS = FIELDS.flatMap(([, items]) => items.map(([k]) => k));
 const TYPES = OUT_TYPES.map(([v]) => v).filter(Boolean);
 
+// NumCond · StrCond 의 키. 연산자 표(build.ts)와 같은 순서다.
+const NUM_CONDS: [key: string, doc: string][] = [
+  ['lt', '`<` — 보다 작다'], ['lte', '`<=` — 이하'], ['gt', '`>` — 보다 크다'],
+  ['gte', '`>=` — 이상'], ['eq', '`=` — 같다'], ['ne', '`!=` — 다르다'],
+];
+const STR_CONDS: [key: string, doc: string][] = [
+  ['eq', '`=` — 같다'], ['ne', '`!=` — 다르다'],
+  ['startsWith', '`^=` — 이것으로 시작한다'], ['endsWith', '`$=` — 이것으로 끝난다'],
+  ['includes', '`*=` — 이것을 품는다'], ['matches', '`~=` — 정규식에 맞는다'],
+  ['notStartsWith', '`!^=` — 이것으로 시작하지 않는다'], ['notEndsWith', '`!$=` — 이것으로 끝나지 않는다'],
+  ['notIncludes', '`!*=` — 이것을 품지 않는다'], ['notMatches', '`!~=` — 정규식에 맞지 않는다'],
+];
+
 const fkeyDoc = (k: string): string => doc((FKEYS.find(([n]) => n === k) || ['', ''])[1]);
 const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
@@ -120,15 +133,15 @@ ${SELS.map(s => `  /** \`${s}\` — ${doc(SEL_HELP[s])} */\n  ${selMethod(s)}(fi
 
 /** 숫자 필드 비교. \`loose\` 는 그 값이 없는 포맷도 통과시킨다 (\`height<=?1080\`). */
 export interface NumCond {
-  lt?: number; lte?: number; gt?: number; gte?: number; eq?: number; ne?: number;
+${NUM_CONDS.map(([k, d]) => `  /** ${d} */\n  ${k}?: number;`).join('\n')}
+  /** 그 필드가 없는 포맷도 통과시킨다 — \`?\` 가 붙는다. */
   loose?: boolean;
 }
 
-/** 문자 필드 비교. */
+/** 문자 필드 비교. 여러 개를 주면 전부 걸린다. */
 export interface StrCond {
-  eq?: string; ne?: string;
-  startsWith?: string; endsWith?: string; includes?: string; matches?: string;
-  notStartsWith?: string; notEndsWith?: string; notIncludes?: string; notMatches?: string;
+${STR_CONDS.map(([k, d]) => `  /** ${d} */\n  ${k}?: string;`).join('\n')}
+  /** 그 필드가 없는 포맷도 통과시킨다 — \`?\` 가 붙는다. */
   loose?: boolean;
 }
 
@@ -159,7 +172,9 @@ ${matchProps}
 
 /** \`-o\` 템플릿에 자주 쓰는 필드. 나머지는 \`t.field('이름')\` 으로. */
 export type OutField = ${union(OUT_FIELDS)};
+/** \`-o\` · \`-P\` 앞에 붙는 파일 종류. 안 붙이면 받는 파일 전부다. */
 export type OutType = ${union(TYPES)};
+/** \`-o\` 필드 맨 뒤의 변환 글자. \`%(title)S\` 의 \`S\`. */
 export type Conversion = ${union(CONVERSIONS.map(([c]) => c))};
 
 /**
@@ -178,7 +193,7 @@ export interface PathMap {
   home?: string;
   /** 받는 동안 쓰는 임시 자리. */
   temp?: string;
-${TYPES.map(t => `  ${t}?: string;`).join('\n')}
+${OUT_TYPES.filter(([t]) => t).map(([t, label]) => `  /** ${doc(label)} */\n  ${t}?: string;`).join('\n')}
 }
 
 /**

@@ -26,28 +26,45 @@ import type { Piece } from './output-template.js';
 
 /** error 는 그대로 돌리면 안 되는 것, warn 은 의도와 다를 수 있는 것, info 는 참고. */
 export const LEVELS = ['error', 'warn', 'info'] as const;
+/** 진단의 심각도. 순서는 {@linkcode LEVELS} 를 따른다. */
 export type Level = (typeof LEVELS)[number];
 const rank = (l: Level): number => LEVELS.indexOf(l);
 
 /** 검증기가 잡은 것 하나. `fixes` 는 없는 플래그일 때 가까운 후보 셋. */
 export interface Issue {
+  /** 심각도. `error` 가 하나라도 있으면 {@linkcode LintResult.ok} 가 거짓이다. */
   level: Level;
+  /** 사람이 읽을 한 줄. 한국어다. */
   msg: string;
+  /** 문제가 난 플래그를 명령어에 쓰인 그대로. 특정 플래그가 아니면 없다. */
   flag?: string;
+  /** 문제가 난 옵션의 id (`write-subs`). 스키마가 모르는 플래그면 없다. */
   opt?: string;
+  /** 대신 쓸 만한 플래그. 없는 플래그일 때 가까운 것부터 셋까지. */
   fixes?: string[];
 }
 
 /** 옵션 id → 읽어 낸 값. 플래그는 boolean, repeatable 은 배열이다. */
 export type Values = Record<string, string | boolean | (string | null)[] | null>;
 
+/** 명령어 문자열 하나를 검사한 결과. */
 export interface LintResult {
+  /** 명령어를 읽어 낸 항목들. 원문 순서 그대로다. */
   items: Item[];
+  /** 옵션이 아닌 토큰 — 받을 대상. */
   urls: string[];
+  /** 옵션 id → 읽어 낸 값. {@linkcode previewFilename} 이 이걸 먹는다. */
   values: Values;
+  /** 잡은 것 전부. 심각한 것부터 온다. */
   issues: Issue[];
   /** 오류가 하나도 없으면 참. 경고는 여기 안 센다. */
   ok: boolean;
+  /**
+   * 한 줄 요약에 쓰는 수.
+   *
+   * `opts` 는 이 명령어가 쓴 서로 다른 옵션 수, `total` 은 대조한 스키마의
+   * 옵션 수다.
+   */
   counts: { error: number; warn: number; info: number; opts: number; total: number };
 }
 

@@ -81,15 +81,45 @@ export interface FormatFactory<E> {
 
 /** 숫자 필드 비교. `loose` 는 그 값이 없는 포맷도 통과시킨다 (`height<=?1080`). */
 export interface NumCond {
-  lt?: number; lte?: number; gt?: number; gte?: number; eq?: number; ne?: number;
+  /** `<` — 보다 작다 */
+  lt?: number;
+  /** `<=` — 이하 */
+  lte?: number;
+  /** `>` — 보다 크다 */
+  gt?: number;
+  /** `>=` — 이상 */
+  gte?: number;
+  /** `=` — 같다 */
+  eq?: number;
+  /** `!=` — 다르다 */
+  ne?: number;
+  /** 그 필드가 없는 포맷도 통과시킨다 — `?` 가 붙는다. */
   loose?: boolean;
 }
 
-/** 문자 필드 비교. */
+/** 문자 필드 비교. 여러 개를 주면 전부 걸린다. */
 export interface StrCond {
-  eq?: string; ne?: string;
-  startsWith?: string; endsWith?: string; includes?: string; matches?: string;
-  notStartsWith?: string; notEndsWith?: string; notIncludes?: string; notMatches?: string;
+  /** `=` — 같다 */
+  eq?: string;
+  /** `!=` — 다르다 */
+  ne?: string;
+  /** `^=` — 이것으로 시작한다 */
+  startsWith?: string;
+  /** `$=` — 이것으로 끝난다 */
+  endsWith?: string;
+  /** `*=` — 이것을 품는다 */
+  includes?: string;
+  /** `~=` — 정규식에 맞는다 */
+  matches?: string;
+  /** `!^=` — 이것으로 시작하지 않는다 */
+  notStartsWith?: string;
+  /** `!$=` — 이것으로 끝나지 않는다 */
+  notEndsWith?: string;
+  /** `!*=` — 이것을 품지 않는다 */
+  notIncludes?: string;
+  /** `!~=` — 정규식에 맞지 않는다 */
+  notMatches?: string;
+  /** 그 필드가 없는 포맷도 통과시킨다 — `?` 가 붙는다. */
   loose?: boolean;
 }
 
@@ -260,7 +290,9 @@ export interface MatchFields {
 
 /** `-o` 템플릿에 자주 쓰는 필드. 나머지는 `t.field('이름')` 으로. */
 export type OutField = 'title' | 'fulltitle' | 'id' | 'ext' | 'upload_date' | 'timestamp' | 'duration' | 'duration_string' | 'view_count' | 'like_count' | 'webpage_url' | 'is_live' | 'was_live' | 'live_status' | 'availability' | 'age_limit' | 'license' | 'uploader' | 'uploader_id' | 'channel' | 'channel_id' | 'artist' | 'album' | 'track' | 'playlist' | 'playlist_title' | 'playlist_id' | 'playlist_index' | 'playlist_count' | 'n_entries' | 'autonumber' | 'format' | 'format_id' | 'format_note' | 'resolution' | 'height' | 'width' | 'fps' | 'vcodec' | 'acodec' | 'filesize' | 'chapter' | 'chapter_number' | 'section_title' | 'section_number' | 'section_start' | 'section_end' | 'extractor' | 'extractor_key' | 'epoch';
+/** `-o` · `-P` 앞에 붙는 파일 종류. 안 붙이면 받는 파일 전부다. */
 export type OutType = 'chapter' | 'subtitle' | 'thumbnail' | 'description' | 'annotation' | 'infojson' | 'link' | 'pl_video' | 'pl_thumbnail' | 'pl_description' | 'pl_infojson';
+/** `-o` 필드 맨 뒤의 변환 글자. `%(title)S` 의 `S`. */
 export type Conversion = 's' | 'd' | 'f' | 'B' | 'j' | 'l' | 'q' | 'D' | 'S' | 'U' | 'h';
 
 /**
@@ -378,16 +410,27 @@ export interface PathMap {
   home?: string;
   /** 받는 동안 쓰는 임시 자리. */
   temp?: string;
+  /** chapter — 챕터별 분할 파일 */
   chapter?: string;
+  /** subtitle — 자막 */
   subtitle?: string;
+  /** thumbnail — 썸네일 */
   thumbnail?: string;
+  /** description — 설명 */
   description?: string;
+  /** annotation — 주석 (yt-dlp 가 받지만 유튜브가 없앤 기능이다) */
   annotation?: string;
+  /** infojson — 메타데이터 JSON */
   infojson?: string;
+  /** link — 인터넷 바로가기 */
   link?: string;
+  /** pl_video — 재생목록 항목 */
   pl_video?: string;
+  /** pl_thumbnail — 재생목록 썸네일 */
   pl_thumbnail?: string;
+  /** pl_description — 재생목록 설명 */
   pl_description?: string;
+  /** pl_infojson — 재생목록 JSON */
   pl_infojson?: string;
 }
 
