@@ -18,13 +18,19 @@
  * installs yt-dlp and runs it. **Without yt-dlp the whole file is skipped** — so
  * a plain `bun test` does not break.
  *
+ * `gen_schema.py` imports yt-dlp as a Python module, so the binary alone is not
+ * enough. Homebrew and pipx keep yt-dlp in a Python of their own, which the plain
+ * `python3` can't import from — so the interpreter defaults to the one on the
+ * binary's `#!` line. If that still can't import it, the file is skipped locally
+ * but fails in CI, where a skip would hide a broken job.
+ *
  * The committed schema being older than the latest is not a failure in itself —
  * that is always the case. It fails **only when the machinery is broken**.
  */
 import { afterAll, beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,7 +42,6 @@ import type { Opt, RawSchema } from '../src/core/schema.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'lib', 'cli.js');
 const YTDLP = process.env.YTDLP_BIN || 'yt-dlp';
-const PYTHON = process.env.PYTHON_BIN || 'python3';
 
 const BASE: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'yt-studio.schema.json'), 'utf8'));
 
@@ -48,7 +53,45 @@ const version = ((): string | null => {
   } catch { return null; }
 })();
 
-const skip = version === null;
+/** The yt-dlp binary's absolute path, found the way the shell finds it. `null` when it isn't on `PATH`. */
+function which(bin: string): string | null {
+  if (bin.includes('/')) return existsSync(bin) ? bin : null;
+  for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
+    const p = path.join(dir, bin);
+    if (dir && existsSync(p)) return p;
+  }
+  return null;
+}
+
+/** The interpreter on the binary's `#!` line, or `python3` for a standalone binary without one. */
+function pythonOf(bin: string): string {
+  const p = which(bin);
+  const first = p ? readFileSync(p).subarray(0, 256).toString('utf8').split('\n')[0] ?? '' : '';
+  const m = /^#!\s*(\S+)(?:\s+(\S+))?/.exec(first);
+  if (!m) return 'python3';
+  const [, interp, arg] = m;
+  return interp?.endsWith('/env') && arg ? arg : interp ?? 'python3';
+}
+
+const PYTHON = process.env.PYTHON_BIN || pythonOf(YTDLP);
+
+const importable = version !== null && ((): boolean => {
+  try {
+    execFileSync(PYTHON, ['-c', 'import yt_dlp'], { stdio: 'pipe' });
+    return true;
+  } catch { return false; }
+})();
+
+if (version !== null && !importable && process.env.CI) {
+  throw new Error(`${PYTHON} 가 yt_dlp 를 import 하지 못한다 — pip 으로 깔렸는지 볼 것`);
+}
+
+const skipWhy = version === null
+  ? `yt-dlp 가 없어 건너뛰었다 (${YTDLP}) — 정기 잡에서 깔고 돌린다`
+  : !importable
+    ? `${PYTHON} 가 yt_dlp 를 import 하지 못해 건너뛰었다 — PYTHON_BIN 으로 yt-dlp 가 깔린 Python 을 가리킬 것`
+    : null;
+const skip = skipWhy !== null;
 const live = test.skipIf(skip);
 
 let parsed: HelpResult;
@@ -111,8 +154,8 @@ live('yt-studio types 가 실물로 끝까지 간다', () => {
 
 // The committed schema lagging behind is routine, so it is not a failure. Only report it.
 afterAll(() => {
-  if (skip) {
-    console.log(`  · yt-dlp 가 없어 건너뛰었다 (${YTDLP}) — 정기 잡에서 깔고 돌린다`);
+  if (skipWhy) {
+    console.log(`  · ${skipWhy}`);
     return;
   }
   const liveBy = new Map(optparse.options.map(o => [o.flag, o]));
@@ -127,5 +170,5 @@ afterAll(() => {
   console.log(`  · 커밋된 스키마 ${BASE.ytdlp_version} · 실물 ${version} — 새로 ${added.length} · 사라짐 ${removed.length}`);
   if (added.length) console.log(`      새 옵션: ${added.join(' ')}`);
   if (removed.length) console.log(`      사라진 옵션: ${removed.join(' ')}`);
-  console.log('      다시 뽑으려면: python3 gen_schema.py > yt-studio.schema.json && bun run gen:types');
+  console.log(`      다시 뽑으려면: ${PYTHON} gen_schema.py > yt-studio.schema.json && bun run gen:types`);
 });
