@@ -153,3 +153,20 @@ test('로컬 스키마가 깨져 있어도 types 는 돈다 — 그걸 다시 �
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /yt-dlp 를 실행하지 못했다/);
 });
+
+// Importing must not touch the file system — users passing their own schema pay nothing.
+// Watched from a separate process: fs is patched before the compiled entry point loads.
+test('yt-studio 를 import 만 하면 파일을 안 읽는다', () => {
+  const probe = `
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const read = [];
+    const orig = fs.readFileSync;
+    fs.readFileSync = (p, ...a) => { read.push(String(p)); return orig(p, ...a); };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(path.join(ROOT, 'lib', 'index.js'))});
+    console.log(JSON.stringify(read.filter(p => p.endsWith('.json'))));
+  `;
+  const out = execFileSync(NODE, ['--input-type=module', '-e', probe], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(out), []);
+});

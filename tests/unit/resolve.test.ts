@@ -22,7 +22,8 @@ import path from 'node:path';
 
 import type { RawSchema } from '../../src/core/schema.js';
 
-const { BUNDLED, resolveSchema, ytstudio } = await import('../../src/index.js');
+const { bundledSchema, resolveSchema, ytstudio } = await import('../../src/index.js');
+const BUNDLED = bundledSchema();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const TMP = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-resolve-'));

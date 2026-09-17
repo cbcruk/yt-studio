@@ -97,15 +97,23 @@ function readBundled(): RawSchema {
   return raw;
 }
 
+let bundled: RawSchema | undefined;
+
 /**
- * The schema shipped with the package, as is.
+ * Returns the schema shipped with the package, as is.
  *
  * **It is where the types came from**, so `yt-studio types` uses it as the
  * baseline — the `.d.ts` it writes extends this, so "new options" must always
  * be relative to it. Using the currently active schema as the baseline would
  * drift from the second run on.
+ *
+ * **Read on first call**, then kept. It used to be a constant, which read and
+ * parsed 114KB of JSON the moment `yt-studio` was imported — even for users
+ * passing their own schema, and against the lazy default handle below.
  */
-export const BUNDLED: RawSchema = readBundled();
+export function bundledSchema(): RawSchema {
+  return (bundled ??= readBundled());
+}
 
 /** Where to look for the schema. Anything omitted falls back to the process's own. */
 export interface Where {
@@ -153,7 +161,7 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
   const raw = readSchema(path);
   if (raw) return found('local', path, raw);
 
-  return found('bundled', bundledPath, BUNDLED);
+  return found('bundled', bundledPath, bundledSchema());
 }
 
 /**

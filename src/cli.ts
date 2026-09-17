@@ -20,7 +20,7 @@ import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { basename, resolve } from 'node:path';
 
-import { BUNDLED, previewFilename, ytstudio } from './index.js';
+import { bundledSchema, previewFilename, ytstudio } from './index.js';
 import { emitEnvTypes } from './core/env-types.js';
 import { parseHelp } from './core/help-schema.js';
 import type { LintResult, Ytstudio } from './index.js';
@@ -205,19 +205,20 @@ function types(args: string[]): number {
     return 1;
   }
 
-  const r = parseHelp(help, version, BUNDLED);
+  const bundled = bundledSchema();
+  const r = parseHelp(help, version, bundled);
 
   // Help is output meant for people, so its format can change. A broken parser
   // extracts only a few and reports success — and then every one of users'
   // flags becomes a typo.
-  const gone = r.removed.length / BUNDLED.options.length;
+  const gone = r.removed.length / bundled.options.length;
   if (gone > 0.2) {
-    console.error(`${red('✗')} 도움말에서 옵션 ${r.removed.length}개가 사라졌다 (번들 ${BUNDLED.options.length}개 중) — 파서가 이 서식을 못 읽는다`);
+    console.error(`${red('✗')} 도움말에서 옵션 ${r.removed.length}개가 사라졌다 (번들 ${bundled.options.length}개 중) — 파서가 이 서식을 못 읽는다`);
     console.error(dim('  아무것도 쓰지 않았다. 반쯤 쓴 스키마가 제일 나쁘다.'));
     return 1;
   }
 
-  const byFlag = new Map(BUNDLED.options.map(o => [o.flag, o]));
+  const byFlag = new Map(bundled.options.map(o => [o.flag, o]));
   const next = new Map(r.schema.options.map(o => [o.flag, o]));
   const dts = emitEnvTypes({
     version,
@@ -237,7 +238,7 @@ function types(args: string[]): number {
   put(dtsPath, dts);
 
   console.log(`${dim('읽음')}      ${bin} ${dim(`(yt-dlp ${version}) · --help 파싱`)}`);
-  console.log(`${dim('옵션')}      ${r.schema.options.length}개 ${dim(`· 새로 ${r.added.length} · 사라짐 ${r.removed.length} (번들 ${BUNDLED.options.length} 대비)`)}`);
+  console.log(`${dim('옵션')}      ${r.schema.options.length}개 ${dim(`· 새로 ${r.added.length} · 사라짐 ${r.removed.length} (번들 ${bundled.options.length} 대비)`)}`);
   console.log(`${dim('씀')}        ${basename(schemaPath)} · ${basename(dtsPath)}`);
   if (r.added.length) console.log(`${dim('새 옵션')}   ${r.added.slice(0, 6).join('  ')}${r.added.length > 6 ? dim(` … ${r.added.length - 6}개 더`) : ''}`);
   if (r.unmappedGroups.length) {
