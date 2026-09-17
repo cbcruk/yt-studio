@@ -14,9 +14,9 @@
  * **All this file adds is one layer: where to pick the schema up from.** The
  * substance lives in `browser.ts` and is re-exported here in full — that side
  * knows nothing of the file system, so it runs in the browser too
- * (`ytstudio/browser`).
+ * (`yt-studio/browser`).
  *
- * **Local first** — if the working directory has `ytstudio.schema.json`, that
+ * **Local first** — if the working directory has `yt-studio.schema.json`, that
  * is used; otherwise the one shipped with the package. See `SchemaSource`.
  *
  * The schema is a **value**, so a handle (`ytstudio()`) carries it around. The
@@ -26,7 +26,7 @@
  *
  * @example Build and check
  * ```ts
- * import { ytdlp, lintCommand } from 'ytstudio';
+ * import { ytdlp, lintCommand } from 'yt-studio';
  *
  * ytdlp('https://youtu.be/abc')
  *   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
@@ -60,7 +60,7 @@ export * from './browser.js';
  * people's projects — it is a common name. Baking the package into the name
  * means the file name itself says why it is there.
  */
-const SCHEMA_FILE = 'ytstudio.schema.json';
+const SCHEMA_FILE = 'yt-studio.schema.json';
 
 /**
  * Not every plausible JSON is our schema.
@@ -89,7 +89,7 @@ function readBundled(): RawSchema {
 /**
  * The schema shipped with the package, as is.
  *
- * **It is where the types came from**, so `ytstudio types` uses it as the
+ * **It is where the types came from**, so `yt-studio types` uses it as the
  * baseline — the `.d.ts` it writes extends this, so "new options" must always
  * be relative to it. Using the currently active schema as the baseline would
  * drift from the second run on.
@@ -98,9 +98,9 @@ export const BUNDLED: RawSchema = readBundled();
 
 /** Where to look for the schema. Anything omitted falls back to the process's own. */
 export interface Where {
-  /** Directory to look for `ytstudio.schema.json` in. */
+  /** Directory to look for `yt-studio.schema.json` in. */
   cwd?: string;
-  /** Path to use instead of `YTSTUDIO_SCHEMA`. */
+  /** Path to use instead of `YT_STUDIO_SCHEMA`. */
   env?: string;
 }
 
@@ -127,14 +127,14 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
     raw,
   });
 
-  const env = at.env ?? process.env.YTSTUDIO_SCHEMA;
+  const env = at.env ?? process.env.YT_STUDIO_SCHEMA;
   if (env) {
     // If something explicitly pointed to can't be read, don't move on silently.
     // That is a typo, and moving on would check against the wrong version and
     // then report a pass.
     const path = resolve(env);
     const raw = readSchema(path);
-    if (!raw) throw new Error(`YTSTUDIO_SCHEMA 가 가리키는 스키마를 읽지 못했다: ${path}`);
+    if (!raw) throw new Error(`YT_STUDIO_SCHEMA 가 가리키는 스키마를 읽지 못했다: ${path}`);
     return found('env', path, raw);
   }
 
@@ -154,7 +154,7 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
  *
  * @example Two repos side by side
  * ```ts
- * import { ytstudio } from 'ytstudio';
+ * import { ytstudio } from 'yt-studio';
  *
  * const mine = ytstudio();
  * const theirs = ytstudio({ cwd: '/other/repo' });
@@ -187,7 +187,7 @@ const def = (): Ytstudio => (fallback ??= ytstudio());
  *
  * @example Stopping a command someone handed you
  * ```ts
- * import { lintCommand, previewFilename } from 'ytstudio';
+ * import { lintCommand, previewFilename } from 'yt-studio';
  *
  * const r = lintCommand('yt-dlp -P /dl -o "%(uploader)s/%(title)s.%(ext)s" https://youtu.be/abc');
  * if (!r.ok) throw new Error(r.issues.map(i => i.msg).join('\n'));

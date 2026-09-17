@@ -1,7 +1,7 @@
 # yt-dlp 스튜디오
 
 [![테스트](https://github.com/cbcruk/yt-studio/actions/workflows/test.yml/badge.svg)](https://github.com/cbcruk/yt-studio/actions/workflows/test.yml)
-[![npm](https://img.shields.io/npm/v/ytstudio.svg)](https://www.npmjs.com/package/ytstudio)
+[![npm](https://img.shields.io/npm/v/yt-studio.svg)](https://www.npmjs.com/package/yt-studio)
 
 **설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.**
 
@@ -10,8 +10,8 @@
 받는 것이다.
 
 ```
-npm i ytstudio
-npx ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
+npm i yt-studio
+npx yt-studio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 ```
 
 **설치하기 전에 만져 보고 싶다면 → [플레이그라운드](https://cbcruk.github.io/yt-studio/)**
@@ -34,7 +34,7 @@ have installed, and what file will it produce?*
 Two entry points over one schema.
 
 ```ts
-import { ytdlp, lintCommand } from 'ytstudio';
+import { ytdlp, lintCommand } from 'yt-studio';
 
 // Write commands in code — autocomplete is your installed yt-dlp's options
 ytdlp('https://youtu.be/abc')
@@ -47,13 +47,13 @@ lintCommand(whateverTheyGaveYou).issues;
 ```
 
 ```
-$ npx ytstudio lint 'yt-dlp -f "bv+ba/" --write-sub https://youtu.be/abc'
+$ npx yt-studio lint 'yt-dlp -f "bv+ba/" --write-sub https://youtu.be/abc'
 ✗ --write-sub is not a flag in this yt-dlp — did you mean --write-subs …
 ✗ could not read the -f value — no selector found
 ```
 
 Exits non-zero when the command has errors, so it drops straight into CI. Run
-`npx ytstudio types` once to re-reflect *your* yt-dlp — both the checker and the
+`npx yt-studio types` once to re-reflect *your* yt-dlp — both the checker and the
 autocomplete then follow your install rather than the version this package
 shipped with.
 
@@ -68,7 +68,7 @@ Korean; the reasoning behind each decision is written there.
 ```
 bun install       # 의존성은 typescript 와 @types/node 둘뿐이다
 bun run build     # → lib/  (tsc — 타입 선언까지 나와야 하므로 이건 tsc 가 한다)
-bun run gen:types # ytstudio.schema.json → src/core/options.gen.ts
+bun run gen:types # yt-studio.schema.json → src/core/options.gen.ts
 bun run cli       # 빌드 없이 CLI 를 돌려 본다
 bun run test      # 타입 + 빌드 + 단위 + CLI + types
 ```
@@ -117,7 +117,7 @@ yt-dlp 의 optparse 트리를 리플렉션해서 뽑은 것이고, `-f` · `-o` 
 ## 코드로 만들기
 
 ```ts
-import { ytdlp } from 'ytstudio';
+import { ytdlp } from 'yt-studio';
 
 ytdlp('https://youtu.be/abc')
   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
@@ -250,7 +250,7 @@ yt-dlp 가 그렇게 정의한다. 그래서 있던 것을 그대로 쓴다. 필
 유일무이한 일이다.
 
 ```
-$ ytstudio lint 'yt-dlp -f "bv+ba/" --write-sub -o "%(title)s" https://youtu.be/abc'
+$ yt-studio lint 'yt-dlp -f "bv+ba/" --write-sub -o "%(title)s" https://youtu.be/abc'
 ✗ --write-sub 는 이 yt-dlp 버전에 없는 플래그다 — --write-subs · --write-srt · --write-link 를 찾은 것 아닐까
     → --write-subs  --write-srt  --write-link
 ✗ -f 값을 읽지 못했다 — 셀렉터를 찾지 못했다 (7번째 글자 근처)
@@ -265,12 +265,12 @@ $ ytstudio lint 'yt-dlp -f "bv+ba/" --write-sub -o "%(title)s" https://youtu.be/
 늘 같이 낸다 — 아래 [어느 yt-dlp 에 대조하나](#어느-yt-dlp-에-대조하나).
 
 **오류가 있으면 1 로 끝난다** — 스크립트와 CI 에 그대로 걸린다. 파이프도 된다
-(`pbpaste | ytstudio lint`). 무슨 뜻인지 읽으려면 `ytstudio explain`.
+(`pbpaste | yt-studio lint`). 무슨 뜻인지 읽으려면 `yt-studio explain`.
 
 코드에서는 같은 것을 함수로 부른다.
 
 ```ts
-import { lintCommand, previewFilename } from 'ytstudio';
+import { lintCommand, previewFilename } from 'yt-studio';
 
 const r = lintCommand(누가준명령어);
 if (!r.ok) throw new Error(r.issues.map(i => i.msg).join('\n'));
@@ -283,7 +283,7 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 
 | 보는 것 | 근거 |
 |---|---|
-| 이 yt-dlp 버전에 있는 플래그인가 | 리플렉션한 `ytstudio.schema.json` (별칭·단축·부정형까지) |
+| 이 yt-dlp 버전에 있는 플래그인가 | 리플렉션한 `yt-studio.schema.json` (별칭·단축·부정형까지) |
 | 오타라면 무엇을 쓰려던 건가 | 편집거리 + 접두어 가중치로 후보 세 개 |
 | 값이 필요한 자리에 값이 있는가 | `kind` · `metavar` |
 | 고를 수 있는 값 중 하나인가 | `choices` |
@@ -304,13 +304,13 @@ previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장
 | | 무엇을 보나 | 바꿀 수 있나 |
 |---|---|---|
 | **런타임** — `lintCommand` · `ytdlp()` 메서드 | 파일을 읽는다 | **된다.** 당신이 깐 것을 볼 수 있다 |
-| **타입** — 자동완성 · `.d.ts` | 패키지를 구울 때 박혔다 | **`ytstudio types` 로 덧씌운다** |
+| **타입** — 자동완성 · `.d.ts` | 패키지를 구울 때 박혔다 | **`yt-studio types` 로 덧씌운다** |
 
 런타임은 이 순서로 찾는다.
 
 ```
-$YTSTUDIO_SCHEMA          → 명시적으로 가리킨 곳
-./ytstudio.schema.json    → 작업 디렉터리
+$YT_STUDIO_SCHEMA          → 명시적으로 가리킨 곳
+./yt-studio.schema.json    → 작업 디렉터리
 패키지 내장                → 아무것도 없으면 (기본)
 ```
 
@@ -321,10 +321,10 @@ yt-dlp 이지 당신 것이 아니다.** 그래서 당신 yt-dlp 가 더 새로�
 당신 것에 맞추려면 **한 번 뽑아 두면 된다.**
 
 ```
-$ npx ytstudio types
+$ npx yt-studio types
 읽음      /usr/local/bin/yt-dlp (yt-dlp 2026.09.01) · --help 파싱
 옵션      194개 · 새로 3 · 사라짐 0 (번들 191 대비)
-씀        ytstudio.schema.json · ytstudio-env.d.ts
+씀        yt-studio.schema.json · yt-studio-env.d.ts
 새 옵션   --brand-new  --another  --third
 ```
 
@@ -339,9 +339,9 @@ ytdlp(u).brandNew('x').build();   // 어제는 없던 메서드다
 `npm ci` 를 견딘다.
 
 ```ts
-// ytstudio-env.d.ts — ytstudio types 가 만든다
-import 'ytstudio';
-declare module 'ytstudio' {
+// yt-studio-env.d.ts — yt-studio types 가 만든다
+import 'yt-studio';
+declare module 'yt-studio' {
   interface Ytdlp {
     brandNew(value: Arg): this;
   }
@@ -349,13 +349,13 @@ declare module 'ytstudio' {
 ```
 
 > **`tsconfig.json` 의 `include` 가 이 파일을 덮어야 한다.** 안 덮으면 파일은
-> 생겼는데 자동완성이 안 늘어난다 — 조용히 무시되는 것이라 `ytstudio types` 가
+> 생겼는데 자동완성이 안 늘어난다 — 조용히 무시되는 것이라 `yt-studio types` 가
 > 그 경우를 보고 경고한다.
 
 돌리지 않았거나 돌린 뒤 yt-dlp 를 또 올렸으면, 코드에서 그 어긋남을 볼 수 있다.
 
 ```ts
-import { ytstudio } from 'ytstudio';
+import { ytstudio } from 'yt-studio';
 
 const yt = ytstudio();
 yt.source.from;          // 'local' | 'env' | 'bundled'
@@ -383,9 +383,9 @@ mine.ytdlp(url);         theirs.ytdlp(url);     // 메서드 목록도 각자다
 어디서 집을까" 한 겹뿐이라, 그 겹을 걷어낸 입구를 따로 낸다.
 
 ```ts
-import { studio } from 'ytstudio/browser';
+import { studio } from 'yt-studio/browser';
 
-const yt = studio(await (await fetch('/ytstudio.schema.json')).json());
+const yt = studio(await (await fetch('/yt-studio.schema.json')).json());
 yt.ytdlp('https://youtu.be/abc').extractAudio().build();
 ```
 
@@ -435,18 +435,18 @@ src/core/            DOM 도 파일 시스템도 모른다. 전부 TypeScript �
   env-types.ts       스키마 → 옵션 메서드 선언. 생성기 둘이 같이 쓴다
 src/browser.ts       파일 시스템을 모르는 입구 — studio(raw) 가 손잡이를 준다
 src/index.ts         공개 API — browser.ts + 스키마를 어디서 집을까 한 겹
-src/cli.ts           ytstudio lint · explain · types
+src/cli.ts           yt-studio lint · explain · types
 demo/                플레이그라운드 — lib/ 와 스키마를 그대로 먹는다 (vite · monaco)
 tests/               전부 bun:test. `bun test` 하나로 다 돈다
   unit/*.test.ts     순수 로직 (106개 — 스키마 해석 순서도 여기다)
   cli.test.ts        프로세스로서의 CLI — 종료 코드 · 파이프 · 스키마 해석 순서
-  types.test.ts      ytstudio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
+  types.test.ts      yt-studio types — 만든 .d.ts 를 진짜 tsc 로 컴파일한다
   docs.test.ts       공개 선언의 JSDoc · @example 이 컴파일되는가 (.claude/rules/jsdoc.md)
   drift.test.ts      실물 yt-dlp 와 대조. yt-dlp 가 없으면 건너뛴다
   fixtures/          진짜 yt-dlp --help 한 판. 파서의 정답지가 스키마다
 gen_schema.py        yt-dlp optparse 트리를 리플렉션한다               ← 유일한 비-TS
 gen_options.ts       그 스키마를 옵션 타입으로
-ytstudio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
+yt-studio.schema.json 리플렉션 결과. 패키지에 같이 실려 나간다
 tsconfig.json        빌드용 (src → lib)
 tsconfig.test.json   타입 검사 전용 (소스 · 테스트 · 생성기 전부)
 .github/workflows/   CI — bun run test 와 같은 것 + 타입이 스키마와 맞는지
@@ -503,7 +503,7 @@ yt-dlp 를 올렸으면 둘을 같이 돌린다. CI 가 **스키마만 고치고
 뽑은 경우**를 잡는다.
 
 ```
-python3 gen_schema.py > ytstudio.schema.json   # 설치된 yt-dlp → 스키마
+python3 gen_schema.py > yt-studio.schema.json   # 설치된 yt-dlp → 스키마
 bun run gen:types                              # 스키마 → src/core/options.gen.ts
 ```
 
@@ -543,9 +543,9 @@ git push --follow-tags            # 태그가 밀리면 발행 잡이 돈다
 
 ## 한계
 
-- **`ytstudio types` 를 안 돌렸으면 이 저장소에 커밋된 yt-dlp 버전 기준이다.**
+- **`yt-studio types` 를 안 돌렸으면 이 저장소에 커밋된 yt-dlp 버전 기준이다.**
   기본값이 그쪽이라 명시적으로 한 번 뽑아야 한다. `ytstudio().source.stale` 과
-  `ytstudio lint` 의 `스키마` 줄이 어느 쪽인지 늘 말한다.
+  `yt-studio lint` 의 `스키마` 줄이 어느 쪽인지 늘 말한다.
 - **확장 선언은 더하기만 된다.** 당신 yt-dlp 에서 **없어진** 옵션은 자동완성에
   계속 뜬다. `@deprecated` 로 취소선만 긋는다 — 검증기는 제대로 잡는다.
 - **검증기는 "스키마와 문법에 어긋나는 곳이 없다"까지만 말한다.** 문법이 맞아도
@@ -582,7 +582,7 @@ spawn('yt-dlp', ytdlp(url).format('bv+ba').toArray(), { stdio: 'inherit' });
 (`ytdlp-nodejs` 등). 그쪽은 `spawn` 을 감싸는 게 본업이고 타입은 거기 딸린
 편의라서, 두 층이 겹치지 않는다.
 
-|  | 실행 래퍼 | ytstudio |
+|  | 실행 래퍼 | yt-studio |
 |---|---|---|
 | 하는 일 | 다운로드 · 스트리밍 · 메타데이터 | 명령어를 **짓고 검사한다** |
 | 바이너리 | 직접 받고 올린다 | 안 건드린다 |

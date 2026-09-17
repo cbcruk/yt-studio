@@ -1,7 +1,7 @@
 /**
  * Is the browser entry point really pure?
  *
- * `ytstudio/browser` makes one promise — **it never touches the file system.**
+ * `yt-studio/browser` makes one promise — **it never touches the file system.**
  * Calling functions cannot confirm that; a test that only walks paths not calling
  * `readFileSync` would pass anyway. There is only one way to confirm it: **bundle
  * it** for the browser and see whether any node builtin comes along.
@@ -18,7 +18,7 @@ import path from 'node:path';
 import type { RawSchema } from '../../src/core/schema.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const RAW: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'ytstudio.schema.json'), 'utf8'));
+const RAW: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'yt-studio.schema.json'), 'utf8'));
 
 const bundle = await Bun.build({
   entrypoints: [path.join(ROOT, 'src/browser.ts')],

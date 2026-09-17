@@ -1,9 +1,9 @@
 /**
  * User code → command → check → explanation.
  *
- * What runs on this page is **the real library**. `ytstudio/browser` never looks at
+ * What runs on this page is **the real library**. `yt-studio/browser` never looks at
  * the file system, so it runs in the browser as-is, and the schema is the repo's
- * `ytstudio.schema.json` baked in at build time. So the commands and check results
+ * `yt-studio.schema.json` baked in at build time. So the commands and check results
  * shown here are the same as running the same code on node.
  *
  * Evaluation is `new Function` — it is the user's own code running in the user's own
@@ -11,9 +11,9 @@
  */
 import {
   studio, previewFilename, tokenize, quote, distance, DEFAULT_OUTTMPL,
-} from 'ytstudio/browser';
-import type { LintResult, Explained, FilePreview } from 'ytstudio/browser';
-import raw from '../../ytstudio.schema.json';
+} from 'yt-studio/browser';
+import type { LintResult, Explained, FilePreview } from 'yt-studio/browser';
+import raw from '../../yt-studio.schema.json';
 
 /** What the demo checks against — the very schema the repo ships. */
 export const yt = studio(raw as Parameters<typeof studio>[0]);
@@ -32,12 +32,12 @@ export class RunError extends Error {}
  * Turns transpiled ESM into a body this page can call.
  *
  * `import` and `export` are syntax errors inside `new Function`. The shape the demo
- * encourages is fixed (one `import … from 'ytstudio'` line, one `export default`), so
+ * encourages is fixed (one `import … from 'yt-studio'` line, one `export default`), so
  * only those two are rewritten. For any other shape, `evaluate` below says so.
  */
 function toBody(js: string): string {
   return js
-    .replace(/^\s*import\s+([\s\S]*?)\s+from\s+['"]ytstudio(?:\/browser)?['"];?\s*$/gm,
+    .replace(/^\s*import\s+([\s\S]*?)\s+from\s+['"]yt-studio(?:\/browser)?['"];?\s*$/gm,
       (_m, clause: string) => `const ${clause.trim()} = __ytstudio;`)
     .replace(/^\s*export\s+default\s+/m, 'return ');
 }
@@ -55,7 +55,7 @@ const buildable = (v: unknown): v is { build(): string } =>
 export function evaluate(js: string): Result {
   const body = toBody(js);
   if (/^\s*(import|export)\s/m.test(body)) {
-    throw new RunError('import 는 ytstudio 한 줄만, 내보내기는 export default 하나만 된다');
+    throw new RunError('import 는 yt-studio 한 줄만, 내보내기는 export default 하나만 된다');
   }
 
   let value: unknown;
@@ -79,7 +79,7 @@ export function evaluate(js: string): Result {
   };
 }
 
-/** What enters user code under the name `ytstudio`. */
+/** What enters user code under the name `yt-studio`. */
 const api = {
   ytdlp: (...urls: string[]) => yt.ytdlp(...urls),
   lintCommand: (text: string) => yt.lint(text),

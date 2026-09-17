@@ -1,7 +1,7 @@
 /**
  * The entry point for places without a file system — browsers and edge runtimes.
  *
- * Of everything the main `ytstudio` entry (`index.ts`) does, the only part
+ * Of everything the main `yt-studio` entry (`index.ts`) does, the only part
  * that needs Node is **where to pick the schema up from** — env var, working
  * directory, the file shipped with the package. Peel off that one layer and
  * the rest is pure. So this file is the real substance, and `index.ts` is file
@@ -12,9 +12,9 @@
  *
  * @example Fetching the schema
  * ```ts
- * import { studio } from 'ytstudio/browser';
+ * import { studio } from 'yt-studio/browser';
  *
- * const yt = studio(await (await fetch('/ytstudio.schema.json')).json());
+ * const yt = studio(await (await fetch('/yt-studio.schema.json')).json());
  * yt.ytdlp('https://youtu.be/abc').extractAudio().build();
  * ```
  *
@@ -34,9 +34,9 @@ import type { LintResult, Values } from './core/lint.js';
 
 /** Where the schema was read from. */
 export type SchemaOrigin =
-  /** Wherever `YTSTUDIO_SCHEMA` points */
+  /** Wherever `YT_STUDIO_SCHEMA` points */
   | 'env'
-  /** `ytstudio.schema.json` in the working directory */
+  /** `yt-studio.schema.json` in the working directory */
   | 'local'
   /** The one shipped with the package */
   | 'bundled'

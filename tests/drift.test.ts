@@ -11,7 +11,7 @@
  *
  * - Does the help parser read **today's** yt-dlp format?
  * - Does `gen_schema.py` run on **today's** yt-dlp?
- * - Does `ytstudio types` go all the way against the real thing?
+ * - Does `yt-studio types` go all the way against the real thing?
  *
  * Not run on every PR. If a yt-dlp release turns someone else's PR red, that is
  * not an alert but an obstruction. A scheduled job (`.github/workflows/drift.yml`)
@@ -38,7 +38,7 @@ const CLI = path.join(ROOT, 'lib', 'cli.js');
 const YTDLP = process.env.YTDLP_BIN || 'yt-dlp';
 const PYTHON = process.env.PYTHON_BIN || 'python3';
 
-const BASE: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'ytstudio.schema.json'), 'utf8'));
+const BASE: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'yt-studio.schema.json'), 'utf8'));
 
 /** Is yt-dlp available? skipIf is read at definition time, so decide at module top level. */
 const version = ((): string | null => {
@@ -95,8 +95,8 @@ live('필드까지 같다 — 아는 옵션은 완전 일치, 새 옵션은 도�
   assert.deepEqual(bad, [], `도움말 파서가 optparse 와 어긋난다\n  ${bad.join('\n  ')}`);
 });
 
-live('ytstudio types 가 실물로 끝까지 간다', () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-drift-'));
+live('yt-studio types 가 실물로 끝까지 간다', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-drift-'));
   writeFileSync(path.join(dir, 'tsconfig.json'), '{}');
   try {
     const out = execFileSync('node', [CLI, 'types', '--yt-dlp', YTDLP], {
@@ -127,5 +127,5 @@ afterAll(() => {
   console.log(`  · 커밋된 스키마 ${BASE.ytdlp_version} · 실물 ${version} — 새로 ${added.length} · 사라짐 ${removed.length}`);
   if (added.length) console.log(`      새 옵션: ${added.join(' ')}`);
   if (removed.length) console.log(`      사라진 옵션: ${removed.join(' ')}`);
-  console.log('      다시 뽑으려면: python3 gen_schema.py > ytstudio.schema.json && bun run gen:types');
+  console.log('      다시 뽑으려면: python3 gen_schema.py > yt-studio.schema.json && bun run gen:types');
 });

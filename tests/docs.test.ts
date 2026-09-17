@@ -8,7 +8,7 @@
  * Two things are checked.
  *
  * - **Missing comments** — every declaration reachable from the entry points
- *   (`ytstudio` · `ytstudio/browser`), and every member of those interfaces ·
+ *   (`yt-studio` · `yt-studio/browser`), and every member of those interfaces ·
  *   classes, has JSDoc.
  * - **Examples** — the code blocks in `@example` compile as-is in a user project.
  *   An example missing its `import` is not merely awkward to read, it is **wrong**.
@@ -209,11 +209,11 @@ test('@example 이 손님 프로젝트에서 그대로 컴파일된다', () => {
   const found = examples();
   expect(found.length).toBeGreaterThan(0);
 
-  // Same shape as types.test.ts — link the repo as node_modules/ytstudio.
+  // Same shape as types.test.ts — link the repo as node_modules/yt-studio.
   // So examples go through exports and see the shipped build (lib/).
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-docs-'));
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-docs-'));
   mkdirSync(path.join(dir, 'node_modules'));
-  symlinkSync(ROOT, path.join(dir, 'node_modules', 'ytstudio'), 'dir');
+  symlinkSync(ROOT, path.join(dir, 'node_modules', 'yt-studio'), 'dir');
   symlinkSync(path.join(ROOT, 'node_modules', '@types'), path.join(dir, 'node_modules', '@types'), 'dir');
   writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ type: 'module' }));
   writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({

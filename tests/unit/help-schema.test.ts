@@ -2,7 +2,7 @@
  * `yt-dlp --help` parser.
  *
  * This test has a property no other test has — **there is an answer key.**
- * `ytstudio.schema.json` reflects the same yt-dlp (2026.07.04) through optparse,
+ * `yt-studio.schema.json` reflects the same yt-dlp (2026.07.04) through optparse,
  * and the fixture help is that release's actual output. So "how much can be
  * recovered from help alone" can be measured **field by field**, not estimated.
  *
@@ -22,7 +22,7 @@ const { parseHelp } = await import('../../src/core/help-schema.js');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p: string): string => readFileSync(path.join(ROOT, p), 'utf8');
 
-const BASE: RawSchema = JSON.parse(read('ytstudio.schema.json'));
+const BASE: RawSchema = JSON.parse(read('yt-studio.schema.json'));
 const HELP = read('tests/fixtures/yt-dlp-2026.07.04.help.txt');
 
 /** A copy of the help with one line removed. Simulates a removed option. */

@@ -57,7 +57,7 @@ jobs:
         run: |
           bun run gen:types
           if ! git diff --quiet -- src/core/options.gen.ts; then
-            echo "::error::options.gen.ts differs from ytstudio.schema.json — run 'bun run gen:types' and commit it together"
+            echo "::error::options.gen.ts differs from yt-studio.schema.json — run 'bun run gen:types' and commit it together"
             git diff --stat -- src/core/options.gen.ts
             exit 1
           fi
@@ -80,7 +80,7 @@ jobs:
       - name: CLI
         run: bun run test:cli
 
-      # ytstudio types writes files into users' projects. So it sets up a temporary
+      # yt-studio types writes files into users' projects. So it sets up a temporary
       # project and compiles the generated .d.ts with real tsc. yt-dlp needn't be
       # installed — this command only looks at --version and --help output, so a
       # shell that prints canned help is the real thing.
@@ -98,4 +98,4 @@ jobs:
       - name: Package
         run: |
           npm pack --pack-destination /tmp
-          npx --yes publint /tmp/ytstudio-*.tgz
+          npx --yes publint /tmp/yt-studio-*.tgz

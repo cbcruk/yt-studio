@@ -25,8 +25,8 @@ import type { RawSchema } from '../../src/core/schema.js';
 const { BUNDLED, resolveSchema, ytstudio } = await import('../../src/index.js');
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const TMP = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-resolve-'));
-const SCHEMA_FILE = 'ytstudio.schema.json';
+const TMP = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-resolve-'));
+const SCHEMA_FILE = 'yt-studio.schema.json';
 
 /** Puts a copy of the real schema, with only the version changed, into a directory. */
 function dirWith(version: string, opts?: number): string {
@@ -61,7 +61,7 @@ test('아무것도 없으면 패키지 내장을 쓴다', () => {
   assert.equal(source.stale, false);
 });
 
-test('작업 디렉터리의 ytstudio.schema.json 이 내장을 이긴다', () => {
+test('작업 디렉터리의 yt-studio.schema.json 이 내장을 이긴다', () => {
   const { source, raw } = resolveSchema({ cwd: dirWith('2026.09.01') });
   assert.equal(source.from, 'local');
   assert.equal(raw.ytdlp_version, '2026.09.01');

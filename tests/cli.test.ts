@@ -29,7 +29,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'lib', 'cli.js');
-const SCHEMA_FILE = 'ytstudio.schema.json';
+const SCHEMA_FILE = 'yt-studio.schema.json';
 
 beforeAll(() => {
   // This test targets the **compiled output**, not the source. If it is missing,
@@ -83,7 +83,7 @@ test('경고만 있으면 0 이다 — 판단이지 틀린 게 아니다', () =>
   assert.match(r.out, /경고/);
 });
 
-test('표준 입력으로 흘려 넣어도 된다 — pbpaste | ytstudio lint', () => {
+test('표준 입력으로 흘려 넣어도 된다 — pbpaste | yt-studio lint', () => {
   const r = run(['lint'], 'yt-dlp --write-sub https://youtu.be/abc\n');
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /--write-sub/);
@@ -122,7 +122,7 @@ test('무엇에 대조했는지 판정 옆에 적는다', () => {
 test('인자 없이 부르면 쓰는 법을 낸다', () => {
   const r = run([]);
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /ytstudio lint/);
+  assert.match(r.out, /yt-studio lint/);
 });
 
 test('모르는 명령은 2 로 끝난다 — 오류(1)와 구분된다', () => {

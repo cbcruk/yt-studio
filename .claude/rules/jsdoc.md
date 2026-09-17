@@ -1,10 +1,10 @@
 # JSDoc Rules
 
-Rules for writing JSDoc on `ytstudio`'s public surface. Apply all of them
+Rules for writing JSDoc on `yt-studio`'s public surface. Apply all of them
 whenever you write or change a public declaration.
 
 The **public surface** is every declaration reachable from the two entry points
-(`ytstudio` = `src/index.ts`, `ytstudio/browser` = `src/browser.ts`). Something
+(`yt-studio` = `src/index.ts`, `yt-studio/browser` = `src/browser.ts`). Something
 in `src/core/*` is public if an entry point re-exports it. Users see the
 `lib/**/*.d.ts` emitted by `tsc`, not the source, so the check reads that.
 
@@ -68,7 +68,7 @@ case — write **the command that gets built as a comment**.
 /**
  * @example Time range
  * ```ts
- * import { ytdlp } from 'ytstudio';
+ * import { ytdlp } from 'yt-studio';
  *
  * ytdlp('https://youtu.be/abc').downloadSections({ from: 60 }).build();
  * // yt-dlp --download-sections "*60-inf" https://youtu.be/abc
@@ -77,8 +77,8 @@ case — write **the command that gets built as a comment**.
 ````
 
 - Write code blocks as **```ts fences**. The check ignores indented code blocks.
-- **Include the `import`.** Use the path users use (`'ytstudio'`,
-  `'ytstudio/browser'`). Never a relative path.
+- **Include the `import`.** Use the path users use (`'yt-studio'`,
+  `'yt-studio/browser'`). Never a relative path.
 - Don't write lines that won't compile, like `→`. Put results in a
   `// yt-dlp …` comment.
 - Result comments must be **what actually came out when run** (quotes
@@ -183,7 +183,7 @@ What `tests/docs.test.ts` checks:
 - Public declarations and members missing JSDoc (based on `lib/**/*.d.ts`)
 - Whether the entry source files have `@module`
 - Every `@example` ```ts block in `lib/`, compiled with `tsc` one file each in a
-  temporary project with `node_modules/ytstudio` linked to the repo. A missing
+  temporary project with `node_modules/yt-studio` linked to the repo. A missing
   `import` fails.
 
 TypeScript 7 has no JS compiler API, so the check reads the line shape of the
