@@ -414,3 +414,14 @@ test('keyed 의 키 패턴은 전부 자바스크립트 정규식으로 읽힌�
   for (const o of keyed) assert.doesNotThrow(() => new RegExp(o.keyed!.pattern), o.flag);
   for (const o of keyed) assert.equal(o.kind, 'repeatable', o.flag);
 });
+
+// Hand-written methods exist regardless of the schema. When the option is gone, say so.
+test('스키마에 없는 옵션을 손으로 쓴 메서드로 부르면 무엇이 없는지 말한다', async () => {
+  const { studio } = await import('../../src/browser.js');
+  const raw = schema.raw;
+  const without = (id: string) => studio({ ...raw, options: raw.options.filter(o => o.id !== id) });
+  assert.throws(() => without('format').ytdlp(U).format('bv'),
+    new RegExp(`--format 는 이 스키마\\(yt-dlp ${raw.ytdlp_version}\\)에 없는 옵션이다`));
+  assert.throws(() => without('cookies-from-browser').ytdlp(U).cookiesFromBrowser('firefox'),
+    /--cookies-from-browser 는 이 스키마/);
+});

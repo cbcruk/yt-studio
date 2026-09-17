@@ -293,8 +293,18 @@ export class Ytdlp {
     this.url(...urls);
   }
 
-  /** Looks up one option in the schema. */
-  private opt(id: string): Opt { return this.schema.byId[id]!; }
+  /**
+   * Looks up one option in the schema.
+   *
+   * Hand-written methods (`format` · `output` · …) exist whatever the schema says, so
+   * the option may be missing — a schema reflected from a yt-dlp that renamed it.
+   * Without this check that surfaced as `undefined is not an object (opt.short)`.
+   */
+  private opt(id: string): Opt {
+    const o = this.schema.byId[id];
+    if (!o) throw new Error(`--${id} 는 이 스키마(yt-dlp ${this.schema.version})에 없는 옵션이다`);
+    return o;
+  }
 
   /** Adds URLs. They always go at the end of the command. */
   url(...urls: string[]): this {
