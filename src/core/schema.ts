@@ -64,6 +64,14 @@ export interface Opt {
    */
   vocabs: Record<string, string[]> | null;
   /**
+   * How a `KEYS:VALUE` value is split into keys, for options yt-dlp stores as a dict.
+   *
+   * Repeating such an option replaces the earlier value **only for the same keys** —
+   * `-o a.%(ext)s -o thumbnail:%(id)s` keeps both. `null` for every other option.
+   * Missing in schemas written before this field existed, which reads as `null`.
+   */
+  keyed?: OptKeyed | null;
+  /**
    * What optparse reads the value as — `'string'`, `'int'`, `'float'`, `'choice'`.
    *
    * `null` for options that take no value. `int` and `float` are real numbers, so
@@ -83,9 +91,45 @@ export interface Opt {
  * How an option takes a value.
  *
  * `flag` takes none, `value` takes one, `choice` takes one of a fixed set, and
- * `repeatable` can be given several times.
+ * `repeatable` can be given several times with every value kept — unless
+ * {@linkcode Opt.keyed} says a repeat replaces the same keys.
  */
 export type OptKind = 'flag' | 'value' | 'choice' | 'repeatable';
+
+/** The `callback_kwargs` of yt-dlp's `_dict_from_options_callback`, as reflected. */
+export interface OptKeyed {
+  /** yt-dlp's `allowed_keys` regex for one key. Also valid as a JavaScript regex. */
+  pattern: string;
+  /** Keys used when the value has no `KEYS:` prefix. `null` when a prefix is required. */
+  defaults: string[] | null;
+  /** Whether one prefix may name several keys, comma-separated (`dash,m3u8:native`). */
+  multiple: boolean;
+  /** Whether a repeat **adds** to the same key instead of replacing it (`--exec`). */
+  append: boolean;
+}
+
+const keyRegex = new WeakMap<OptKeyed, RegExp>();
+
+/**
+ * The keys a value of a keyed option lands on, the way yt-dlp splits them.
+ *
+ * `-o thumbnail:%(id)s` → `['thumbnail']`, `-o %(title)s` → `['default']`.
+ * Keys are lowercased, as yt-dlp does. `null` when the option isn't keyed, or when
+ * the value has no prefix and the option has no default (yt-dlp rejects it).
+ */
+export function keysOf(opt: Opt, value: string): string[] | null {
+  const k = opt.keyed;
+  if (!k) return null;
+  let re = keyRegex.get(k);
+  if (!re) {
+    const one = `(?:${k.pattern})`;
+    re = new RegExp(`^(${k.multiple ? `${one}(?:,${one})*` : one}):`, 'is');
+    keyRegex.set(k, re);
+  }
+  const m = re.exec(value);
+  if (m) return m[1]!.split(',').map(s => s.toLowerCase());
+  return k.defaults;
+}
 
 /**
  * `[source>]target(/[source>]target)*` — a port of yt-dlp's `FFmpeg*PP.FORMAT_RE`.

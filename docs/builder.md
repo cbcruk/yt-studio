@@ -115,6 +115,19 @@ ytdlp(u).extractAudio().format('bv').lint();
 같은 옵션을 두 번 주면 **자리를 지키며 덮어쓴다.** 뒤에 붙이면 코드에서 고친
 순서가 명령어 순서를 바꿔서, 한 줄 고쳤는데 diff 가 두 줄 난다.
 
+yt-dlp 가 되풀이를 쌓는 옵션은 예외다 — 규칙은 yt-dlp 의 것을 그대로 따른다.
+
+```ts
+.subLangs('ko').subLangs('en')            // --sub-langs ko --sub-langs en    (쌓인다)
+.output(a).output('thumbnail', b)         // -o a -o thumbnail:b              (종류가 다르면 둘 다)
+.output(a).output(b)                      // -o b                             (같은 종류는 덮어쓴다)
+.paths({ home: '/a' }).paths({ home: '/b' })  // -P /b
+```
+
+`-o` · `-P` · `--downloader` 처럼 `KEYS:VALUE` 를 받는 옵션은 yt-dlp 가 키별 사전에
+담으므로 **같은 키만** 덮어쓴다. 어느 옵션이 어떻게 쌓이는지는 손으로 안 적었다 —
+`gen_schema.py` 가 callback 을 읽어 스키마의 `kind` · `keyed` 에 싣는다.
+
 ### `-f` — 포맷 셀렉터
 
 ```ts

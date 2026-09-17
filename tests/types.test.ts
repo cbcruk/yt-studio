@@ -126,7 +126,7 @@ test('사라진 옵션에 @deprecated 를 붙인다', () => {
 
   const dts = readFileSync(path.join(dir, 'yt-studio-env.d.ts'), 'utf8');
   assert.match(dts, /@deprecated not an option in yt-dlp 2099\.01\.01/);
-  assert.match(dts, /subLangs\(value: Arg\): this;/, '같은 시그니처로 다시 선언해야 병합된다');
+  assert.match(dts, /subLangs\(\.\.\.values: Arg\[\]\): this;/, '같은 시그니처로 다시 선언해야 병합된다');
 
   // It must still compile — a strikethrough, not an error
   const c = compiles(dir, "import { ytdlp } from 'yt-studio';\nytdlp('u').subLangs('ko').build();\n");

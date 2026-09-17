@@ -459,14 +459,14 @@ export interface Options {
    *
    * @stage run · General Options
    */
-  alias(value: Arg): this;
+  alias(...values: Arg[]): this;
 
   /**
    * `--color` — Whether to emit color codes in output, optionally prefixed by the STREAM (stdout or stderr) to apply the setting to. Can be one of "always", "auto" (default), "never", or "no_color" (use non color terminal sequences). Use "auto-tty" or "no_color-tty" to decide based on terminal support only. Can be used multiple times
    *
    * @stage run · General Options
    */
-  color(value: Arg): this;
+  color(...values: Arg[]): this;
 
   /**
    * `--compat-options` — Options that can help keep compatibility with youtube-dl or youtube-dlc configurations by reverting some of the changes made in yt-dlp. See "Differences in default behavior" for details
@@ -534,7 +534,7 @@ export interface Options {
    * @stage run · General Options
    * @remarks `.jsRuntimes(false)` → `--no-js-runtimes`
    */
-  jsRuntimes(value: Arg): this;
+  jsRuntimes(...values: Arg[]): this;
 
   /**
    * `--list-extractors` — List all supported extractors and exit
@@ -565,7 +565,7 @@ export interface Options {
    * @stage run · General Options
    * @remarks `.pluginDirs(false)` → `--no-plugin-dirs`
    */
-  pluginDirs(value: string): this;
+  pluginDirs(...values: string[]): this;
 
   /**
    * `--preset-alias` (-t) — Applies a predefined set of options. e.g. --preset-alias mp3. The following presets are available: mp3, aac, mp4, mkv, sleep. See the "Preset Aliases" section at the end for more info. This option can be used multiple times
@@ -580,7 +580,7 @@ export interface Options {
    * @stage run · General Options
    * @remarks `.remoteComponents(false)` → `--no-remote-components`
    */
-  remoteComponents(value: Arg): this;
+  remoteComponents(...values: Arg[]): this;
 
   /**
    * `--update` (-U) — Check if updates are available. You installed yt-dlp with pip or using the wheel from PyPi; Use that to update
@@ -602,7 +602,7 @@ export interface Options {
    *
    * @stage run · General Options
    */
-  useExtractors(value: Arg): this;
+  useExtractors(...values: Arg[]): this;
 
   /**
    * `--version` — Print program version and exit
@@ -624,7 +624,7 @@ export interface Options {
    *
    * @stage connect · Workarounds
    */
-  addHeaders(value: Arg): this;
+  addHeaders(...values: Arg[]): this;
 
   /**
    * `--ap-list-mso` — List all supported multiple-system operators
@@ -877,7 +877,7 @@ export interface Options {
    *
    * @stage extract · Extractor Options
    */
-  extractorArgs(value: Arg): this;
+  extractorArgs(...values: Arg[]): this;
 
   /**
    * `--extractor-retries` — Number of retries for known extractor errors (default is 3), or "infinite"
@@ -1030,7 +1030,7 @@ export interface Options {
    *
    * @stage format · Video Format Options
    */
-  formatSort(value: Arg): this;
+  formatSort(...values: Arg[]): this;
 
   /**
    * `--format-sort-force` (--S-force) — Force user specified sort order to have precedence over all fields, see "Sorting Formats" for more details (Alias: --S-force)
@@ -1097,7 +1097,7 @@ export interface Options {
    *
    * @stage format · Subtitle Options
    */
-  subLangs(value: Arg): this;
+  subLangs(...values: Arg[]): this;
 
   /**
    * `--video-multistreams` — Allow multiple video streams to be merged into a single file
@@ -1166,14 +1166,14 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  downloader(value: Arg): this;
+  downloader(...values: Arg[]): this;
 
   /**
    * `--downloader-args` (--external-downloader-args) — Give these arguments to the external downloader. Specify the downloader name and the arguments separated by a colon ":". For ffmpeg, arguments can be passed to different positions using the same syntax as --postprocessor-args. You can use this option multiple times to give different arguments to different downloaders (Alias: --external-downloader-args)
    *
    * @stage download · Download Options
    */
-  downloaderArgs(value: Arg): this;
+  downloaderArgs(...values: Arg[]): this;
 
   /**
    * `--file-access-retries` — Number of times to retry on file access error (default is 3), or "infinite"
@@ -1256,7 +1256,7 @@ export interface Options {
    *
    * @stage download · Download Options
    */
-  retrySleep(value: Arg): this;
+  retrySleep(...values: Arg[]): this;
 
   /**
    * `--skip-unavailable-fragments` (--no-abort-on-unavailable-fragments) — Skip unavailable fragments for DASH, hlsnative and ISM downloads (default) (Alias: --no-abort-on-unavailable-fragments)
@@ -1359,7 +1359,7 @@ export interface Options {
    * @stage process · Post-Processing Options
    * @remarks `.exec(false)` → `--no-exec`
    */
-  exec(value: Arg): this;
+  exec(...values: Arg[]): this;
 
   /**
    * `--extract-audio` (-x) — Drops the video and keeps only the audio. Requires ffmpeg.
@@ -1412,7 +1412,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  parseMetadata(value: Arg): this;
+  parseMetadata(...values: Arg[]): this;
 
   /**
    * `--post-overwrites` — Overwrite post-processed files (default)
@@ -1429,7 +1429,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  postprocessorArgs(value: Arg): this;
+  postprocessorArgs(...values: Arg[]): this;
 
   /**
    * `--recode-video` — Re-encode the video into another format if necessary. The syntax and supported formats are the same as --remux-video
@@ -1458,7 +1458,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  replaceInMetadata(value: Arg): this;
+  replaceInMetadata(...values: Arg[]): this;
 
   /**
    * `--split-chapters` (--split-tracks) — Split video into multiple files based on internal chapters. The "chapter:" prefix can be used with "--paths" and "--output" to set the output filename for the split files. See "OUTPUT TEMPLATE" for details
@@ -1505,7 +1505,7 @@ export interface Options {
    *
    * @stage process · Post-Processing Options
    */
-  usePostprocessor(value: Arg): this;
+  usePostprocessor(...values: Arg[]): this;
 
   /**
    * `--xattrs` (--xattr) — Write metadata to the video file's xattrs (using Dublin Core and XDG standards)
@@ -1743,14 +1743,14 @@ export interface Options {
    *
    * @stage report · Verbosity and Simulation Options
    */
-  print(value: Arg): this;
+  print(...values: Arg[]): this;
 
   /**
    * `--print-to-file` — Append given template to the file. The values of WHEN and TEMPLATE are the same as that of --print. FILE uses the same syntax as the output template. This option can be used multiple times
    *
    * @stage report · Verbosity and Simulation Options
    */
-  printToFile(value: Arg): this;
+  printToFile(...values: Arg[]): this;
 
   /**
    * `--print-traffic` — Display sent and read HTTP traffic
@@ -1779,7 +1779,7 @@ export interface Options {
    *
    * @stage report · Verbosity and Simulation Options
    */
-  progressTemplate(value: Arg): this;
+  progressTemplate(...values: Arg[]): this;
 
   /**
    * `--quiet` (-q) — Activate quiet mode. If used with --verbose, print the log to stderr

@@ -97,8 +97,8 @@ test('값이 있는 옵션 · choices · repeatable', () => {
 });
 
 test('같은 옵션을 두 번 주면 자리를 지키며 덮어쓴다', () => {
-  const c = ytdlp(U).subLangs('ko').embedSubs().subLangs('en');
-  assert.equal(c.build(), `yt-dlp --sub-langs en --embed-subs ${U}`);
+  const c = ytdlp(U).retries(3).embedSubs().retries(10);
+  assert.equal(c.build(), `yt-dlp -R 10 --embed-subs ${U}`);
 });
 
 test('공백이 든 값은 따옴표로 감싸고, argv 에는 안 감싼다', () => {
@@ -384,4 +384,33 @@ test('--download-sections 는 구간과 챕터를 갈라 받는다', () => {
   assert.equal(c(ytdlp(U).downloadSections({ from: 60 })), '--download-sections "*60-inf"');
   assert.equal(c(ytdlp(U).downloadSections({ to: 90 })), '--download-sections "*0-90"');
   assert.equal(c(ytdlp(U).downloadSections('intro')), '--download-sections intro');
+});
+
+// yt-dlp stores -o · -P per type and replaces only the same type:
+//   -o a -o thumbnail:b → {'default': a, 'thumbnail': b}. The builder used to keep only the last.
+test('종류가 다른 -o · -P 는 둘 다 남고, 같은 종류는 자리를 지키며 덮어쓴다', () => {
+  const both = ytdlp(U).output(t => t`${t.title}.${t.ext}`).output('thumbnail', t => t`${t.id}`).build();
+  assert.equal(both, `yt-dlp -o "%(title)s.%(ext)s" -o "thumbnail:%(id)s" ${U}`);
+
+  const again = ytdlp(U).output('a.%(ext)s').writeSubs().output('b.%(ext)s').build();
+  assert.equal(again, `yt-dlp -o "b.%(ext)s" --write-subs ${U}`);
+
+  const paths = ytdlp(U).paths({ home: '/a', temp: '/t' }).paths({ home: '/b' }).build();
+  assert.equal(paths, `yt-dlp -P /b -P temp:/t ${U}`);
+});
+
+test('쌓이는 옵션은 되풀이해도 전부 남는다', () => {
+  assert.equal(ytdlp(U).exec('echo a').exec('echo b').build(), `yt-dlp --exec "echo a" --exec "echo b" ${U}`);
+  assert.equal(ytdlp(U).subLangs('ko').subLangs('en').build(), `yt-dlp --sub-langs ko --sub-langs en ${U}`);
+  // Different header names are different keys; the same name (case-insensitive) replaces
+  assert.equal(ytdlp(U).addHeaders('A:1').addHeaders('B:2').addHeaders('a:3').build(),
+    `yt-dlp --add-headers a:3 --add-headers B:2 ${U}`);
+});
+
+// Every allowed_keys regex is copied from Python. Die here if one stops being valid JavaScript.
+test('keyed 의 키 패턴은 전부 자바스크립트 정규식으로 읽힌다', () => {
+  const keyed = schema.opts.filter(o => o.keyed);
+  assert.ok(keyed.length >= 10, String(keyed.length));
+  for (const o of keyed) assert.doesNotThrow(() => new RegExp(o.keyed!.pattern), o.flag);
+  for (const o of keyed) assert.equal(o.kind, 'repeatable', o.flag);
 });

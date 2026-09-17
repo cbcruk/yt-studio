@@ -185,7 +185,7 @@ test('scanCommand 는 순서와 원문을 지킨다', () => {
 
 test('--flag=값 도 값으로 읽는다', () => {
   const r = lintCommand('yt-dlp --sub-langs=ko,en --write-subs https://x/y');
-  assert.equal(r.values['sub-langs'], 'ko,en');
+  assert.deepEqual(r.values['sub-langs'], ['ko,en']);   // repeatable — yt-dlp collects repeats
   assert.equal(r.ok, true);
 });
 
@@ -237,4 +237,30 @@ test('값에 그냥 든 콜론은 안 건드린다', () => {
   ]) {
     assert.deepEqual(lintCommand(cmd).issues.filter(i => i.level !== 'info'), [], cmd);
   }
+});
+
+// yt-dlp keeps these per key (-o · -P · --downloader …) or collects every value (--exec · --sub-langs).
+// "Only the last one is used" about them was a false warning.
+test('쌓이는 옵션을 되풀이해도 경고하지 않는다', () => {
+  const quiet = [
+    'yt-dlp -o "%(title)s.%(ext)s" -o "thumbnail:%(id)s" https://x/y',
+    'yt-dlp --exec "echo a" --exec "after_move:echo b" https://x/y',
+    'yt-dlp --sub-langs ko --sub-langs en --write-subs https://x/y',
+    'yt-dlp --add-headers A:1 --add-headers B:2 https://x/y',
+    // Overriding one key after a default is intended, not a mistake
+    'yt-dlp --color never --color stderr:always https://x/y',
+  ];
+  for (const c of quiet) assert.equal(msgs(c), '', c);
+});
+
+test('같은 키를 두 번 주면 경고한다', () => {
+  assert.match(msgs('yt-dlp -o "a.%(ext)s" -o "b.%(ext)s" https://x/y'), /-o 에 default 가 두 번 있다/);
+  assert.match(msgs('yt-dlp --add-headers A:1 --add-headers a:2 https://x/y'), /a 가 두 번 있다/);
+});
+
+test('-o 는 템플릿마다 읽고, 확장자 경고는 본 파일에만 낸다', () => {
+  assert.match(msgs('yt-dlp -o "%(title)s.%(ext)s" -o "thumbnail:%(id" https://x/y'), /-o 값을 읽지 못했다/);
+  assert.match(msgs('yt-dlp -o "thumbnail:%(id" -o "%(title)s.%(ext)s" https://x/y'), /-o 값을 읽지 못했다/);
+  assert.doesNotMatch(msgs('yt-dlp -o "%(title)s.%(ext)s" -o "thumbnail:%(id)s" https://x/y'), /%\(ext\)s 가 없다/);
+  assert.match(msgs('yt-dlp -o "thumbnail:%(id)s.%(ext)s" -o "%(title)s" https://x/y'), /%\(ext\)s 가 없다/);
 });

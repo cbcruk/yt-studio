@@ -95,7 +95,7 @@ function report(r: LintResult): void {
 
   const f = previewFilename(r.values);
   if (r.urls.length || Object.keys(r.values).length) {
-    console.log(`\n${dim('만들 파일')}  ${f.text}${f.dflt ? dim('  (-o 없음, yt-dlp 기본값)') : ''}`);
+    console.log(`\n${dim('만들 파일')}  ${f.text}${f.dflt ? dim('  (종류 없는 -o 없음, yt-dlp 기본값)') : ''}`);
   }
 
   const { error, warn, opts, total } = r.counts;

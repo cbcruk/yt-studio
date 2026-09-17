@@ -28,6 +28,7 @@ import { FIELDS, emitPiece } from './output-template.js';
 import { lintCommand } from './lint.js';
 import { quote } from './command.js';
 import { emitCookieSource } from './cookies.js';
+import { keysOf } from './schema.js';
 import type { Opt, Schema } from './schema.js';
 import { methodName, selMethod } from './env-types.js';
 
@@ -98,6 +99,10 @@ export { methodName, selMethod };
  * **name** comes from the long flag (`.format()`, not `-f`) — code is meant to be read.
  */
 const flagOf = (opt: Opt): string => opt.short || opt.flag;
+
+/** Whether two values of a keyed option land on exactly the same keys. */
+const sameKeys = (opt: Opt, a: string, b: string): boolean =>
+  [...(keysOf(opt, a) ?? [])].sort().join(',') === [...(keysOf(opt, b) ?? [])].sort().join(',');
 
 
 const COND_OPS: Record<string, string> = {
@@ -302,14 +307,20 @@ export class Ytdlp {
    *
    * Giving the same option twice **overwrites it in place.** Appending instead would
    * let edit order in code reorder the command, so changing one line produces a
-   * two-line diff. Only repeatable options accumulate.
+   * two-line diff. Repeatable options accumulate — except keyed ones, where a value
+   * for the same keys replaces the earlier one, as yt-dlp does
+   * (`.output(a).output('thumbnail', b)` keeps both, `.output(a).output(b)` keeps `b`).
    */
   place(id: string, flag: string, value?: string): this {
-    if (this.opt(id).kind !== 'repeatable') {
-      const at = this.parts.findIndex(p => p.id === id);
-      if (at >= 0) { this.parts[at] = { id, flag, value }; return this; }
-    }
-    this.parts.push({ id, flag, value });
+    const opt = this.opt(id);
+    const same = opt.kind !== 'repeatable'
+      ? (p: Part) => p.id === id
+      : opt.keyed && !opt.keyed.append && value != null
+        ? (p: Part) => p.id === id && p.value != null && sameKeys(opt, p.value, value)
+        : null;
+    const at = same ? this.parts.findIndex(same) : -1;
+    if (at >= 0) this.parts[at] = { id, flag, value };
+    else this.parts.push({ id, flag, value });
     return this;
   }
 

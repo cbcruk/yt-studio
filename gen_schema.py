@@ -49,17 +49,23 @@ STAGE_OVERRIDE = {
     "--cookies-from-browser": "connect",
 }
 
-# Options where yt-dlp collects values by TYPES are really given several times.
-#     -P home:/a -P temp:/b
-# On the optparse side it's just a callback action with a dict default, so it
-# doesn't look like append. --output and --progress-template behave the same, but
-# the UI currently assumes a single value, so they're left alone. Add them here
-# when that opens up.
+# Callbacks that **collect** values across repeated flags instead of replacing them.
+# On the optparse side these are just `action='callback'`, so they don't look like
+# append — for a while only `--paths` was marked by hand, and `-o` · `--exec` ·
+# `--sub-langs` were treated as single values. The builder then dropped the default
+# `-o` template when a typed one was added, and the checker warned "only the last
+# one is used" about commands that were fine.
 #
-# The three using allowed_values (see option_choices below) behave the same too —
-# they collect values into a set. Those aren't written by hand; reflection attaches them.
-KIND_OVERRIDE = {
-    "--paths": "repeatable",
+#     --sub-langs ko --sub-langs en    → ['ko', 'en']
+#     -o a.%(ext)s -o thumbnail:%(id)s → {'default': …, 'thumbnail': …}
+#
+# Only names are listed; how each one collects is read from callback_kwargs.
+COLLECTING_CALLBACKS = {
+    "_list_from_options_callback",
+    "_set_from_options_callback",
+    "_dict_from_options_callback",
+    "_create_alias",
+    "_preset_alias_callback",
 }
 
 
@@ -213,12 +219,48 @@ def control_kind(opt):
     if opt.choices:
         return "choice"
     if opt.action == "count":
-        return "count"
+        # No option uses it today. The schema has no kind for it, so die rather
+        # than emit something the TypeScript side can't read.
+        raise SystemExit(f"{opt._long_opts[0]}: action=count has no kind")
     if not opt.takes_value():
         return "flag"
     if opt.action == "append":
         return "repeatable"
+    if opt.action == "callback" and callback_name(opt) in COLLECTING_CALLBACKS:
+        if callback_name(opt) == "_list_from_options_callback" \
+                and (opt.callback_kwargs or {}).get("append", True) is False:
+            return "value"
+        return "repeatable"
     return "value"
+
+
+def callback_name(opt):
+    cb = getattr(opt, "callback", None)
+    return getattr(cb, "__name__", None)
+
+
+def option_keyed(opt):
+    """How a `KEYS:VALUE` option is split into keys — `_dict_from_options_callback`.
+
+    A repeated flag replaces the earlier value **only for the same keys**
+    (`-o a -o thumbnail:b` keeps both), unless `append` collects every value
+    (`--exec`). The checker and the builder need the key to tell those apart.
+
+    `pattern` is yt-dlp's own `allowed_keys` regex, kept as is — it is also valid
+    as a JavaScript regex for every option today, and a test checks that.
+    """
+    if callback_name(opt) != "_dict_from_options_callback":
+        return None
+    kw = opt.callback_kwargs or {}
+    if kw.get("delimiter", ":") != ":":
+        raise SystemExit(f"{opt._long_opts[0]}: delimiter other than ':' is not handled")
+    default = kw.get("default_key")
+    return {
+        "pattern": kw.get("allowed_keys", r"[\w-]+"),
+        "defaults": None if default is None else ([default] if isinstance(default, str) else list(default)),
+        "multiple": bool(kw.get("multiple_keys", True)),
+        "append": bool(kw.get("append", False)),
+    }
 
 
 def base_name(long_opt):
@@ -261,12 +303,13 @@ def main():
                 "stage": STAGE_OVERRIDE.get(long_opt, stage),
                 "group": group.title,
                 "dest": opt.dest,
-                "kind": KIND_OVERRIDE.get(long_opt, kind),
+                "kind": kind,
                 "metavar": opt.metavar,
                 "choices": choices,
                 "keys": option_keys(opt),
                 "rule": option_rule(long_opt, rules),
                 "vocabs": vocabs.get(long_opt),
+                "keyed": option_keyed(opt),
                 # What optparse reads the value as. int and float are real numbers —
                 # everything used to be `string | number`, and then the types
                 # couldn't stop `--socket-timeout 'fast'`.

@@ -94,7 +94,7 @@ async function render(): Promise<void> {
   }));
 
   els.file.textContent = out.file.dflt
-    ? `${out.file.text}  (yt-dlp 기본값 — -o 를 안 줬다)`
+    ? `${out.file.text}  (yt-dlp 기본값 — 종류 없는 -o 를 안 줬다)`
     : out.file.text;
 }
 
