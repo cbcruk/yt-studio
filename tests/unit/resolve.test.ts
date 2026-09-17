@@ -22,7 +22,8 @@ import path from 'node:path';
 
 import type { RawSchema } from '../../src/core/schema.js';
 
-const { BUNDLED, resolveSchema, ytstudio } = await import('../../src/index.js');
+const { bundledSchema, resolveSchema, ytstudio } = await import('../../src/index.js');
+const BUNDLED = bundledSchema();
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const TMP = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-resolve-'));
@@ -127,4 +128,41 @@ test('스키마를 직접 줄 수도 있다 — 파일을 안 거친다', () => 
   assert.equal(yt.schema.opts.length, 3);
   assert.equal(yt.source.version, '2100.01.01');
   assert.equal(yt.source.stale, true);
+});
+
+/** A directory whose schema file has exactly this text. */
+function dirWithText(text: string): string {
+  const dir = mkdtempSync(path.join(TMP, 'raw-'));
+  writeFileSync(path.join(dir, SCHEMA_FILE), text);
+  return dir;
+}
+
+// A half-right file used to die later as a TypeError naming neither the file nor the field.
+test('우리 스키마인데 필드가 빠졌으면 무엇이 빠졌는지 말한다', () => {
+  const { stages: _drop, ...noStages } = BUNDLED;
+  const dir = dirWithText(JSON.stringify(noStages));
+  assert.throws(() => resolveSchema({ cwd: dir }), (e: Error) =>
+    e.name === 'SchemaError' && /stages — 배열이어야 한다/.test(e.message) && e.message.includes(dir));
+
+  const broken = { ...BUNDLED, options: [{ ...BUNDLED.options[0], aliases: undefined }] };
+  assert.throws(() => resolveSchema({ cwd: dirWithText(JSON.stringify(broken)) }),
+    /options\[0\]\.aliases — 문자열 배열이어야 한다/);
+});
+
+// Our file name, cut off mid-write — silently checking against the bundle would report a pass.
+test('중간에 잘린 스키마 파일은 조용히 넘어가지 않는다', () => {
+  const text = JSON.stringify(BUNDLED);
+  const dir = dirWithText(text.slice(0, text.length / 2));
+  assert.throws(() => resolveSchema({ cwd: dir }), /JSON 으로 읽지 못했다/);
+});
+
+test('나중에 생긴 필드는 없어도 읽는다', () => {
+  const old = { ...BUNDLED, options: BUNDLED.options.map(({ keyed: _k, vocabs: _v, valueType: _t, ...o }) => o) };
+  const { source } = resolveSchema({ cwd: dirWithText(JSON.stringify(old)) });
+  assert.equal(source.from, 'local');
+});
+
+test('브라우저 입구도 모양을 본다', async () => {
+  const { studio } = await import('../../src/browser.js');
+  assert.throws(() => studio({} as RawSchema), /ytdlp_version — 문자열이어야 한다/);
 });

@@ -22,7 +22,7 @@
 import { beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -128,4 +128,45 @@ test('인자 없이 부르면 쓰는 법을 낸다', () => {
 test('모르는 명령은 2 로 끝난다 — 오류(1)와 구분된다', () => {
   assert.equal(run(['nope']).code, 2);
   assert.equal(run(['lint']).code, 2, '빈 입력도 2여야 한다');
+});
+
+// The schema used to be decided at the top of the module — a bad pointer printed a stack
+// trace even for --help, and a broken local schema blocked `types`, the command that fixes it.
+test('스키마를 못 읽으면 스택 트레이스 대신 한 줄로 말하고 2 로 끝난다', () => {
+  const bad = { env: { YT_STUDIO_SCHEMA: '/nope/yt-studio.schema.json' } };
+
+  const lint = run(['lint', 'yt-dlp -x https://youtu.be/abc'], '', bad);
+  assert.equal(lint.code, 2, lint.out);
+  assert.match(lint.out, /YT_STUDIO_SCHEMA 가 가리키는 스키마를 읽지 못했다/);
+  assert.doesNotMatch(lint.out, /\n\s+at /, '스택 트레이스가 새어 나왔다');
+
+  const help = run(['--help'], '', bad);
+  assert.equal(help.code, 0, help.out);
+  assert.match(help.out, /yt-studio lint/);
+});
+
+test('로컬 스키마가 깨져 있어도 types 는 돈다 — 그걸 다시 뽑는 명령이다', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-cli-'));
+  writeFileSync(path.join(dir, SCHEMA_FILE), '{"ytdlp_version": "2026');
+  const r = run(['types', '--yt-dlp', '/nope/yt-dlp'], '', { cwd: dir });
+  // Fails on the missing binary — not on the broken schema it is meant to replace
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /yt-dlp 를 실행하지 못했다/);
+});
+
+// Importing must not touch the file system — users passing their own schema pay nothing.
+// Watched from a separate process: fs is patched before the compiled entry point loads.
+test('yt-studio 를 import 만 하면 파일을 안 읽는다', () => {
+  const probe = `
+    import fs from 'node:fs';
+    import { syncBuiltinESMExports } from 'node:module';
+    const read = [];
+    const orig = fs.readFileSync;
+    fs.readFileSync = (p, ...a) => { read.push(String(p)); return orig(p, ...a); };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(path.join(ROOT, 'lib', 'index.js'))});
+    console.log(JSON.stringify(read.filter(p => p.endsWith('.json'))));
+  `;
+  const out = execFileSync(NODE, ['--input-type=module', '-e', probe], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(out), []);
 });

@@ -166,3 +166,42 @@ test('우선순위 표는 sel > merge > fallback > multi', () => {
   assert.ok(PREC.fallback > PREC.multi);
 });
 
+
+// Bad input must come out as GrammarError and nothing else — the checker catches only that,
+// so any other exception is a parser bug and must not be dressed up as a verdict.
+test('잘못된 입력에는 GrammarError 만 던진다', async () => {
+  const { GrammarError } = await import('../../src/core/grammar-error.js');
+  const { parseCookieSource } = await import('../../src/core/cookies.js');
+  const { parseTemplate } = await import('../../src/core/output-template.js');
+  let seed = 7;
+  const rnd = (): number => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const junk = (alpha: string): string =>
+    Array.from({ length: Math.floor(rnd() * 16) }, () => alpha[Math.floor(rnd() * alpha.length)]).join('');
+
+  const cases: [string, (v: string) => unknown, string][] = [
+    ['-f', parseFormat, 'bvwa*+/,()[]<>=!?^$~ h1_.-'],
+    ['-o', parseTemplate, '%()sdj>|.0-5 abcS'],
+    ['--cookies-from-browser', v => parseCookieSource(v, { browser: ['firefox'], keyring: ['KWALLET'] }), 'firefox+:KWALLET :: x'],
+  ];
+  for (const [name, parse, alpha] of cases) {
+    for (let k = 0; k < 3000; k++) {
+      const v = junk(alpha);
+      try { parse(v); } catch (e) { assert.ok(e instanceof GrammarError, `${name} ${JSON.stringify(v)} → ${e}`); }
+    }
+  }
+});
+
+// This one used to be "-f 값을 읽지 못했다 — Maximum call stack size exceeded".
+test('괄호가 너무 깊으면 스택 대신 문법 오류로 말한다', async () => {
+  const { lintCommand } = await import('../../src/index.js');
+  const deep = '('.repeat(20000) + 'b' + ')'.repeat(20000);
+  const msg = lintCommand(`yt-dlp -f "${deep}" https://x/y`).issues.map(i => i.msg).join(' | ');
+  assert.match(msg, /괄호가 64겹보다 깊다/);
+  assert.doesNotThrow(() => parseFormat('('.repeat(64) + 'b' + ')'.repeat(64)));
+});
+
+test('문법 오류가 아닌 예외는 삼키지 않는다', async () => {
+  const { grammarMessage, GrammarError } = await import('../../src/core/grammar-error.js');
+  assert.equal(grammarMessage(new GrammarError('x')), 'x');
+  assert.throws(() => grammarMessage(new TypeError('bug')), TypeError);
+});

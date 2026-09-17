@@ -10,7 +10,7 @@
  * - Is there a value where one is required?         opt.kind
  * - Is it one of the allowed values?                opt.choices
  * - Do -f and -o follow their grammar?              runs the real parsers
- * - Does -P avoid giving the same type twice?
+ * - Does a repeated flag replace a value it didn't mean to? (`-f b -f w`, `-P home:/a -P home:/b`)
  * - Are options that contradict each other given together?
  *
  * Knows nothing of the DOM or app state. One string goes in, a list of
@@ -18,10 +18,12 @@
  */
 
 import { scanCommand } from './command.js';
+import { grammarMessage } from './grammar-error.js';
 import { parseFormat } from './format-grammar.js';
 import { parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
 import { parseCookieSource } from './cookies.js';
+import { keysOf } from './schema.js';
 import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Piece } from './output-template.js';
@@ -195,32 +197,29 @@ function checkKeys(opt: Opt, value: string | null): string | null {
 function checkCookies(opt: Opt, value: string | null): string | null {
   if (!opt.vocabs || value == null || value === '') return null;
   try { parseCookieSource(value, opt.vocabs); return null; }
-  catch (e) { return `${opt.flag} — ${(e as Error).message}`; }
+  catch (e) { return `${opt.flag} — ${grammarMessage(e)}`; }
 }
 
 /** Runs `-f` through the real parser. If it cannot be read, returns what the parser said. */
 function checkFormat(value: string): string | null {
   try { parseFormat(value); return null; }
-  catch (e) { return (e as Error).message; }
+  catch (e) { return grammarMessage(e); }
 }
 
 function checkOutput(value: string): { error?: string; pieces?: Piece[]; hasExt?: boolean } {
   const { template } = splitType(value);
   let pieces;
   try { pieces = parseTemplate(template); }
-  catch (e) { return { error: (e as Error).message }; }
+  catch (e) { return { error: grammarMessage(e) }; }
   const hasExt = pieces.some(p => p.t === 'field' && (p.name === 'ext' || /(^|\.)ext$/.test(p.name)));
   return { pieces, hasExt };
 }
 
 function checkPaths(values: string[]): string[] {
-  const seen = new Map<string, string>(), out: string[] = [];
+  const out: string[] = [];
   for (const line of values) {
     const { type, path } = splitEntry(line);
-    const key = type || 'home';
-    if (seen.has(key)) out.push(`-P 에 ${key} 가 두 번 있다 — 뒤엣것만 쓰인다`);
-    seen.set(key, path);
-    if (!path) out.push(`-P ${key} 의 경로가 비어 있다`);
+    if (!path) out.push(`-P ${type || 'home'} 의 경로가 비어 있다`);
   }
   return out;
 }
@@ -271,6 +270,8 @@ export function lintCommand(schema: Schema, text: string): LintResult {
   const urls = items.filter(i => i.kind === 'url').map(i => i.raw);
   const values: Values = {};               // optId → value (arrays for repeatable)
   const count: Record<string, number> = {};
+  // Keyed options replace per key set: optId → key set ("default", "dash,m3u8") → times given
+  const keyCount: Record<string, Record<string, number>> = {};
 
   for (const it of items) {
     if (it.kind === 'unknown') {
@@ -306,13 +307,29 @@ export function lintCommand(schema: Schema, text: string): LintResult {
 
     const odd = checkKeys(opt, value);
     if (odd) issues.push({ level: 'warn', flag: it.flag, opt: opt.id, msg: odd });
+
+    const keys = opt.keyed && !opt.keyed.append && value != null ? keysOf(opt, value) : null;
+    if (keys) {
+      const set = [...keys].sort().join(',');
+      (keyCount[opt.id] ||= {})[set] = (keyCount[opt.id]![set] || 0) + 1;
+    }
   }
 
   for (const id in count) {
-    const o = schema.byId[id];
-    if (count[id] > 1 && o.kind !== 'repeatable') {
+    const o = schema.byId[id]!;
+    if (count[id]! > 1 && o.kind !== 'repeatable') {
       issues.push({ level: 'warn', opt: id,
         msg: `${o.flag} 를 ${count[id]}번 줬다 — 마지막 것만 쓰인다` });
+    }
+  }
+  // Only an identical key set is flagged. A partial overlap is how you set a default
+  // and then override one key (`--color never --color stderr:always`) — that is intended.
+  for (const id in keyCount) {
+    const o = schema.byId[id]!;
+    for (const [set, n] of Object.entries(keyCount[id]!)) {
+      if (n < 2) continue;
+      issues.push({ level: 'warn', opt: id,
+        msg: `${o.short || o.flag} 에 ${set} 가 ${n === 2 ? '두 번' : `${n}번`} 있다 — 뒤엣것만 쓰인다` });
     }
   }
 
@@ -324,12 +341,16 @@ export function lintCommand(schema: Schema, text: string): LintResult {
     if (err) issues.push({ level: 'error', opt: 'format', msg: `-f 값을 읽지 못했다 — ${err}` });
   }
   if (has('output')) {
-    const first = (Array.isArray(values.output) ? values.output[0] : values.output) as string;
-    const r = checkOutput(first);
-    if (r.error) issues.push({ level: 'error', opt: 'output', msg: `-o 값을 읽지 못했다 — ${r.error}` });
-    else if (!r.hasExt) {
-      issues.push({ level: 'warn', opt: 'output',
-        msg: '-o 에 %(ext)s 가 없다 — 확장자 없는 파일이 만들어진다' });
+    // Every template is read, not just the first. The missing-extension warning is
+    // for the main file only — for thumbnails and subtitles yt-dlp adds the extension.
+    for (const out of ([] as (string | null)[]).concat(values.output as string | (string | null)[])) {
+      if (out == null) continue;
+      const r = checkOutput(out);
+      if (r.error) issues.push({ level: 'error', opt: 'output', msg: `-o 값을 읽지 못했다 — ${r.error}` });
+      else if (!r.hasExt && !splitType(out).type) {
+        issues.push({ level: 'warn', opt: 'output',
+          msg: '-o 에 %(ext)s 가 없다 — 확장자 없는 파일이 만들어진다' });
+      }
     }
   }
   if (has('paths')) {

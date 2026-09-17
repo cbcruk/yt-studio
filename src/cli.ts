@@ -16,17 +16,14 @@
  * into CI or scripts.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { basename, resolve } from 'node:path';
 
-import { BUNDLED, previewFilename, ytstudio } from './index.js';
+import { bundledSchema, previewFilename, ytstudio } from './index.js';
 import { emitEnvTypes } from './core/env-types.js';
 import { parseHelp } from './core/help-schema.js';
-import type { LintResult } from './index.js';
-
-// The schema is decided once, here. What this process checks against is this one line.
-const yt = ytstudio();
+import type { LintResult, Ytstudio } from './index.js';
 
 // Colors are off when piped — color codes getting caught by grep is a nuisance.
 const tty = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -38,7 +35,27 @@ const bold = (s: string) => c(1, s);
 
 const MARK = { error: red('✗'), warn: yellow('!'), info: dim('·') };
 
-const HELP = `yt-studio — 설치된 yt-dlp(${yt.source.version}) 에 명령어를 대조한다
+let handle: Ytstudio | undefined;
+
+/**
+ * The schema this process checks against — decided once, on first use.
+ *
+ * It used to be decided at the top of the module, so a bad `YT_STUDIO_SCHEMA` or a
+ * broken local schema printed a stack trace even for `--help`, and blocked
+ * `yt-studio types` — the command that rewrites that very file.
+ */
+function yt(): Ytstudio {
+  if (handle) return handle;
+  try {
+    return (handle = ytstudio());
+  } catch (e) {
+    console.error(`${red('✗')} ${(e as Error).message}`);
+    console.error(dim('  YT_STUDIO_SCHEMA 나 작업 디렉터리의 yt-studio.schema.json 을 고치거나 지울 것 — yt-studio types 로 다시 뽑을 수 있다.'));
+    process.exit(2);
+  }
+}
+
+const help = (version: string): string => `yt-studio — 설치된 yt-dlp(${version}) 에 명령어를 대조한다
 
   yt-studio lint <명령어>       스키마와 문법에 어긋나는 곳을 찾는다
   yt-studio explain <명령어>    토큰마다 무슨 옵션인지 말한다
@@ -61,10 +78,17 @@ const HELP = `yt-studio — 설치된 yt-dlp(${yt.source.version}) 에 명령어
 작업 디렉터리의 yt-studio.schema.json 을 검증기가 먼저 본다. YT_STUDIO_SCHEMA 로
 다른 자리를 가리킬 수도 있다.`;
 
+/** Help must show even when the schema is broken — that is when it's needed most. */
+function helpText(): string {
+  let version = '?';
+  try { version = ytstudio().source.version; } catch { /* the command that needs the schema reports it */ }
+  return help(version);
+}
+
 /** One line on which schema was used. Without it, nobody knows what the verdict is a verdict about. */
 function source(): string {
-  const where = yt.source.from === 'bundled' ? '패키지 내장' : yt.source.path;
-  return `${where} ${dim(`(yt-dlp ${yt.source.version})`)}`;
+  const { from, path, version } = yt().source;
+  return `${from === 'bundled' ? '패키지 내장' : path} ${dim(`(yt-dlp ${version})`)}`;
 }
 
 /**
@@ -95,7 +119,7 @@ function report(r: LintResult): void {
 
   const f = previewFilename(r.values);
   if (r.urls.length || Object.keys(r.values).length) {
-    console.log(`\n${dim('만들 파일')}  ${f.text}${f.dflt ? dim('  (-o 없음, yt-dlp 기본값)') : ''}`);
+    console.log(`\n${dim('만들 파일')}  ${f.text}${f.dflt ? dim('  (종류 없는 -o 없음, yt-dlp 기본값)') : ''}`);
   }
 
   const { error, warn, opts, total } = r.counts;
@@ -107,14 +131,14 @@ function report(r: LintResult): void {
 
   // Suggest next steps only when there are no errors — suggesting on top of something wrong is noise
   if (!error) {
-    const next = yt.suggest(r.values).slice(0, 4);
+    const next = yt().suggest(r.values).slice(0, 4);
     if (next.length) console.log(`${dim('이어서')}    ${next.map(s => s.opt.flag).join('  ')}`);
   }
 }
 
 /** Which option each token is. No checking — it only reads it back. */
 function explain(r: LintResult): void {
-  for (const row of yt.explain(r.items)) {
+  for (const row of yt().explain(r.items)) {
     const where = row.stageLabel ? dim(`  [${row.stageLabel}]`) : '';
     console.log(`${bold(row.text)}${where}\n    ${row.ko}`);
   }
@@ -181,19 +205,20 @@ function types(args: string[]): number {
     return 1;
   }
 
-  const r = parseHelp(help, version, BUNDLED);
+  const bundled = bundledSchema();
+  const r = parseHelp(help, version, bundled);
 
   // Help is output meant for people, so its format can change. A broken parser
   // extracts only a few and reports success — and then every one of users'
   // flags becomes a typo.
-  const gone = r.removed.length / BUNDLED.options.length;
+  const gone = r.removed.length / bundled.options.length;
   if (gone > 0.2) {
-    console.error(`${red('✗')} 도움말에서 옵션 ${r.removed.length}개가 사라졌다 (번들 ${BUNDLED.options.length}개 중) — 파서가 이 서식을 못 읽는다`);
+    console.error(`${red('✗')} 도움말에서 옵션 ${r.removed.length}개가 사라졌다 (번들 ${bundled.options.length}개 중) — 파서가 이 서식을 못 읽는다`);
     console.error(dim('  아무것도 쓰지 않았다. 반쯤 쓴 스키마가 제일 나쁘다.'));
     return 1;
   }
 
-  const byFlag = new Map(BUNDLED.options.map(o => [o.flag, o]));
+  const byFlag = new Map(bundled.options.map(o => [o.flag, o]));
   const next = new Map(r.schema.options.map(o => [o.flag, o]));
   const dts = emitEnvTypes({
     version,
@@ -203,11 +228,17 @@ function types(args: string[]): number {
 
   const schemaPath = resolve(process.cwd(), 'yt-studio.schema.json');
   const dtsPath = resolve(process.cwd(), 'yt-studio-env.d.ts');
-  writeFileSync(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
-  writeFileSync(dtsPath, dts);
+  // Write beside the target, then rename. An interrupted write used to leave half a
+  // schema under our file name — now the old file stays until the new one is whole.
+  const put = (path: string, text: string): void => {
+    writeFileSync(`${path}.tmp`, text);
+    renameSync(`${path}.tmp`, path);
+  };
+  put(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
+  put(dtsPath, dts);
 
   console.log(`${dim('읽음')}      ${bin} ${dim(`(yt-dlp ${version}) · --help 파싱`)}`);
-  console.log(`${dim('옵션')}      ${r.schema.options.length}개 ${dim(`· 새로 ${r.added.length} · 사라짐 ${r.removed.length} (번들 ${BUNDLED.options.length} 대비)`)}`);
+  console.log(`${dim('옵션')}      ${r.schema.options.length}개 ${dim(`· 새로 ${r.added.length} · 사라짐 ${r.removed.length} (번들 ${bundled.options.length} 대비)`)}`);
   console.log(`${dim('씀')}        ${basename(schemaPath)} · ${basename(dtsPath)}`);
   if (r.added.length) console.log(`${dim('새 옵션')}   ${r.added.slice(0, 6).join('  ')}${r.added.length > 6 ? dim(` … ${r.added.length - 6}개 더`) : ''}`);
   if (r.unmappedGroups.length) {
@@ -244,19 +275,19 @@ function tsconfigWarnings(dtsPath: string): string[] {
 const [cmd, ...rest] = process.argv.slice(2);
 
 if (!cmd || cmd === 'help' || cmd === '--help' || cmd === '-h') {
-  console.log(HELP);
+  console.log(helpText());
   process.exit(0);
 }
 if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
   // Only the version goes to stdout — scripts read it as is.
-  console.log(yt.source.version);
+  console.log(yt().source.version);
   console.error(dim(`스키마  ${source()}`));
   process.exit(0);
 }
 if (cmd === 'types') process.exit(types(rest));
 
 if (cmd !== 'lint' && cmd !== 'explain') {
-  console.error(`모르는 명령이다: ${cmd}\n\n${HELP}`);
+  console.error(`모르는 명령이다: ${cmd}\n\n${helpText()}`);
   process.exit(2);
 }
 
@@ -266,7 +297,7 @@ if (!text) {
   process.exit(2);
 }
 
-const result = yt.lint(text);
+const result = yt().lint(text);
 if (cmd === 'explain') explain(result);
 else report(result);
 

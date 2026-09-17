@@ -11,6 +11,8 @@
  * first, then `>`, and they are rejoined in the same order, so it is lossless.
  */
 
+import { GrammarError } from './grammar-error.js';
+
 /** File types that can prefix `-o` and `-P`, with a one-line description. `''` is the default. */
 export const OUT_TYPES: [type: string, label: string][] = [
   ['', 'default (all files)'],
@@ -139,7 +141,7 @@ function splitBody(body: string): Body {
 const joinBody = ({ name, strf, fallback }: Body): string =>
   name + (strf ? '>' + strf : '') + (fallback != null ? '|' + fallback : '');
 
-/** Template string → pieces. Throws with the reason when it cannot be read. */
+/** Template string → pieces. Throws {@linkcode GrammarError} with the reason when it cannot be read. */
 export function parseTemplate(src: string): Piece[] {
   const s = src || '';
   const out: Piece[] = [];
@@ -149,17 +151,17 @@ export function parseTemplate(src: string): Piece[] {
   for (let i = 0; i < s.length; i++) {
     if (s[i] !== '%') { text += s[i]; continue; }
     if (s[i + 1] === '%') { text += '%'; i++; continue; }   // %% → literal %
-    if (s[i + 1] !== '(') throw new Error(`'%' 뒤에 '(' 가 없다 (${i + 1}번째 글자)`);
+    if (s[i + 1] !== '(') throw new GrammarError(`'%' 뒤에 '(' 가 없다 (${i + 1}번째 글자)`, i);
 
     const close = s.indexOf(')', i + 2);
-    if (close < 0) throw new Error("'%(' 의 괄호가 닫히지 않았다");
+    if (close < 0) throw new GrammarError("'%(' 의 괄호가 닫히지 않았다", i);
     const body = s.slice(i + 2, close);
-    if (!body) throw new Error(`빈 필드 %() (${i + 1}번째 글자)`);
+    if (!body) throw new GrammarError(`빈 필드 %() (${i + 1}번째 글자)`, i);
 
     // After the parenthesis: flags, width, precision, then one conversion character.
     let j = close + 1;
     while (j < s.length && /[#0\-+ .,\d]/.test(s[j])) j++;
-    if (j >= s.length) throw new Error(`%(${body}) 뒤에 변환 글자가 없다`);
+    if (j >= s.length) throw new GrammarError(`%(${body}) 뒤에 변환 글자가 없다`, i);
 
     flush();
     out.push({ t: 'field', fmt: s.slice(close + 1, j), conv: s[j], ...splitBody(body) });

@@ -9,6 +9,8 @@
  *   multi    := fallback (',' fallback)*            bv,ba
  */
 
+import { GrammarError } from './grammar-error.js';
+
 /** Operator precedence. A child lower than its parent gets parenthesized. */
 export const PREC = { multi: 0, fallback: 1, merge: 2, sel: 3 } as const;
 
@@ -90,19 +92,26 @@ export const FKEYS: [key: string, label: string, type: 'num' | 'str'][] = [
 /** `height<=?1080`, `format_note`, `!format_note` → one filter slot. */
 export function parseFilterBody(body: string): Filter {
   const b = body.trim();
-  if (!b) throw new Error('빈 필터');
+  if (!b) throw new GrammarError('빈 필터');
   const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
   if (m) return { key: m[1], op: m[2], loose: m[3] === '?', value: m[4].trim() };
   if (/^![A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b.slice(1), op: 'hasnot', value: '' };
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b, op: 'has', value: '' };
-  throw new Error(`필터를 읽지 못했다: [${body}]`);
+  throw new GrammarError(`필터를 읽지 못했다: [${body}]`);
 }
 
-/** Format selector string → tree. Throws with the reason when it cannot be read. */
+/**
+ * Nesting deeper than this is refused instead of overflowing the stack.
+ *
+ * Real selectors nest two or three levels; 64 leaves plenty of room.
+ */
+const MAX_DEPTH = 64;
+
+/** Format selector string → tree. Throws {@linkcode GrammarError} with the reason when it cannot be read. */
 export function parseFormat(src: string): FormatNode | null {
   const s = (src || '').trim();
   if (!s) return null;
-  let i = 0;
+  let i = 0, depth = 0;
   const ws = (): void => { while (i < s.length && /\s/.test(s[i])) i++; };
   const peek = (): string | undefined => s[i];
 
@@ -134,20 +143,21 @@ export function parseFormat(src: string): FormatNode | null {
     ws();
     let node: FormatNode;
     if (peek() === '(') {
+      if (++depth > MAX_DEPTH) throw new GrammarError(`괄호가 ${MAX_DEPTH}겹보다 깊다`, i);
       i++; node = expr(); ws();
-      if (peek() !== ')') throw new Error("')' 가 닫히지 않았다");
-      i++;
+      if (peek() !== ')') throw new GrammarError("')' 가 닫히지 않았다", i);
+      i++; depth--;
     } else {
       const start = i;
       while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s[i])) i++;
-      if (i === start) throw new Error(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`);
+      if (i === start) throw new GrammarError(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`, i);
       node = { t: 'sel', name: s.slice(start, i), filters: [] };
     }
     ws();
     while (peek() === '[') {
       i++;
       const j = s.indexOf(']', i);
-      if (j < 0) throw new Error("']' 가 닫히지 않았다");
+      if (j < 0) throw new GrammarError("']' 가 닫히지 않았다", i);
       (node.filters ||= []).push(parseFilterBody(s.slice(i, j)));
       i = j + 1; ws();
     }
@@ -155,7 +165,7 @@ export function parseFormat(src: string): FormatNode | null {
   }
 
   const tree = expr(); ws();
-  if (i < s.length) throw new Error(`읽고 남은 글자: "${s.slice(i)}"`);
+  if (i < s.length) throw new GrammarError(`읽고 남은 글자: "${s.slice(i)}"`, i);
   return tree;
 }
 

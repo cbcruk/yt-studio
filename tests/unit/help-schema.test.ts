@@ -112,3 +112,11 @@ test('source 를 help 로 박는다 — 번들보다 덜 충실하다는 표시�
   assert.equal(r.schema.source, 'help');
   assert.equal(BASE.source ?? 'optparse', 'optparse');
 });
+
+// The help can't say how a repeat combines — it comes from the bundle, like choices.
+test('keyed 는 번들에서 물려받는다', () => {
+  const r = parseHelp(HELP, '2026.07.04', BASE);
+  const o = r.schema.options.find(x => x.flag === '--output')!;
+  assert.equal(o.kind, 'repeatable');
+  assert.deepEqual(o.keyed, BASE.options.find(x => x.flag === '--output')!.keyed);
+});

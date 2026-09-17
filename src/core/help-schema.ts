@@ -238,6 +238,7 @@ export function parseHelp(help: string, version: string, base: RawSchema): HelpR
       choices: prev && richer !== 'flag' ? prev.choices : null,
       keys: prev && richer !== 'flag' ? prev.keys : null,
       rule: prev && richer !== 'flag' ? prev.rule : null,
+      keyed: prev && richer !== 'flag' ? (prev.keyed ?? null) : null,
       vocabs: prev && richer !== 'flag' ? prev.vocabs : null,
       // The help does not show optparse's type. As long as both agree it takes a
       // value, use the bundle's; new options are treated as strings.

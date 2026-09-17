@@ -11,21 +11,24 @@
  * - what would naturally follow the current combination of options
  */
 
+import { grammarMessage } from './grammar-error.js';
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
 import type { Opt, Schema } from './schema.js';
 import type { Item } from './command.js';
 import type { Values } from './lint.js';
 
-/** The filename this command produces. If `-o` could not be read, `ok` is false and the original text comes back. */
+/**
+ * The main file this command produces. If `-o` could not be read, `ok` is false and the original text comes back.
+ *
+ * Typed templates (`-o thumbnail:…`) name other files, so they never show up here.
+ */
 export interface FilePreview {
   /** Whether `-o` was read. When false, `text` is the original text. */
   ok: boolean;
-  /** The type prefix on `-o` (`thumbnail` in `thumbnail:`). */
-  type: string;
   /** The filename. Fields are placeholders like `‹제목›`, prefixed with `-P home` when given. */
   text: string;
-  /** True when there was no `-o` and yt-dlp's default template was used. */
+  /** True when no `-o` without a type was given, so yt-dlp's default template was used. */
   dflt?: boolean;
 }
 
@@ -65,11 +68,14 @@ export const DEFAULT_OUTTMPL = '%(title)s [%(id)s].%(ext)s';
  * given it is prepended — "what lands where" should read as one line.
  */
 export function previewFilename(values: Values): FilePreview {
-  const rawOut = (Array.isArray(values.output) ? values.output[0] : values.output) as string | null;
-  const { type, template } = splitType(rawOut || DEFAULT_OUTTMPL);
+  // The main file follows the last template without a type prefix — typed ones
+  // (`thumbnail:…`) name other files, and a repeat of the same type replaces the earlier one.
+  const outs = ([] as (string | null)[]).concat((values.output ?? []) as string | (string | null)[]);
+  const rawOut = outs.filter((v): v is string => v != null && !splitType(v).type).at(-1) ?? null;
+  const template = rawOut || DEFAULT_OUTTMPL;
   let body: string;
   try { body = previewTemplate(parseTemplate(template)); }
-  catch { return { ok: false, text: rawOut || DEFAULT_OUTTMPL, type }; }
+  catch (e) { grammarMessage(e); return { ok: false, text: template }; }
 
   let home = '';
   if (values.paths) {
@@ -79,7 +85,7 @@ export function previewFilename(values: Values): FilePreview {
     }
   }
   const sep = home && !/[/\\]$/.test(home) ? '/' : '';
-  return { ok: true, type, text: home + sep + body, dflt: !rawOut };
+  return { ok: true, text: home + sep + body, dflt: !rawOut };
 }
 
 /** Describes one token in one line. */

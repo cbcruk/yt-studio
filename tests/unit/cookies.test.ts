@@ -96,7 +96,8 @@ test('빌더가 자리를 제대로 잇는다', () => {
 // Had the vocabulary been hand-written, it would have quietly diverged when yt-dlp
 // supported one more browser. Pin down that it comes from the schema.
 test('어휘는 스키마에서 온다', async () => {
-  const { BUNDLED } = await import('../../src/index.js');
+  const { bundledSchema } = await import('../../src/index.js');
+  const BUNDLED = bundledSchema();
   const o = BUNDLED.options.find(x => x.id === 'cookies-from-browser')!;
   assert.deepEqual(Object.keys(o.vocabs ?? {}).sort(), ['browser', 'keyring']);
   assert.ok(o.vocabs!['browser']!.includes('firefox'));

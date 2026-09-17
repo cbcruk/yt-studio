@@ -49,10 +49,19 @@ test('home 이 아닌 -P 는 파일명에 안 붙는다', () => {
   assert.equal(f.text, '‹제목›.‹확장자›');
 });
 
-test('종류별 -o 는 종류를 따로 들고 있는다', () => {
-  const f = previewFilename(valuesOf('yt-dlp -o "thumbnail:%(id)s.%(ext)s" https://y.be/a'));
-  assert.equal(f.type, 'thumbnail');
-  assert.equal(f.text, '‹영상 ID›.‹확장자›');
+// yt-dlp keeps -o per type: {'default': …, 'thumbnail': …}. The main file follows
+// 'default' only — a typed template names a side file.
+test('종류별 -o 는 본 파일명이 아니다', () => {
+  const only = previewFilename(valuesOf('yt-dlp -o "thumbnail:%(id)s.%(ext)s" https://y.be/a'));
+  assert.equal(only.dflt, true);
+  assert.equal(only.text, '‹제목› [‹영상 ID›].‹확장자›');
+
+  const both = previewFilename(valuesOf('yt-dlp -o "thumbnail:%(id)s.%(ext)s" -o "%(title)s.%(ext)s" https://y.be/a'));
+  assert.equal(both.dflt, false);
+  assert.equal(both.text, '‹제목›.‹확장자›');
+
+  const twice = previewFilename(valuesOf('yt-dlp -o "a.%(ext)s" -o "b.%(ext)s" https://y.be/a'));
+  assert.equal(twice.text, 'b.‹확장자›', 'the same type again replaces it');
 });
 
 // If the grammar is broken, do not make things up — return the original and lower ok.
