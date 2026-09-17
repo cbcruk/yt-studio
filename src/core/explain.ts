@@ -11,6 +11,7 @@
  * - what would naturally follow the current combination of options
  */
 
+import { grammarMessage } from './grammar-error.js';
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
 import type { Opt, Schema } from './schema.js';
@@ -74,7 +75,7 @@ export function previewFilename(values: Values): FilePreview {
   const template = rawOut || DEFAULT_OUTTMPL;
   let body: string;
   try { body = previewTemplate(parseTemplate(template)); }
-  catch { return { ok: false, text: template }; }
+  catch (e) { grammarMessage(e); return { ok: false, text: template }; }
 
   let home = '';
   if (values.paths) {

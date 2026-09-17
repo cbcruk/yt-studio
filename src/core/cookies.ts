@@ -23,6 +23,8 @@
  * So `Firefox` and `FIREFOX` are both valid.
  */
 
+import { GrammarError } from './grammar-error.js';
+
 /** The four slots read out. Slots not given are `null`. */
 export interface CookieSource {
   browser: string;
@@ -40,7 +42,7 @@ export interface CookieVocabs {
 const SHAPE = /^([^+:]+)(?:\s*\+\s*([^:]+))?(?:\s*:\s*(?!:)(.+?))?(?:\s*::\s*(.+))?$/;
 
 /** Why a value couldn't be read. One human-readable line, in Korean. */
-export class CookieError extends Error {}
+export class CookieError extends GrammarError {}
 
 /**
  * String → four slots. Throws `CookieError` when it can't be read.
