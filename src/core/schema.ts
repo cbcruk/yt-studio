@@ -19,6 +19,7 @@
  * Now it is a value, so the seam is an argument. Two schemas can be held side by
  * side.
  */
+import { Effect, Schema, SchemaIssue } from 'effect';
 
 /** One option, exactly as `gen_schema.py` extracted it from the optparse tree. */
 export interface Opt {
@@ -221,8 +222,82 @@ export class SchemaError extends Error {
   }
 }
 
-const KINDS: readonly string[] = ['flag', 'value', 'choice', 'repeatable'] satisfies OptKind[];
-const VALUE_TYPES: readonly unknown[] = ['string', 'int', 'float', 'choice', null];
+/** Attaches one message for both a wrong value and a missing key, as the old checker said them. */
+const says = <S extends Schema.Top>(message: string) => (s: S): S['Rebuild'] =>
+  s.annotate({ message }).annotateKey({ messageMissingKey: message });
+
+const STR = Schema.String.pipe(says('문자열이어야 한다'));
+const STRS = Schema.mutable(Schema.Array(STR)).pipe(says('문자열 배열이어야 한다'));
+const STR_OR_NULL = Schema.NullOr(Schema.String).pipe(says('문자열이나 null 이어야 한다'));
+const STRS_OR_NULL = Schema.NullOr(STRS).pipe(says('문자열 배열이나 null 이어야 한다'));
+const BOOL = Schema.Boolean.pipe(says('boolean 이어야 한다'));
+
+/**
+ * Added after the first schemas. Absent, it decodes as `null`; present, it must match.
+ *
+ * The old checker let these through as `undefined` and cast the result, so
+ * {@linkcode Opt.keys} said `string[] | null` while an old file handed over `undefined`.
+ */
+const ABSENT = Effect.succeed(null);
+
+const STAGE = Schema.Struct({ id: STR, label: STR, blurb: STR, groups: STRS })
+  .annotate({ message: '객체여야 한다' });
+
+const OPT = Schema.Struct({
+  id: STR, flag: STR, stage: STR, group: STR, help: STR,
+  short: STR_OR_NULL, dest: STR_OR_NULL, metavar: STR_OR_NULL, negation: STR_OR_NULL,
+  aliases: STRS,
+  kind: Schema.Literals(['flag', 'value', 'choice', 'repeatable'] satisfies OptKind[])
+    .pipe(says('flag · value · choice · repeatable 중 하나여야 한다')),
+  choices: STRS_OR_NULL,
+  keys: STRS_OR_NULL.pipe(Schema.withDecodingDefaultKey(ABSENT)),
+  rule: Schema.NullOr(Schema.Struct({ vocab: STRS, from: BOOL }))
+    .annotate({ message: '{ vocab: 문자열 배열, from: boolean } 이나 null 이어야 한다' })
+    .pipe(Schema.withDecodingDefaultKey(ABSENT)),
+  vocabs: Schema.NullOr(Schema.Record(Schema.String, STRS))
+    .annotate({ message: '문자열 배열을 값으로 갖는 객체나 null 이어야 한다' })
+    .pipe(Schema.withDecodingDefaultKey(ABSENT)),
+  valueType: Schema.NullOr(Schema.Literals(['string', 'int', 'float', 'choice']))
+    .annotate({ message: "'string' · 'int' · 'float' · 'choice' · null 중 하나여야 한다" })
+    .pipe(Schema.withDecodingDefaultKey(ABSENT)),
+  keyed: Schema.NullOr(Schema.Struct({ pattern: STR, defaults: STRS_OR_NULL, multiple: BOOL, append: BOOL }))
+    .annotate({ message: '{ pattern, defaults, multiple, append } 나 null 이어야 한다' })
+    .pipe(Schema.withDecodingDefaultKey(ABSENT)),
+  default: Schema.Unknown.pipe(Schema.withDecodingDefaultKey(ABSENT)),
+}).annotate({ message: '객체여야 한다' });
+
+const RAW = Schema.Struct({
+  ytdlp_version: STR,
+  source: Schema.optionalKey(Schema.Literals(['optparse', 'help']).annotate({ message: "'optparse' 나 'help' 여야 한다" })),
+  stages: Schema.mutable(Schema.Array(STAGE)).pipe(says('배열이어야 한다')),
+  options: Schema.mutable(Schema.Array(OPT)).pipe(says('배열이어야 한다')),
+}).annotate({ message: '객체여야 한다' });
+
+const decodeRaw = Schema.decodeUnknownEffect(RAW);
+const formatIssue = SchemaIssue.makeFormatterStandardSchemaV1({
+  leafHook: issue => issue._tag === 'MissingKey'
+    ? issue.annotations?.messageMissingKey ?? '있어야 한다'
+    : SchemaIssue.defaultLeafHook(issue),
+});
+
+/** `['options', 3, 'aliases']` → `options[3].aliases`. */
+const pathText = (path: ReadonlyArray<PropertyKey | { key: PropertyKey }> | undefined): string =>
+  (path ?? []).map(seg => (typeof seg === 'object' ? seg.key : seg))
+    .map((k, i) => (typeof k === 'number' ? `[${k}]` : `${i ? '.' : ''}${String(k)}`))
+    .join('') || '(최상위)';
+
+/**
+ * Decodes an unknown value as a {@linkcode RawSchema}, failing with every problem at once.
+ *
+ * The shape lives in one `effect/Schema` definition, so what is checked and what
+ * the type says can't drift apart — the hand-written checker this replaced had to
+ * repeat every field name as a string.
+ */
+export const decodeRawSchema = (v: unknown): Effect.Effect<RawSchema, SchemaError> =>
+  decodeRaw(v, { errors: 'all' }).pipe(
+    Effect.map((raw): RawSchema => raw),
+    Effect.mapError(e => new SchemaError(formatIssue(e.issue).issues.map(i => `${pathText(i.path)} — ${i.message}`))),
+  );
 
 /**
  * Checks that an unknown value has every field the code reads, and returns it as a {@linkcode RawSchema}.
@@ -237,49 +312,7 @@ const VALUE_TYPES: readonly unknown[] = ['string', 'int', 'float', 'choice', nul
  * @throws {SchemaError} listing every problem found.
  */
 export function checkRawSchema(v: unknown): RawSchema {
-  const bad: string[] = [];
-  const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
-  const isStrs = (x: unknown): boolean => Array.isArray(x) && x.every(s => typeof s === 'string');
-  const need = (ok: boolean, at: string, what: string): void => { if (!ok) bad.push(`${at} — ${what}`); };
-  const strOrNull = (x: unknown): boolean => x === null || typeof x === 'string';
-  const later = (o: Record<string, unknown>, k: string, ok: (x: unknown) => boolean, at: string, what: string): void => {
-    if (o[k] !== undefined) need(ok(o[k]), `${at}.${k}`, what);
-  };
-
-  if (!isObj(v)) throw new SchemaError(['(최상위) — 객체여야 한다']);
-  need(typeof v.ytdlp_version === 'string', 'ytdlp_version', '문자열이어야 한다');
-  need(v.source === undefined || v.source === 'optparse' || v.source === 'help', 'source', "'optparse' 나 'help' 여야 한다");
-
-  if (!Array.isArray(v.stages)) bad.push('stages — 배열이어야 한다');
-  else v.stages.forEach((s, i) => {
-    const at = `stages[${i}]`;
-    if (!isObj(s)) return void bad.push(`${at} — 객체여야 한다`);
-    for (const k of ['id', 'label', 'blurb']) need(typeof s[k] === 'string', `${at}.${k}`, '문자열이어야 한다');
-    need(isStrs(s.groups), `${at}.groups`, '문자열 배열이어야 한다');
-  });
-
-  if (!Array.isArray(v.options)) bad.push('options — 배열이어야 한다');
-  else v.options.forEach((o, i) => {
-    const at = `options[${i}]`;
-    if (!isObj(o)) return void bad.push(`${at} — 객체여야 한다`);
-    for (const k of ['id', 'flag', 'stage', 'group', 'help']) need(typeof o[k] === 'string', `${at}.${k}`, '문자열이어야 한다');
-    for (const k of ['short', 'dest', 'metavar', 'negation']) need(strOrNull(o[k]), `${at}.${k}`, '문자열이나 null 이어야 한다');
-    need(isStrs(o.aliases), `${at}.aliases`, '문자열 배열이어야 한다');
-    need(KINDS.includes(o.kind as string), `${at}.kind`, `${KINDS.join(' · ')} 중 하나여야 한다`);
-    need(o.choices === null || isStrs(o.choices), `${at}.choices`, '문자열 배열이나 null 이어야 한다');
-    later(o, 'keys', x => x === null || isStrs(x), at, '문자열 배열이나 null 이어야 한다');
-    later(o, 'rule', x => x === null || (isObj(x) && isStrs(x.vocab) && typeof x.from === 'boolean'), at,
-      '{ vocab: 문자열 배열, from: boolean } 이나 null 이어야 한다');
-    later(o, 'vocabs', x => x === null || (isObj(x) && Object.values(x).every(isStrs)), at,
-      '문자열 배열을 값으로 갖는 객체나 null 이어야 한다');
-    later(o, 'valueType', x => VALUE_TYPES.includes(x), at, "'string' · 'int' · 'float' · 'choice' · null 중 하나여야 한다");
-    later(o, 'keyed', x => x === null || (isObj(x) && typeof x.pattern === 'string'
-      && (x.defaults === null || isStrs(x.defaults)) && typeof x.multiple === 'boolean' && typeof x.append === 'boolean'), at,
-      '{ pattern, defaults, multiple, append } 나 null 이어야 한다');
-  });
-
-  if (bad.length) throw new SchemaError(bad);
-  return v as unknown as RawSchema;
+  return Effect.runSync(decodeRawSchema(v));
 }
 
 /** Raw JSON → indexed schema. A pure function. */

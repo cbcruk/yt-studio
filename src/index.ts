@@ -39,12 +39,12 @@
  *
  * @module
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { Effect } from 'effect';
 
-import { checkRawSchema, SchemaError, studio, TYPES_VERSION } from './browser.js';
-import type { SchemaOrigin, SchemaSource, Ytstudio } from './browser.js';
+import { studio } from './browser.js';
+import { resolveWith } from './resolve.js';
+import type { Where } from './resolve.js';
+import type { SchemaSource, Ytstudio } from './browser.js';
 import type { RawSchema } from './core/schema.js';
 import type { Ytdlp } from './core/build.js';
 import type { Item } from './core/command.js';
@@ -52,76 +52,8 @@ import type { Explained, Suggestion } from './core/explain.js';
 import type { LintResult, Values } from './core/lint.js';
 
 export * from './browser.js';
-
-/**
- * File name of the local schema.
- *
- * Plain `schema.json` would collide with JSON Schema files at the root of other
- * people's projects — it is a common name. Baking the package into the name
- * means the file name itself says why it is there.
- */
-const SCHEMA_FILE = 'yt-studio.schema.json';
-
-/**
- * Reads a schema file: `null` when it isn't there or isn't ours, an error when it is ours but broken.
- *
- * Since we search the working directory, we may pick up someone else's JSON — one
- * without `ytdlp_version` is treated as absent. But a file that **is** ours and can't
- * be used must not be skipped silently: that would check against the bundled
- * version and report a pass. That covers two cases.
- *
- * - not JSON at all — our file name, cut off mid-write (`yt-studio types` interrupted)
- * - has `ytdlp_version` but a field is missing or wrong — {@linkcode checkRawSchema} lists them
- *
- * @throws {SchemaError} with the path in front.
- */
-function readSchema(path: string): RawSchema | null {
-  if (!existsSync(path)) return null;
-  let v: unknown;
-  try { v = JSON.parse(readFileSync(path, 'utf8')); }
-  catch (e) { throw new SchemaError([`${path} — JSON 으로 읽지 못했다 (${(e as Error).message})`]); }
-  if (typeof v !== 'object' || v === null || !('ytdlp_version' in v)) return null;
-  try { return checkRawSchema(v); }
-  catch (e) {
-    if (e instanceof SchemaError) throw new SchemaError(e.problems.map(p => `${path}: ${p}`));
-    throw e;
-  }
-}
-
-const bundledPath = fileURLToPath(new URL(`../${SCHEMA_FILE}`, import.meta.url));
-
-/** The one shipped with the package. If it is missing the types are too, so there is no recovering. */
-function readBundled(): RawSchema {
-  const raw = readSchema(bundledPath);
-  if (!raw) throw new Error(`패키지에 ${SCHEMA_FILE} 이 없다 — 설치가 깨졌다`);
-  return raw;
-}
-
-let bundled: RawSchema | undefined;
-
-/**
- * Returns the schema shipped with the package, as is.
- *
- * **It is where the types came from**, so `yt-studio types` uses it as the
- * baseline — the `.d.ts` it writes extends this, so "new options" must always
- * be relative to it. Using the currently active schema as the baseline would
- * drift from the second run on.
- *
- * **Read on first call**, then kept. It used to be a constant, which read and
- * parsed 114KB of JSON the moment `yt-studio` was imported — even for users
- * passing their own schema, and against the lazy default handle below.
- */
-export function bundledSchema(): RawSchema {
-  return (bundled ??= readBundled());
-}
-
-/** Where to look for the schema. Anything omitted falls back to the process's own. */
-export interface Where {
-  /** Directory to look for `yt-studio.schema.json` in. */
-  cwd?: string;
-  /** Path to use instead of `YT_STUDIO_SCHEMA`. */
-  env?: string;
-}
+export { bundledSchema } from './resolve.js';
+export type { Where } from './resolve.js';
 
 /**
  * Local first, otherwise the one shipped with the package.
@@ -136,32 +68,7 @@ export interface Where {
  * shake the whole process with `process.chdir`.
  */
 export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawSchema } {
-  const found = (from: SchemaOrigin, path: string, raw: RawSchema) => ({
-    source: {
-      from, path,
-      version: raw.ytdlp_version,
-      typesVersion: TYPES_VERSION,
-      stale: raw.ytdlp_version !== TYPES_VERSION,
-    },
-    raw,
-  });
-
-  const env = at.env ?? process.env.YT_STUDIO_SCHEMA;
-  if (env) {
-    // If something explicitly pointed to can't be read, don't move on silently.
-    // That is a typo, and moving on would check against the wrong version and
-    // then report a pass.
-    const path = resolve(env);
-    const raw = readSchema(path);
-    if (!raw) throw new Error(`YT_STUDIO_SCHEMA 가 가리키는 스키마를 읽지 못했다: ${path}`);
-    return found('env', path, raw);
-  }
-
-  const path = resolve(at.cwd ?? process.cwd(), SCHEMA_FILE);
-  const raw = readSchema(path);
-  if (raw) return found('local', path, raw);
-
-  return found('bundled', bundledPath, bundledSchema());
+  return Effect.runSync(resolveWith(at));
 }
 
 /**

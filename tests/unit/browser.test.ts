@@ -20,10 +20,13 @@ import type { RawSchema } from '../../src/core/schema.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const RAW: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'yt-studio.schema.json'), 'utf8'));
 
+// `node:*` stays external — for the browser target Bun swaps a builtin for an empty
+// module, which leaves nothing in the output to find. External, it stays an import.
 const bundle = await Bun.build({
   entrypoints: [path.join(ROOT, 'src/browser.ts')],
   target: 'browser',
   minify: true,
+  external: ['node:*'],
 });
 
 test('브라우저용으로 묶인다', () => {
@@ -32,15 +35,17 @@ test('브라우저용으로 묶인다', () => {
 
 test('노드 빌트인이 하나도 안 딸려 온다', async () => {
   const js = await bundle.outputs[0]!.text();
-  const found = [...new Set(js.match(/node:[a-z_]+/g) ?? [])];
+  // Only a quoted specifier is an import — minified code has plain `{node:t}` properties.
+  const found = [...new Set((js.match(/["'`]node:[a-z_]+/g) ?? []).map(s => s.slice(1)))];
   assert.deepEqual(found, [], `브라우저 입구에 노드 빌트인이 샜다: ${found.join(' ')}`);
 });
 
 // The demo page downloads this whole, so its size is the time users wait.
 // The exact number does not matter; we need to know when the order of magnitude changes.
-test('묶은 것이 작다 — 50KB 아래', async () => {
+// About 290KB of it is `effect/Schema` (#28) — the rest was 27KB before that.
+test('묶은 것이 작다 — 400KB 아래', async () => {
   const js = await bundle.outputs[0]!.text();
-  expect(js.length).toBeLessThan(50_000);
+  expect(js.length).toBeLessThan(400_000);
 });
 
 test('스키마를 직접 주면 손잡이가 된다', async () => {
