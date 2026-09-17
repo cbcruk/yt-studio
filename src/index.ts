@@ -248,4 +248,4 @@ export const nearestFlags = (flag: string, limit?: number): string[] =>
 export const schemaSource = (): SchemaSource => def().source;
 
 /** Reads just one token. For several, use `explainCommand`. */
-export const explainItem = (item: Item): Explained => def().explain([item])[0]!;
+export const explainItem = (item: Item): Explained => def().explain([item])[0]!;   // one item in, one out

@@ -81,11 +81,12 @@ export function distance(a: string, b: string): number {
   for (let i = 1; i <= m; i++) {
     const cur: number[] = [i];
     for (let j = 1; j <= n; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      // Both rows hold n + 1 entries and j - 1 was filled on the previous step.
+      cur[j] = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
     }
     prev = cur;
   }
-  return prev[n];
+  return prev[n]!;
 }
 
 /**
@@ -269,9 +270,10 @@ export function lintCommand(schema: Schema, text: string): LintResult {
   const issues: Issue[] = [];
   const urls = items.filter(i => i.kind === 'url').map(i => i.raw);
   const values: Values = {};               // optId → value (arrays for repeatable)
-  const count: Record<string, number> = {};
-  // Keyed options replace per key set: optId → key set ("default", "dash,m3u8") → times given
-  const keyCount: Record<string, Record<string, number>> = {};
+  // Keyed by the option itself, not its id — reading them back needs no lookup that could miss.
+  const count = new Map<Opt, number>();
+  // Keyed options replace per key set: option → key set ("default", "dash,m3u8") → times given
+  const keyCount = new Map<Opt, Map<string, number>>();
 
   for (const it of items) {
     if (it.kind === 'unknown') {
@@ -281,9 +283,9 @@ export function lintCommand(schema: Schema, text: string): LintResult {
           msg: `${it.flag} 는 이 yt-dlp 버전에 없는 플래그다`
             + (fixes.length ? ` — ${fixes.join(' · ')} 를 찾은 것 아닐까` : '') });
       } else if (it.why === 'no-value') {
-        const o: Opt = schema.byFlag[it.flag]!.opt;
-        issues.push({ level: 'error', flag: it.flag, opt: o.id,
-          msg: `${it.flag} 는 값이 필요하다 (${o.metavar || 'VALUE'})` });
+        const o = schema.byFlag[it.flag]?.opt;
+        issues.push({ level: 'error', flag: it.flag, opt: o?.id,
+          msg: `${it.flag} 는 값이 필요하다 (${o?.metavar || 'VALUE'})` });
       } else {
         issues.push({ level: 'error', flag: it.flag,
           msg: `${it.flag} 는 값을 받지 않는 플래그인데 값을 줬다` });
@@ -293,7 +295,7 @@ export function lintCommand(schema: Schema, text: string): LintResult {
     if (it.kind !== 'opt') continue;
 
     const { opt, value, negated } = it;
-    count[opt.id] = (count[opt.id] || 0) + 1;
+    count.set(opt, (count.get(opt) ?? 0) + 1);
     if (opt.kind === 'repeatable') ((values[opt.id] ||= []) as (string | null)[]).push(value);
     else if (opt.kind === 'flag') values[opt.id] = !negated;
     else values[opt.id] = value;
@@ -311,24 +313,23 @@ export function lintCommand(schema: Schema, text: string): LintResult {
     const keys = opt.keyed && !opt.keyed.append && value != null ? keysOf(opt, value) : null;
     if (keys) {
       const set = [...keys].sort().join(',');
-      (keyCount[opt.id] ||= {})[set] = (keyCount[opt.id]![set] || 0) + 1;
+      const sets = keyCount.get(opt) ?? new Map<string, number>();
+      keyCount.set(opt, sets.set(set, (sets.get(set) ?? 0) + 1));
     }
   }
 
-  for (const id in count) {
-    const o = schema.byId[id]!;
-    if (count[id]! > 1 && o.kind !== 'repeatable') {
-      issues.push({ level: 'warn', opt: id,
-        msg: `${o.flag} 를 ${count[id]}번 줬다 — 마지막 것만 쓰인다` });
+  for (const [o, n] of count) {
+    if (n > 1 && o.kind !== 'repeatable') {
+      issues.push({ level: 'warn', opt: o.id,
+        msg: `${o.flag} 를 ${n}번 줬다 — 마지막 것만 쓰인다` });
     }
   }
   // Only an identical key set is flagged. A partial overlap is how you set a default
   // and then override one key (`--color never --color stderr:always`) — that is intended.
-  for (const id in keyCount) {
-    const o = schema.byId[id]!;
-    for (const [set, n] of Object.entries(keyCount[id]!)) {
+  for (const [o, sets] of keyCount) {
+    for (const [set, n] of sets) {
       if (n < 2) continue;
-      issues.push({ level: 'warn', opt: id,
+      issues.push({ level: 'warn', opt: o.id,
         msg: `${o.short || o.flag} 에 ${set} 가 ${n === 2 ? '두 번' : `${n}번`} 있다 — 뒤엣것만 쓰인다` });
     }
   }

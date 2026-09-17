@@ -58,7 +58,7 @@ const STR_CONDS: [key: string, doc: string][] = [
   ['notIncludes', '`!*=` — does not contain'], ['notMatches', '`!~=` — does not match the regex'],
 ];
 
-const fkeyDoc = (k: string): string => doc((FKEYS.find(([n]) => n === k) || ['', ''])[1]);
+const fkeyDoc = (k: string): string => doc(FKEYS.find(([n]) => n === k)?.[1]);
 const filterProps = FKEYS.map(([k, , t]) =>
   `  /** ${fkeyDoc(k)} */\n  ${k}?: ${t === 'num' ? 'number | NumCond' : 'string | StrCond'} | boolean;`,
 ).join('\n');

@@ -127,7 +127,7 @@ export function keysOf(opt: Opt, value: string): string[] | null {
     keyRegex.set(k, re);
   }
   const m = re.exec(value);
-  if (m) return m[1]!.split(',').map(s => s.toLowerCase());
+  if (m) return m[1]!.split(',').map(s => s.toLowerCase());   // group 1 is required
   return k.defaults;
 }
 

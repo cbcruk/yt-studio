@@ -53,7 +53,7 @@ export function parseCookieSource(value: string, vocabs: CookieVocabs = {}): Coo
   const m = SHAPE.exec(String(value ?? '').trim());
   if (!m) throw new CookieError('BROWSER[+KEYRING][:PROFILE][::CONTAINER] 모양이 아니다');
 
-  const browser = m[1]!.trim().toLowerCase();
+  const browser = m[1]!.trim().toLowerCase();   // group 1 is required
   const keyring = m[2] === undefined ? null : m[2].trim().toUpperCase();
 
   const known = vocabs.browser;

@@ -179,7 +179,7 @@ test('카탈로그에 없는 필드는 field() 로', () => {
 
 test('빌더가 만든 템플릿은 파서가 읽는다', () => {
   const c = ytdlp(U).output(t => t`${t.uploader}/${t.upload_date.date('%Y')}/${t.title}.${t.ext}`);
-  const tpl = c.toArray()[c.toArray().indexOf('-o') + 1];
+  const tpl = c.toArray()[c.toArray().indexOf('-o') + 1]!;
   assert.deepEqual(parseTemplate(tpl).map(p => p.t),
     ['field', 'text', 'field', 'text', 'field', 'text', 'field']);
 });

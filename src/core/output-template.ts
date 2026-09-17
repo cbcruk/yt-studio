@@ -160,11 +160,11 @@ export function parseTemplate(src: string): Piece[] {
 
     // After the parenthesis: flags, width, precision, then one conversion character.
     let j = close + 1;
-    while (j < s.length && /[#0\-+ .,\d]/.test(s[j])) j++;
+    while (j < s.length && /[#0\-+ .,\d]/.test(s.charAt(j))) j++;
     if (j >= s.length) throw new GrammarError(`%(${body}) 뒤에 변환 글자가 없다`, i);
 
     flush();
-    out.push({ t: 'field', fmt: s.slice(close + 1, j), conv: s[j], ...splitBody(body) });
+    out.push({ t: 'field', fmt: s.slice(close + 1, j), conv: s.charAt(j), ...splitBody(body) });
     i = j;
   }
   flush();

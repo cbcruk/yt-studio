@@ -32,7 +32,7 @@ export const selMethod = (sel: string): string => sel.replace('*', 'Star');
  * If the closing marker comes through as-is, the comment ends right there — the
  * generator broke on that once.
  */
-export const doc = (s: string): string =>
+export const doc = (s: string | undefined): string =>
   String(s || '').replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
 
 export const union = (xs: readonly string[]): string => xs.map(x => `'${x}'`).join(' | ');

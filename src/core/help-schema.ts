@@ -23,6 +23,8 @@ import type { Opt, OptKind, RawSchema, Stage } from './schema.js';
 /**
  * Kinds of lines in the help.
  *
+ * Every capture group this file reads as `m[n]!` is non-optional, so it is a string whenever the line matched.
+ *
  * As of 2026.07.04, groups are indented 2 spaces, options 4, and continuation lines
  * of a description 36. To avoid depending on the description column (36),
  * continuation lines are recognized only as "heavily indented lines" — this
@@ -76,10 +78,10 @@ function glued(prev: string, cur: string, width: number): boolean {
 
 /** Wrapped lines → one line. `width` is the text width measured over the whole help. */
 function unwrap(parts: string[], width: number): string {
-  let out = parts[0] ?? '';
-  for (let i = 1; i < parts.length; i++) {
-    const prev = parts[i - 1]!, cur = parts[i]!;
-    out += (glued(prev, cur, width) ? '' : ' ') + cur;
+  let out = '', prev: string | null = null;
+  for (const cur of parts) {
+    out += prev === null ? cur : (glued(prev, cur, width) ? '' : ' ') + cur;
+    prev = cur;
   }
   return out.replace(/\s+/g, ' ').trim();
 }
@@ -153,15 +155,16 @@ function fold(list: Parsed[]): Array<Parsed & { negation: string | null }> {
 
   const out: Array<Parsed & { negation: string | null }> = [];
   for (const arr of byBase.values()) {
-    const pos = arr.filter(([, p]) => p === null).map(([o]) => o);
-    const neg = arr.filter(([, p]) => p === 'no').map(([o]) => o);
-    const yes = arr.filter(([, p]) => p === 'yes').map(([o]) => o);
+    const pos = arr.find(([, p]) => p === null)?.[0];
+    const neg = arr.find(([, p]) => p === 'no')?.[0];
+    const yes = arr.find(([, p]) => p === 'yes')?.[0];
+    const other = neg ?? yes;
 
-    if (pos.length && (neg.length || yes.length)) {
-      out.push({ ...pos[0]!, negation: (neg[0] ?? yes[0])!.flag });
-    } else if (neg.length && yes.length) {
+    if (pos && other) {
+      out.push({ ...pos, negation: other.flag });
+    } else if (neg && yes) {
       // Both sides are prefixed forms, like --no-playlist / --yes-playlist
-      out.push({ ...neg[0]!, negation: yes[0]!.flag });
+      out.push({ ...neg, negation: yes.flag });
     } else {
       for (const o of arr) out.push({ ...o[0], negation: null });
     }
@@ -225,6 +228,7 @@ export function parseHelp(help: string, version: string, base: RawSchema): HelpR
       // list only part of them (--convert-subs), so take the union — drop neither side.
       aliases: [...new Set([...(prev?.aliases ?? []), ...p.aliases])],
       // A new group has nowhere to go. Better to put it in the run stage and report it than to drop it
+      // `base` is the bundled schema, which always has stages.
       stage: stage ?? base.stages[0]!.id,
       group: p.group,
       dest: prev?.dest ?? null,
