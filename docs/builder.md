@@ -54,7 +54,7 @@ ytdlp('https://youtu.be/abc')
 
 패키지로 받아 쓸 때는 `npx yt-studio types` 가 손님 yt-dlp 를 리플렉션해 확장
 선언을 얹는다 — 그러면 그 문장이 손님에게도 참이 된다.
-[어느 yt-dlp 에 대조하나](../README.md#어느-yt-dlp-에-대조하나).
+[Which yt-dlp it checks against](../README.md#which-yt-dlp-it-checks-against).
 
 그래서 검증기가 런타임에 하던 일의 절반이 컴파일 타임으로 올라간다.
 
