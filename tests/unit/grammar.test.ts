@@ -148,8 +148,8 @@ test('<= 를 < 보다 먼저 읽는다', () => {
 test('? 는 필터마다 독립이다', () => {
   const s = 'bv[height<=?1080][fps>30]';
   const t = tree(s);
-  assert.equal(t.filters?.[0].loose, true);
-  assert.equal(t.filters?.[1].loose, false);
+  assert.equal(t.filters?.[0]?.loose, true);
+  assert.equal(t.filters?.[1]?.loose, false);
   assert.equal(emitTree(t), s);
 });
 

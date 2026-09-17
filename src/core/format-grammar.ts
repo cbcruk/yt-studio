@@ -94,7 +94,8 @@ export function parseFilterBody(body: string): Filter {
   const b = body.trim();
   if (!b) throw new GrammarError('빈 필터');
   const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
-  if (m) return { key: m[1], op: m[2], loose: m[3] === '?', value: m[4].trim() };
+  // All four groups are required, so each is a string whenever `m` matched.
+  if (m) return { key: m[1]!, op: m[2]!, loose: m[3] === '?', value: m[4]!.trim() };
   if (/^![A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b.slice(1), op: 'hasnot', value: '' };
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b, op: 'has', value: '' };
   throw new GrammarError(`필터를 읽지 못했다: [${body}]`);
@@ -112,25 +113,25 @@ export function parseFormat(src: string): FormatNode | null {
   const s = (src || '').trim();
   if (!s) return null;
   let i = 0, depth = 0;
-  const ws = (): void => { while (i < s.length && /\s/.test(s[i])) i++; };
+  const ws = (): void => { while (i < s.length && /\s/.test(s.charAt(i))) i++; };
   const peek = (): string | undefined => s[i];
 
   const expr = (): FormatNode => multi();
 
   function multi(): FormatNode {
-    const kids = [fallback()]; ws();
+    const first = fallback(), kids = [first]; ws();
     while (peek() === ',') { i++; kids.push(fallback()); ws(); }
-    return kids.length === 1 ? kids[0] : { t: 'multi', kids };
+    return kids.length === 1 ? first : { t: 'multi', kids };
   }
   function fallback(): FormatNode {
-    const kids = [merge()]; ws();
+    const first = merge(), kids = [first]; ws();
     while (peek() === '/') { i++; kids.push(merge()); ws(); }
-    return kids.length === 1 ? kids[0] : { t: 'fallback', kids };
+    return kids.length === 1 ? first : { t: 'fallback', kids };
   }
   function merge(): FormatNode {
-    const kids = [atom()]; ws();
+    const first = atom(), kids = [first]; ws();
     while (peek() === '+') { i++; kids.push(atom()); ws(); }
-    return kids.length === 1 ? kids[0] : { t: 'merge', kids };
+    return kids.length === 1 ? first : { t: 'merge', kids };
   }
 
   /**
@@ -149,7 +150,7 @@ export function parseFormat(src: string): FormatNode | null {
       i++; depth--;
     } else {
       const start = i;
-      while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s[i])) i++;
+      while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s.charAt(i))) i++;
       if (i === start) throw new GrammarError(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`, i);
       node = { t: 'sel', name: s.slice(start, i), filters: [] };
     }

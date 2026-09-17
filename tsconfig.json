@@ -12,6 +12,8 @@
     "types": ["node"],
 
     "strict": true,
+    // An index can miss. `schema.byId[id]!` once asserted an option the schema didn't have (#23).
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "skipLibCheck": true,
 

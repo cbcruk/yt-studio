@@ -196,7 +196,7 @@ function types(args: string[]): number {
 
   let help: string, version: string;
   try {
-    version = ask('--version').trim().split('\n')[0]!.trim();
+    version = ask('--version').trim().split('\n')[0]!.trim();   // split always returns at least one
     help = ask('--help');
   } catch {
     // Silently falling back to the bundled one would pretend to succeed while changing nothing

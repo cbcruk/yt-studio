@@ -41,7 +41,7 @@ export function tokenize(s: string): string[] {
   // `open` is needed separately — `""` is an empty token, not the absence of one.
   // (Swallow `--sub-langs ""` and nobody ever sees that the value was empty.)
   for (let i = 0; i < s.length; i++) {
-    const c = s[i];
+    const c = s.charAt(i);
     if (q) {
       if (c === '\\' && q === '"') { cur += s[++i] ?? ''; }
       else if (c === q) q = null;
@@ -65,7 +65,7 @@ export function scanCommand(schema: Schema, text: string): { head: string | null
 
   const items: Item[] = [];
   for (let i = 0; i < toks.length; i++) {
-    const raw0 = toks[i];
+    const raw0 = toks[i]!;   // i < toks.length
     if (!raw0.startsWith('-') || raw0 === '-') { items.push({ kind: 'url', raw: raw0 }); continue; }
 
     let flag = raw0, inline: string | null = null;

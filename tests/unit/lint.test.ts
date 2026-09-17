@@ -167,7 +167,7 @@ test('스키마가 모르는 토큰도 원문 그대로 들고 있는다', () =>
   const { items } = scanCommand('yt-dlp --future-flag --embed-subs https://x/y');
   const unknown = items.filter(i => i.kind === 'unknown');
   assert.deepEqual(unknown.map(i => i.raw), ['--future-flag']);
-  assert.equal(unknown[0].why, 'no-flag');
+  assert.equal(unknown[0]?.why, 'no-flag');
 
   const { issues } = lintCommand('yt-dlp --future-flag --embed-subs https://x/y');
   assert.ok(issues.some(i => i.level === 'error' && i.flag === '--future-flag'));
@@ -178,9 +178,9 @@ test('scanCommand 는 순서와 원문을 지킨다', () => {
   assert.equal(head, 'yt-dlp');
   assert.deepEqual(items.map(i => i.kind), ['opt', 'opt', 'url']);
   // raw is not the original but re-quoted — so the round trip is stable
-  assert.equal(items[0].raw, '-f bv+ba');
-  assert.equal(items[1].raw, '--embed-subs');
-  assert.equal(items[2].raw, 'https://x/y');
+  assert.equal(items[0]?.raw, '-f bv+ba');
+  assert.equal(items[1]?.raw, '--embed-subs');
+  assert.equal(items[2]?.raw, 'https://x/y');
 });
 
 test('--flag=값 도 값으로 읽는다', () => {
