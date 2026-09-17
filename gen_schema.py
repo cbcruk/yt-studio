@@ -6,7 +6,7 @@ Reflects yt-dlp's optparse tree as is and drops it as JSON.
 It reads option objects rather than scraping help text, so upgrading yt-dlp
 brings the schema along. Rerun in CI on every release.
 
-    python gen_schema.py > ytstudio.schema.json
+    python gen_schema.py > yt-studio.schema.json
 """
 
 import json

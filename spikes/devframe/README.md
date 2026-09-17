@@ -1,6 +1,6 @@
 # devframe 스파이크
 
-`ytstudio` 의 검사기를 [devframe](https://devfra.me) 정의 하나로 감싸서, **같은 RPC
+`yt-studio` 의 검사기를 [devframe](https://devfra.me) 정의 하나로 감싸서, **같은 RPC
 셋이 브라우저 패널과 MCP 서버를 동시에 먹이는지** 본다. 버려도 되는 자리다 —
 본체(`src/`)는 안 건드리고 `lib/` 산출물만 읽는다.
 

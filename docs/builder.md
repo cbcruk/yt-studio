@@ -4,7 +4,7 @@
 무엇을 만드는 도구인지는 [README](../README.md) 에 있다.
 
 ```ts
-import { ytdlp } from 'ytstudio';
+import { ytdlp } from 'yt-studio';
 
 ytdlp('https://youtu.be/abc')
   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
@@ -48,13 +48,13 @@ ytdlp('https://youtu.be/abc')
 
 ## 타입이 카탈로그다
 
-`gen_schema.py` 가 설치된 yt-dlp 를 리플렉션해 `ytstudio.schema.json` 을 떨구고,
+`gen_schema.py` 가 설치된 yt-dlp 를 리플렉션해 `yt-studio.schema.json` 을 떨구고,
 `gen_options.ts` 가 그걸 `src/core/options.gen.ts` 로 옮긴다. **자동완성에 뜨는
 옵션 = 이 저장소를 구울 때의 yt-dlp 옵션**이다.
 
-패키지로 받아 쓸 때는 `npx ytstudio types` 가 손님 yt-dlp 를 리플렉션해 확장
+패키지로 받아 쓸 때는 `npx yt-studio types` 가 손님 yt-dlp 를 리플렉션해 확장
 선언을 얹는다 — 그러면 그 문장이 손님에게도 참이 된다.
-[어느 yt-dlp 에 대조하나](../README.md#어느-yt-dlp-에-대조하나).
+[Which yt-dlp it checks against](../README.md#which-yt-dlp-it-checks-against).
 
 그래서 검증기가 런타임에 하던 일의 절반이 컴파일 타임으로 올라간다.
 
@@ -96,7 +96,7 @@ ytdlp(u).extractAudio().format('bv').lint();
 
 메서드 이름은 **긴 플래그**에서 나온다 — `--embed-subs` → `.embedSubs()`.
 명령어에 찍히는 건 **짧은 게 있으면 짧은 것**이다(`-f` · `-x` · `-R`) — 사람이
-손으로 쓰는 모양이 그쪽이고, `ytstudio lint` 가 뱉는 플래그와도 같아야 눈으로
+손으로 쓰는 모양이 그쪽이고, `yt-studio lint` 가 뱉는 플래그와도 같아야 눈으로
 대조가 된다.
 
 ```ts
@@ -191,7 +191,7 @@ t.field('release_year')          // 카탈로그에 없는 필드
 ## 만드는 법
 
 ```
-bun gen_options.ts              # ytstudio.schema.json → options.gen.ts  (bun run gen:types)
+bun gen_options.ts              # yt-studio.schema.json → options.gen.ts  (bun run gen:types)
 tsc                             # src/ → lib/                   (bun run build)
 tsc -p tsconfig.test.json       # 타입 검사                      (bun run check:types)
 ```

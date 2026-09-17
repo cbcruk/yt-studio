@@ -43,7 +43,7 @@ self.MonacoEnvironment = {
 typescriptDefaults.setCompilerOptions({
   target: ScriptTarget.ESNext,
   module: ModuleKind.ESNext,
-  // Node-style. `'ytstudio'` resolves through the virtual package.json's `types`, and
+  // Node-style. `'yt-studio'` resolves through the virtual package.json's `types`, and
   // shipped relative paths inside it like `./core/schema.js` are looked up by TypeScript
   // as `.d.ts`.
   moduleResolution: ModuleResolutionKind.NodeJs,
@@ -56,7 +56,7 @@ typescriptDefaults.setEagerModelSync(true);
 
 for (const { path, content } of libs) typescriptDefaults.addExtraLib(content, path);
 
-editor.defineTheme('ytstudio', {
+editor.defineTheme('yt-studio', {
   base: 'vs-dark', inherit: true, rules: [],
   colors: { 'editor.background': '#141821', 'editorLineNumber.foreground': '#3d4657' },
 });
@@ -77,7 +77,7 @@ export function mount(el: HTMLElement, code: string): Editor {
   const model = editor.createModel(code, 'typescript', MODEL);
   const ed = editor.create(el, {
     model,
-    theme: 'ytstudio',
+    theme: 'yt-studio',
     fontSize: 13,
     lineHeight: 21,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',

@@ -324,7 +324,7 @@ export class Ytdlp {
    *
    * @example As an expression
    * ```ts
-   * import { ytdlp } from 'ytstudio';
+   * import { ytdlp } from 'yt-studio';
    *
    * ytdlp('https://youtu.be/abc')
    *   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
@@ -345,7 +345,7 @@ export class Ytdlp {
    *
    * @example As a tagged template
    * ```ts
-   * import { ytdlp } from 'ytstudio';
+   * import { ytdlp } from 'yt-studio';
    *
    * ytdlp('https://youtu.be/abc')
    *   .output(t => t`${t.title} [${t.id}].${t.ext}`)
@@ -384,7 +384,7 @@ export class Ytdlp {
    *
    * @example Slots by name
    * ```ts
-   * import { ytdlp } from 'ytstudio';
+   * import { ytdlp } from 'yt-studio';
    *
    * ytdlp('https://youtu.be/abc').cookiesFromBrowser('firefox', { container: 'Personal' }).build();
    * // yt-dlp --cookies-from-browser firefox::Personal https://youtu.be/abc
@@ -413,7 +413,7 @@ export class Ytdlp {
    *
    * @example As an object
    * ```ts
-   * import { ytdlp } from 'ytstudio';
+   * import { ytdlp } from 'yt-studio';
    *
    * ytdlp('https://youtu.be/abc').matchFilters({ duration: { gt: 120 }, is_live: false }).build();
    * // yt-dlp --match-filters "duration>120 & !is_live" https://youtu.be/abc
@@ -449,7 +449,7 @@ export class Ytdlp {
    *
    * @example Time range
    * ```ts
-   * import { ytdlp } from 'ytstudio';
+   * import { ytdlp } from 'yt-studio';
    *
    * ytdlp('https://youtu.be/abc').downloadSections({ from: 60, to: '2:30' }).build();
    * // yt-dlp --download-sections "*60-2:30" https://youtu.be/abc
@@ -460,7 +460,7 @@ export class Ytdlp {
    *
    * @example Chapter title
    * ```ts
-   * import { ytdlp } from 'ytstudio';
+   * import { ytdlp } from 'yt-studio';
    *
    * ytdlp('https://youtu.be/abc').downloadSections('Intro').build();
    * // yt-dlp --download-sections Intro https://youtu.be/abc

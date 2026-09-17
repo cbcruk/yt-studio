@@ -12,7 +12,7 @@ export const EXAMPLES: Example[] = [
   {
     name: '기본',
     note: '점을 찍으면 옵션 191개가 뜬다. 이름은 스키마에서 자란 것이라 오타가 안 난다.',
-    code: `import { ytdlp } from 'ytstudio';
+    code: `import { ytdlp } from 'yt-studio';
 
 export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
   .extractAudio()
@@ -23,7 +23,7 @@ export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
   {
     name: '포맷 식',
     note: '-f 는 문자열이 아니라 식이다. bv[height<=1080]+ba/b 를 손으로 안 적는다.',
-    code: `import { ytdlp } from 'ytstudio';
+    code: `import { ytdlp } from 'yt-studio';
 
 // bv[height<=1080]+ba/b
 export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
@@ -34,7 +34,7 @@ export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
   {
     name: '출력 템플릿',
     note: '-o 도 식이다. %(title)s 를 외우는 대신 t.title 을 쓴다 — 필드가 자동완성된다.',
-    code: `import { ytdlp } from 'ytstudio';
+    code: `import { ytdlp } from 'yt-studio';
 
 export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
   .output(t => t\`\${t.uploader}/\${t.title} [\${t.id}].\${t.ext}\`)
@@ -46,7 +46,7 @@ export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
   {
     name: '값 목록',
     note: '옵션 이름만이 아니라 값도 목록이 있다. 따옴표 안에서 Ctrl+Space — yt-dlp 가 정한 것이라 오타가 안 난다.',
-    code: `import { ytdlp } from 'ytstudio';
+    code: `import { ytdlp } from 'yt-studio';
 
 export default ytdlp('https://youtu.be/dQw4w9WgXcQ')
   // 자막 포맷은 네 가지뿐이다 (+ 끄는 값 'none')

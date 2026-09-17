@@ -43,7 +43,7 @@ jobs:
         run: bun run build
 
       # It fails only when the machinery is broken — the help parser can't read the
-      # current format, gen_schema.py won't run, or ytstudio types can't finish
+      # current format, gen_schema.py won't run, or yt-studio types can't finish
       # against the real thing. The committed schema being older than latest is
       # always the case, so that's reported only as a notice.
       - name: Compare

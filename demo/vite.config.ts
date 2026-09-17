@@ -10,18 +10,18 @@ const at = (p: string): string => fileURLToPath(new URL(p, import.meta.url));
  * `vite dev` it must be `/`, so an environment variable decides.
  *
  * Reads **only what the repo produced** — the compiled output in `lib/` and
- * `ytstudio.schema.json`. Reading `src/` directly would show the ingredients rather
+ * `yt-studio.schema.json`. Reading `src/` directly would show the ingredients rather
  * than what users install, and keeping a hand-copied duplicate would make the demo
  * start lying from that moment on. Hence `bun run build` comes first.
  *
  * It is wired with an alias because it is a sibling directory. With
- * `"ytstudio": "file:.."` bun **copies the whole repo** in (minus the gitignored
+ * `"yt-studio": "file:.."` bun **copies the whole repo** in (minus the gitignored
  * `lib/`), which leaves out exactly what is needed, and the copy soon goes stale.
  */
 export default defineConfig({
   base: process.env.DEMO_BASE ?? '/',
   resolve: {
-    alias: { 'ytstudio/browser': at('../lib/browser.js') },
+    alias: { 'yt-studio/browser': at('../lib/browser.js') },
   },
   server: { fs: { allow: ['..'] } },
   build: {

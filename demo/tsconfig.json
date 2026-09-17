@@ -11,7 +11,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "paths": { "ytstudio/browser": ["../lib/browser.d.ts"] }
+    "paths": { "yt-studio/browser": ["../lib/browser.d.ts"] }
   },
   "include": ["src", "vite.config.ts"]
 }

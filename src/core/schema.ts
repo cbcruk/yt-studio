@@ -159,7 +159,7 @@ export interface Schema {
   stage: Readonly<Record<string, Stage>>;
   /** Every flag, including aliases, short and negated forms. The checker uses it to read strings back. */
   byFlag: Readonly<Record<string, FlagHit>>;
-  /** The raw input it was built from. Used when `ytstudio types` has to write it out again. */
+  /** The raw input it was built from. Used when `yt-studio types` has to write it out again. */
   raw: RawSchema;
 }
 

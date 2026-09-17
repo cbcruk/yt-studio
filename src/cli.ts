@@ -9,8 +9,8 @@
  *
  * That job never needed a screen. A pipe is enough.
  *
- *     ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
- *     pbpaste | ytstudio lint
+ *     yt-studio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
+ *     pbpaste | yt-studio lint
  *
  * It speaks through the exit code — 1 if there are errors. It drops straight
  * into CI or scripts.
@@ -38,27 +38,27 @@ const bold = (s: string) => c(1, s);
 
 const MARK = { error: red('✗'), warn: yellow('!'), info: dim('·') };
 
-const HELP = `ytstudio — 설치된 yt-dlp(${yt.source.version}) 에 명령어를 대조한다
+const HELP = `yt-studio — 설치된 yt-dlp(${yt.source.version}) 에 명령어를 대조한다
 
-  ytstudio lint <명령어>       스키마와 문법에 어긋나는 곳을 찾는다
-  ytstudio explain <명령어>    토큰마다 무슨 옵션인지 말한다
-  ytstudio types               당신이 깐 yt-dlp 를 리플렉션해 스키마와 타입을 다시 뽑는다
-  ytstudio version             지금 대조하는 스키마의 yt-dlp 버전
+  yt-studio lint <명령어>       스키마와 문법에 어긋나는 곳을 찾는다
+  yt-studio explain <명령어>    토큰마다 무슨 옵션인지 말한다
+  yt-studio types               당신이 깐 yt-dlp 를 리플렉션해 스키마와 타입을 다시 뽑는다
+  yt-studio version             지금 대조하는 스키마의 yt-dlp 버전
 
 명령어를 인자로 주거나 표준 입력으로 흘려 넣는다.
 
-  ytstudio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
-  pbpaste | ytstudio lint
+  yt-studio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
+  pbpaste | yt-studio lint
 
 오류가 있으면 1 로 끝난다.
 
 기본은 패키지에 실린 스키마다 — 이 저장소를 구울 때의 yt-dlp 이지 당신 것이
 아니다. 당신 것에 맞추려면 한 번 뽑아 두면 된다.
 
-  npx ytstudio types                    PATH 의 yt-dlp 를 읽는다
-  npx ytstudio types --yt-dlp <경로>    다른 자리에 있으면
+  npx yt-studio types                    PATH 의 yt-dlp 를 읽는다
+  npx yt-studio types --yt-dlp <경로>    다른 자리에 있으면
 
-작업 디렉터리의 ytstudio.schema.json 을 검증기가 먼저 본다. YTSTUDIO_SCHEMA 로
+작업 디렉터리의 yt-studio.schema.json 을 검증기가 먼저 본다. YT_STUDIO_SCHEMA 로
 다른 자리를 가리킬 수도 있다.`;
 
 /** One line on which schema was used. Without it, nobody knows what the verdict is a verdict about. */
@@ -70,7 +70,7 @@ function source(): string {
 /**
  * The arguments if given, otherwise all of standard input.
  *
- * Without a pipe it doesn't read — typing a bare `ytstudio lint` in a terminal
+ * Without a pipe it doesn't read — typing a bare `yt-studio lint` in a terminal
  * would stall waiting for input. That looks broken.
  */
 function input(args: string[]): string {
@@ -163,7 +163,7 @@ function types(args: string[]): number {
     bin = values['yt-dlp'] ?? 'yt-dlp';
   } catch (e) {
     console.error(`${red('✗')} ${argError(e)}`);
-    console.error(dim('  쓰는 법: ytstudio types [--yt-dlp <경로>]'));
+    console.error(dim('  쓰는 법: yt-studio types [--yt-dlp <경로>]'));
     return 2;
   }
 
@@ -201,8 +201,8 @@ function types(args: string[]): number {
     removed: r.removed.map(f => byFlag.get(f)!),
   });
 
-  const schemaPath = resolve(process.cwd(), 'ytstudio.schema.json');
-  const dtsPath = resolve(process.cwd(), 'ytstudio-env.d.ts');
+  const schemaPath = resolve(process.cwd(), 'yt-studio.schema.json');
+  const dtsPath = resolve(process.cwd(), 'yt-studio-env.d.ts');
   writeFileSync(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
   writeFileSync(dtsPath, dts);
 

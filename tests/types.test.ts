@@ -1,5 +1,5 @@
 /**
- * Tests for `ytstudio types`.
+ * Tests for `yt-studio types`.
  *
  * This command **writes files** into the user's project. So calling a function
  * is not enough — make a real directory, spawn a real process, and **compile the
@@ -25,7 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'lib', 'cli.js');
 const TSC = path.join(ROOT, 'node_modules', '.bin', 'tsc');
 const HELP = readFileSync(path.join(ROOT, 'tests/fixtures/yt-dlp-2026.07.04.help.txt'), 'utf8');
-const BASE: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'ytstudio.schema.json'), 'utf8'));
+const BASE: RawSchema = JSON.parse(readFileSync(path.join(ROOT, 'yt-studio.schema.json'), 'utf8'));
 
 beforeAll(() => {
   assert.ok(existsSync(CLI), `${CLI} 가 없다 — 'bun run build' 를 먼저 돌릴 것`);
@@ -36,14 +36,14 @@ interface Run { code: number; out: string }
 /**
  * One user project.
  *
- * Symlinks `node_modules/ytstudio` to the repo — a real install would cost a few
+ * Symlinks `node_modules/yt-studio` to the repo — a real install would cost a few
  * seconds per test. It resolves the same way.
  */
 function project(help: string | null, tsconfig?: string): string {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'ytstudio-types-'));
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-types-'));
   mkdirSync(path.join(dir, 'src'));
   mkdirSync(path.join(dir, 'node_modules'));
-  symlinkSync(ROOT, path.join(dir, 'node_modules', 'ytstudio'), 'dir');
+  symlinkSync(ROOT, path.join(dir, 'node_modules', 'yt-studio'), 'dir');
   writeFileSync(path.join(dir, 'tsconfig.json'), tsconfig ?? JSON.stringify({
     compilerOptions: {
       module: 'NodeNext', moduleResolution: 'NodeNext',
@@ -97,7 +97,7 @@ test('아무것도 안 달라졌으면 새로 0 · 사라짐 0', () => {
   const r = types(dir);
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /새로 0 · 사라짐 0/);
-  assert.ok(wrote(dir, 'ytstudio.schema.json') && wrote(dir, 'ytstudio-env.d.ts'), '파일을 안 썼다');
+  assert.ok(wrote(dir, 'yt-studio.schema.json') && wrote(dir, 'yt-studio-env.d.ts'), '파일을 안 썼다');
 });
 
 // This test is why the command exists — options only in the user's yt-dlp become types.
@@ -107,14 +107,14 @@ test('새 옵션이 진짜 메서드가 된다 — brandNew(value: Arg)', () => 
   assert.match(r.out, /새로 1/, r.out);
   assert.match(r.out, /--brand-new/, '새 옵션을 안 알렸다');
 
-  const c = compiles(dir, "import { ytdlp } from 'ytstudio';\nytdlp('u').brandNew('x').build();\n");
+  const c = compiles(dir, "import { ytdlp } from 'yt-studio';\nytdlp('u').brandNew('x').build();\n");
   assert.equal(c.code, 0, `컴파일 실패\n${c.out}`);
 });
 
 test('값을 안 받는 새 옵션은 boolean 을 받는다', () => {
   const dir = project(withOption('    --brand-flag                    Just a switch'));
   types(dir);
-  const c = compiles(dir, "import { ytdlp } from 'ytstudio';\nytdlp('u').brandFlag().build();\n");
+  const c = compiles(dir, "import { ytdlp } from 'yt-studio';\nytdlp('u').brandFlag().build();\n");
   assert.equal(c.code, 0, `컴파일 실패\n${c.out}`);
 });
 
@@ -124,12 +124,12 @@ test('사라진 옵션에 @deprecated 를 붙인다', () => {
   const r = types(dir);
   assert.match(r.out, /사라짐 1/, r.out);
 
-  const dts = readFileSync(path.join(dir, 'ytstudio-env.d.ts'), 'utf8');
+  const dts = readFileSync(path.join(dir, 'yt-studio-env.d.ts'), 'utf8');
   assert.match(dts, /@deprecated not an option in yt-dlp 2099\.01\.01/);
   assert.match(dts, /subLangs\(value: Arg\): this;/, '같은 시그니처로 다시 선언해야 병합된다');
 
   // It must still compile — a strikethrough, not an error
-  const c = compiles(dir, "import { ytdlp } from 'ytstudio';\nytdlp('u').subLangs('ko').build();\n");
+  const c = compiles(dir, "import { ytdlp } from 'yt-studio';\nytdlp('u').subLangs('ko').build();\n");
   assert.equal(c.code, 0, `컴파일 실패\n${c.out}`);
 });
 
@@ -140,7 +140,7 @@ test('만든 스키마를 검증기가 곧바로 집는다 — 런타임과 타�
   const r = spawn(dir, ['lint', 'yt-dlp --brand-new x https://youtu.be/abc']);
   assert.equal(r.code, 0, r.out);
   assert.match(r.out, /확인됨/, `새 플래그를 못 알아봤다\n${r.out}`);
-  assert.match(r.out, /ytstudio\.schema\.json/);
+  assert.match(r.out, /yt-studio\.schema\.json/);
 });
 
 test('yt-dlp 를 못 찾으면 1 로 끝난다 — 조용히 안 넘어간다', () => {
@@ -148,7 +148,7 @@ test('yt-dlp 를 못 찾으면 1 로 끝난다 — 조용히 안 넘어간다', 
   const r = types(dir);
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /yt-dlp 를 실행하지 못했다/);
-  assert.ok(!wrote(dir, 'ytstudio-env.d.ts'), '실패했는데 파일을 썼다');
+  assert.ok(!wrote(dir, 'yt-studio-env.d.ts'), '실패했는데 파일을 썼다');
 });
 
 // Help is human-facing output, so its format can change. Extracting only a few and
@@ -158,7 +158,7 @@ test(`서식이 깨지면 거부하고 아무것도 안 쓴다 — 번들 ${BASE
   const r = types(dir);
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /파서가 이 서식을 못 읽는다/);
-  assert.ok(!wrote(dir, 'ytstudio-env.d.ts') && !wrote(dir, 'ytstudio.schema.json'), '거부했는데 파일을 썼다');
+  assert.ok(!wrote(dir, 'yt-studio-env.d.ts') && !wrote(dir, 'yt-studio.schema.json'), '거부했는데 파일을 썼다');
 });
 
 // The file exists but autocomplete does not grow — the quietest way this tool fails
@@ -170,11 +170,11 @@ const narrow = (include: string[]): string => JSON.stringify({
 test('tsconfig 가 안 덮으면 경고한다', () => {
   const r = types(project(HELP, narrow(['src/**/*'])));
   assert.equal(r.code, 0, `경고지 오류가 아니다 — 종료 코드 ${r.code}`);
-  assert.match(r.out, /include 가 ytstudio-env\.d\.ts 을 안 덮는/);
+  assert.match(r.out, /include 가 yt-studio-env\.d\.ts 을 안 덮는/);
 });
 
 test('덮으면 경고하지 않는다', () => {
-  const r = types(project(HELP, narrow(['src/**/*', 'ytstudio-env.d.ts'])));
+  const r = types(project(HELP, narrow(['src/**/*', 'yt-studio-env.d.ts'])));
   assert.doesNotMatch(r.out, /include 가/, '멀쩡한 설정에 경고를 냈다');
 });
 
@@ -195,7 +195,7 @@ test('모르는 옵션은 2 로 끝난다', () => {
   const r = spawn(dir, ['types', '--nonsense']);
   assert.equal(r.code, 2, r.out);
   assert.match(r.out, /모르는 옵션이다: --nonsense/);
-  assert.ok(!wrote(dir, 'ytstudio-env.d.ts'), '인자가 틀렸는데 파일을 썼다');
+  assert.ok(!wrote(dir, 'yt-studio-env.d.ts'), '인자가 틀렸는데 파일을 썼다');
 });
 
 // 2 means "you called me wrong", 1 means "I tried to do what you asked but the target
@@ -204,5 +204,5 @@ test('--yt-dlp 뒤가 비면 2 로 끝난다 — 잘못 부른 것이다', () =>
   const dir = project(HELP);
   const r = spawn(dir, ['types', '--yt-dlp']);
   assert.equal(r.code, 2, r.out);
-  assert.ok(!wrote(dir, 'ytstudio-env.d.ts'), '인자가 틀렸는데 파일을 썼다');
+  assert.ok(!wrote(dir, 'yt-studio-env.d.ts'), '인자가 틀렸는데 파일을 썼다');
 });

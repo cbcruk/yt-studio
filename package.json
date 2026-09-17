@@ -1,5 +1,5 @@
 {
-  "name": "ytstudio",
+  "name": "yt-studio",
   "version": "0.1.0",
   "description": "설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기",
   "license": "MIT",
@@ -34,11 +34,11 @@
       "types": "./lib/browser.d.ts",
       "import": "./lib/browser.js"
     },
-    "./ytstudio.schema.json": "./ytstudio.schema.json"
+    "./yt-studio.schema.json": "./yt-studio.schema.json"
   },
   "files": [
     "lib",
-    "ytstudio.schema.json"
+    "yt-studio.schema.json"
   ],
   "repository": {
     "type": "git",
@@ -50,7 +50,7 @@
     "node": ">=22"
   },
   "bin": {
-    "ytstudio": "./lib/cli.js"
+    "yt-studio": "./lib/cli.js"
   },
   "keywords": [
     "yt-dlp",

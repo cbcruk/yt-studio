@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ytstudio-devframe-spike",
+      "name": "yt-studio-devframe-spike",
       "dependencies": {
         "@devframes/agentic": "1.0.0",
         "cac": "^7.0.0",
