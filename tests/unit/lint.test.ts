@@ -22,6 +22,13 @@ test('맞는 명령어는 조용하다', () => {
   assert.equal(r.counts.warn, 0);
 });
 
+// `count` became a Map in #30 while this still read Object.keys(count), so it said 0 for every command.
+test('대조한 옵션 수는 서로 다른 옵션의 수다', () => {
+  assert.equal(lintCommand('yt-dlp -x -f bv+ba https://x/y').counts.opts, 2);
+  assert.equal(lintCommand('yt-dlp --sub-langs ko --sub-langs en https://x/y').counts.opts, 1);
+  assert.equal(lintCommand('yt-dlp https://x/y').counts.opts, 0);
+});
+
 test('없는 플래그를 잡고 가까운 것을 제안한다', () => {
   const r = lintCommand('yt-dlp --write-sub https://x/y');
   assert.equal(r.ok, false);

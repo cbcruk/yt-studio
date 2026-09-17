@@ -373,7 +373,7 @@ export function lintCommand(schema: Schema, text: string): LintResult {
       error: issues.filter(i => i.level === 'error').length,
       warn: issues.filter(i => i.level === 'warn').length,
       info: issues.filter(i => i.level === 'info').length,
-      opts: Object.keys(count).length,
+      opts: count.size,
       total: schema.opts.length,
     },
   };
