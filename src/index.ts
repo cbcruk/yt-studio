@@ -1,24 +1,14 @@
 /**
- * 공개 API.
+ * 설치된 yt-dlp 를 리플렉션해서 만든 타입 빌더와 명령어 검증기.
  *
  * 내보내는 것이 둘이다.
  *
- *   **빌더** — 코드로 명령어를 만든다. 타입이 옵션 카탈로그다.
- *   **검증기** — 어디서 왔든 명령어 문자열을 검사한다.
+ * - **빌더** — 코드로 명령어를 만든다. 타입이 옵션 카탈로그다.
+ * - **검증기** — 어디서 왔든 명령어 문자열을 검사한다.
  *
  * 둘째가 빠지면 안 된다. 빌더는 빌더로 쓴 것만 보지만, 블로그에서 주웠거나
  * 동료가 붙여넣었거나 LLM 이 준 명령어는 문자열로 온다. 그걸 설치된 yt-dlp 에
  * 대조하는 게 이 패키지가 하는 유일무이한 일이다.
- *
- *     import { ytdlp, lintCommand } from 'ytstudio';
- *
- *     ytdlp('https://youtu.be/abc')
- *       .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
- *       .output(t => t`${t.title} [${t.id}].${t.ext}`)
- *       .build();
- *
- *     lintCommand('yt-dlp --write-sub https://youtu.be/abc').issues;
- *     // [{ level: 'error', msg: '--write-sub 는 이 yt-dlp 버전에 없는 …' }]
  *
  * **이 파일이 얹는 것은 스키마를 어디서 집을까 한 겹뿐이다.** 알맹이는
  * `browser.ts` 에 있고 여기서 전부 다시 내보낸다 — 그쪽은 파일 시스템을 모르므로
@@ -30,6 +20,21 @@
  * 스키마는 **값**이라 손잡이(`ytstudio()`)가 들고 다닌다. 평평한 함수들
  * (`lintCommand` 등)은 게으르게 만든 기본 손잡이에 얹혀 있다 — 편의일 뿐
  * 특별한 것이 아니라서, 손잡이를 직접 만들면 스키마 둘을 나란히 들 수 있다.
+ *
+ * @example 만들고 검사하기
+ * ```ts
+ * import { ytdlp, lintCommand } from 'ytstudio';
+ *
+ * ytdlp('https://youtu.be/abc')
+ *   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
+ *   .output(t => t`${t.title} [${t.id}].${t.ext}`)
+ *   .build();
+ *
+ * lintCommand('yt-dlp --write-sub https://youtu.be/abc').issues;
+ * // [{ level: 'error', msg: '--write-sub 는 이 yt-dlp 버전에 없는 …' }]
+ * ```
+ *
+ * @module
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -134,10 +139,20 @@ export function resolveSchema(at: Where = {}): { source: SchemaSource; raw: RawS
 }
 
 /**
- * 손잡이를 만든다.
+ * 스키마 하나에 묶인 손잡이를 만든다.
  *
- * 인자가 없으면 `resolveSchema()` 로 찾는다(환경변수 → 작업 디렉터리 → 내장).
+ * 인자가 없으면 {@linkcode resolveSchema} 로 찾는다(환경변수 → 작업 디렉터리 → 내장).
  * 스키마를 직접 주면 그걸 쓴다 — 검사가 그 길로 프로세스를 안 갈라도 된다.
+ *
+ * @example 두 저장소를 나란히
+ * ```ts
+ * import { ytstudio } from 'ytstudio';
+ *
+ * const mine = ytstudio();
+ * const theirs = ytstudio({ cwd: '/other/repo' });
+ * mine.source.version;    // 이 손잡이가 대조하는 yt-dlp 버전
+ * theirs.lint('yt-dlp -x https://youtu.be/abc').ok;
+ * ```
  */
 export function ytstudio(opts: Where & { raw?: RawSchema } = {}): Ytstudio {
   if (opts.raw) return studio(opts.raw);
@@ -155,10 +170,19 @@ let fallback: Ytstudio | null = null;
 const def = (): Ytstudio => (fallback ??= ytstudio());
 
 /**
- * 검증기 — 어디서 왔든 명령어 문자열을 본다.
+ * 명령어 문자열을 설치된 yt-dlp 의 스키마와 문법에 대조한다.
  *
  * 빌더가 못 하는 일이다. 빌더는 빌더로 쓴 것만 보지만, 블로그에서 주웠거나
  * 동료가 붙여넣었거나 LLM 이 준 명령어는 문자열로 온다.
+ *
+ * @example 남이 준 명령어를 막기
+ * ```ts
+ * import { lintCommand, previewFilename } from 'ytstudio';
+ *
+ * const r = lintCommand('yt-dlp -P /dl -o "%(uploader)s/%(title)s.%(ext)s" https://youtu.be/abc');
+ * if (!r.ok) throw new Error(r.issues.map(i => i.msg).join('\n'));
+ * previewFilename(r.values).text;   // '/dl/‹업로더›/‹제목›.‹확장자›'
+ * ```
  */
 export const lintCommand = (text: string): LintResult => def().lint(text);
 
@@ -167,6 +191,13 @@ export const ytdlp = (...urls: string[]): Ytdlp => def().ytdlp(...urls);
 
 /** 명령어를 사람 말로 — 토큰별 설명 · 다음 걸음. */
 export const explainCommand = (items: Item[]): Explained[] => def().explain(items);
+
+/**
+ * 지금 옵션 조합에 이어서 줄 만한 옵션들.
+ *
+ * @param values {@linkcode LintResult.values} 처럼 옵션 id → 값.
+ * @param limit 최대 개수. 기본 6.
+ */
 export const suggestNext = (values: Values, limit?: number): Suggestion[] =>
   def().suggest(values, limit);
 

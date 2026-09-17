@@ -18,9 +18,11 @@ import type { Values } from './lint.js';
 
 /** 이 명령어가 만들 파일명. `-o` 를 못 읽었으면 `ok` 가 거짓이고 원문이 그대로 온다. */
 export interface FilePreview {
+  /** `-o` 를 읽었나. 거짓이면 `text` 가 원문이다. */
   ok: boolean;
   /** `-o` 앞에 붙은 종류 접두어(`thumbnail:` 의 `thumbnail`). */
   type: string;
+  /** 파일명. 필드는 `‹제목›` 같은 자리표시자이고, `-P home` 이 있으면 앞에 붙는다. */
   text: string;
   /** `-o` 가 없어서 yt-dlp 기본 템플릿을 쓴 경우. */
   dflt?: boolean;
@@ -28,18 +30,27 @@ export interface FilePreview {
 
 /** 토큰 하나를 한 줄로 읽은 것. */
 export interface Explained {
+  /** 토큰의 종류 — 옵션 · URL · 못 읽은 것. */
   kind: Item['kind'];
+  /** 명령어에 쓰인 원문(다시 인용한 것). */
   text: string;
+  /** 한 줄 설명. 옵션이면 yt-dlp 도움말이고, 끄는 형태면 `— 끄기` 가 붙는다. */
   ko: string;
+  /** 옵션 id. 옵션일 때만 있다. */
   id?: string;
+  /** 생애주기 단계 id (`format` · `store` …). 옵션일 때만 있다. */
   stage?: string;
+  /** 단계의 사람이 읽을 이름. */
   stageLabel?: string;
+  /** 옵션에 준 값. 값을 받지 않는 플래그면 `null`. */
   value?: string | null;
 }
 
 /** 이어서 줄 만한 옵션 하나와 그 이유. */
 export interface Suggestion {
+  /** 제안하는 옵션. */
   opt: Opt;
+  /** 지금 명령어에 왜 이게 따라오나. 한 줄이다. */
   why: string;
 }
 
@@ -87,6 +98,7 @@ export function explainItem(schema: Schema, it: Item): Explained {
   };
 }
 
+/** 항목마다 {@linkcode explainItem} 을 부른다. */
 export const explainCommand = (schema: Schema, items: Item[]): Explained[] =>
   items.map(it => explainItem(schema, it));
 

@@ -137,7 +137,10 @@ export function toFilters(spec?: Filters): Filter[] {
  * 문법을 공유한다는 뜻이고, 단위 테스트가 deepEqual 로 그걸 지킨다.
  */
 export class Expr {
-  constructor(readonly node: FormatNode) {}
+  constructor(
+    /** 감싼 식 트리. `parseFormat` 이 내놓는 모양 그대로다. */
+    readonly node: FormatNode,
+  ) {}
 
   private op(t: FormatOp, rest: Expr[]): Expr {
     const kids = [this.node, ...rest.map(r => r.node)];
@@ -164,9 +167,11 @@ export class Expr {
     return new Expr({ ...this.node, filters: [...(this.node.filters || []), ...toFilters(spec)] });
   }
 
+  /** `-f` 에 줄 문자열 (`bv[height<=1080]+ba/b`). */
   toString(): string { return emitTree(this.node); }
 }
 
+/** `.format(f => …)` 의 `f`. 셀렉터마다 메서드가 하나씩 있다. */
 export interface FormatFactory extends GenFactory<Expr> {}
 
 /** 셀렉터마다 메서드 하나. 목록은 `SELECTORS` 에서 자란다. */
@@ -185,8 +190,16 @@ export function formatFactory(): FormatFactory {
 export type FieldPiece = Extract<OutNode, { t: 'field' }>;
 export type { OutNode };
 
+/**
+ * `-o` 템플릿의 필드 한 칸 — `t.title` 이 주는 것.
+ *
+ * 메서드마다 새 조각을 돌려주므로 이어 붙여 쓴다(`t.upload_date.date('%Y').or('?')`).
+ */
 export class Piece {
-  constructor(readonly p: FieldPiece) {}
+  constructor(
+    /** 감싼 필드 조각. `output-template.ts` 가 읽는 모양 그대로다. */
+    readonly p: FieldPiece,
+  ) {}
   private with(patch: Partial<FieldPiece>): Piece { return new Piece({ ...this.p, ...patch }); }
 
   /** `|` — 값이 없을 때 대신 쓸 것. */
@@ -200,14 +213,20 @@ export class Piece {
   /** 변환 글자를 직접. */
   as(conv: Conversion): Piece { return this.with({ conv }); }
 
+  /** 템플릿에 들어갈 문자열 (`%(title).40S`). */
   toString(): string { return emitPiece(this.p); }
 }
 
 const field = (name: string): Piece =>
   new Piece({ t: 'field', name, strf: '', fallback: null, fmt: '', conv: 's' });
 
+/** `` t`…` `` 태그가 만든 출력 템플릿 한 벌. */
 export class Template {
-  constructor(readonly pieces: OutNode[]) {}
+  constructor(
+    /** 리터럴과 필드가 번갈아 놓인 조각들. */
+    readonly pieces: OutNode[],
+  ) {}
+  /** `-o` 에 줄 문자열 (`%(title)s [%(id)s].%(ext)s`). */
   toString(): string { return this.pieces.map(emitPiece).join(''); }
 }
 
@@ -254,8 +273,10 @@ export interface Ytdlp extends Options {}
 export class Ytdlp {
   /** 이 명령어가 대조하는 스키마. 인스턴스마다 제 것을 든다. */
   readonly schema: Schema;
+  /** 받을 대상. 명령어 맨 끝에 붙는다. */
   urls: string[] = [];
-  parts: Part[] = [];                  // 쓴 순서 그대로 나간다
+  /** 놓인 플래그와 값. 쓴 순서 그대로 나간다. */
+  parts: Part[] = [];
 
   constructor(schema: Schema, urls: string[] = []) {
     this.schema = schema;
@@ -287,6 +308,7 @@ export class Ytdlp {
     return this;
   }
 
+  /** 옵션 id 로 놓인 플래그를 뺀다. 없으면 아무 일도 안 한다. */
   drop(id: string): this {
     this.parts = this.parts.filter(p => p.id !== id);
     return this;
@@ -295,8 +317,15 @@ export class Ytdlp {
   /**
    * `-f` — 포맷 셀렉터.
    *
-   *     .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
-   *     → -f "bv[height<=1080]+ba/b"
+   * @example 식으로
+   * ```ts
+   * import { ytdlp } from 'ytstudio';
+   *
+   * ytdlp('https://youtu.be/abc')
+   *   .format(f => f.bv({ height: { lte: 1080 } }).plus(f.ba()).or(f.b()))
+   *   .build();
+   * // yt-dlp -f "bv[height<=1080]+ba/b" https://youtu.be/abc
+   * ```
    */
   format(build: (f: FormatFactory) => Expr): this;
   /** `-f` 를 문자열로 직접. 문법은 `.lint()` 가 본다. */
@@ -309,8 +338,15 @@ export class Ytdlp {
   /**
    * `-o` — 출력 템플릿.
    *
-   *     .output(t => t`${t.title} [${t.id}].${t.ext}`)
-   *     → -o "%(title)s [%(id)s].%(ext)s"
+   * @example 태그드 템플릿으로
+   * ```ts
+   * import { ytdlp } from 'ytstudio';
+   *
+   * ytdlp('https://youtu.be/abc')
+   *   .output(t => t`${t.title} [${t.id}].${t.ext}`)
+   *   .build();
+   * // yt-dlp -o "%(title)s [%(id)s].%(ext)s" https://youtu.be/abc
+   * ```
    */
   output(build: (t: OutTag) => Template): this;
   /** 종류별 템플릿 (`thumbnail:…`). */
@@ -337,13 +373,20 @@ export class Ytdlp {
   /**
    * `--cookies-from-browser` — 브라우저에서 쿠키를 읽어 온다.
    *
-   *     .cookiesFromBrowser('firefox')
-   *     .cookiesFromBrowser('firefox', { container: 'Personal' })
-   *     .cookiesFromBrowser('chrome', { keyring: 'GNOMEKEYRING' })
-   *
    * 값이 `BROWSER[+KEYRING][:PROFILE][::CONTAINER]` 라 자리가 넷이다. 문자열로
    * 이어 붙이면 `::` 와 `:` 를 헷갈리기 쉬워서 자리마다 이름을 붙였다 —
    * 프로필 없이 컨테이너만 주는 형태(`firefox::Personal`)가 특히 그렇다.
+   *
+   * @example 자리마다 이름으로
+   * ```ts
+   * import { ytdlp } from 'ytstudio';
+   *
+   * ytdlp('https://youtu.be/abc').cookiesFromBrowser('firefox', { container: 'Personal' }).build();
+   * // yt-dlp --cookies-from-browser firefox::Personal https://youtu.be/abc
+   *
+   * ytdlp('https://youtu.be/abc').cookiesFromBrowser('chrome', { keyring: 'GNOMEKEYRING' }).build();
+   * // yt-dlp --cookies-from-browser chrome+GNOMEKEYRING https://youtu.be/abc
+   * ```
    */
   cookiesFromBrowser(browser: Browser, from: CookieFrom = {}): this {
     const id = 'cookies-from-browser';
@@ -359,11 +402,16 @@ export class Ytdlp {
   /**
    * `--match-filters` — 조건에 맞는 영상만 받는다.
    *
-   *     .matchFilters({ duration: { gt: 120 }, is_live: false })
-   *     → --match-filters "duration>120 & !is_live"
-   *
    * **연산자는 `-f` 필터와 같고 필드는 `-o` 템플릿과 같다** — yt-dlp 가 그렇게
    * 정의한다. 그래서 `toFilters` 를 그대로 쓴다. 여러 번 주면 OR 이다.
+   *
+   * @example 객체로
+   * ```ts
+   * import { ytdlp } from 'ytstudio';
+   *
+   * ytdlp('https://youtu.be/abc').matchFilters({ duration: { gt: 120 }, is_live: false }).build();
+   * // yt-dlp --match-filters "duration>120 & !is_live" https://youtu.be/abc
+   * ```
    */
   matchFilters(spec: MatchFields): this;
   /** 카탈로그 밖의 필드를 쓸 때. 여러 개를 주면 OR 이다 — yt-dlp 가 그렇게 읽는다. */
@@ -374,6 +422,7 @@ export class Ytdlp {
 
   /** `--break-match-filters` — 위와 같은데, 걸리면 **거기서 멈춘다.** */
   breakMatchFilters(spec: MatchFields): this;
+  /** 카탈로그 밖의 필드를 쓸 때. 걸리면 거기서 멈춘다. */
   breakMatchFilters(...exprs: string[]): this;
   breakMatchFilters(...args: [MatchFields] | string[]): this {
     return this.pushAll('break-match-filters', args);
@@ -389,14 +438,30 @@ export class Ytdlp {
   /**
    * `--download-sections` — 영상의 일부만 받는다.
    *
-   *     .downloadSections({ from: 60, to: '2:30' })   → --download-sections "*60-2:30"
-   *     .downloadSections({ from: 60 })                → --download-sections "*60-inf"
-   *     .downloadSections('인트로')                     → --download-sections 인트로
-   *
    * 객체를 주면 시간 구간(`*시작-끝`)이고, 문자열을 주면 **챕터 제목 정규식**이다.
    * 둘이 완전히 다른 뜻이라 별표를 손으로 붙이게 두지 않았다.
+   *
+   * @example 시간 구간
+   * ```ts
+   * import { ytdlp } from 'ytstudio';
+   *
+   * ytdlp('https://youtu.be/abc').downloadSections({ from: 60, to: '2:30' }).build();
+   * // yt-dlp --download-sections "*60-2:30" https://youtu.be/abc
+   *
+   * ytdlp('https://youtu.be/abc').downloadSections({ from: 60 }).build();
+   * // yt-dlp --download-sections "*60-inf" https://youtu.be/abc
+   * ```
+   *
+   * @example 챕터 제목
+   * ```ts
+   * import { ytdlp } from 'ytstudio';
+   *
+   * ytdlp('https://youtu.be/abc').downloadSections('인트로').build();
+   * // yt-dlp --download-sections "인트로" https://youtu.be/abc
+   * ```
    */
   downloadSections(range: Section): this;
+  /** 제목이 이 정규식에 맞는 챕터만 받는다. */
   downloadSections(chapter: string): this;
   downloadSections(arg: Section | string): this {
     const id = 'download-sections';
@@ -461,6 +526,7 @@ export class Ytdlp {
     return { ok, issues };
   }
 
+  /** {@linkcode Ytdlp.build} 와 같다. */
   toString(): string { return this.build(); }
 }
 

@@ -1,17 +1,22 @@
 /**
  * 파일 시스템이 없는 곳에서 쓰는 입구 — 브라우저 · 엣지 런타임.
  *
- *     import { studio } from 'ytstudio/browser';
- *
- *     const yt = studio(await (await fetch('/ytstudio.schema.json')).json());
- *     yt.ytdlp('https://youtu.be/abc').extractAudio().build();
- *
  * `ytstudio` 본체(`index.ts`)가 하는 일 가운데 노드가 필요한 것은 **스키마를
  * 어디서 집을까**뿐이다 — 환경변수, 작업 디렉터리, 패키지에 실린 파일. 그
  * 한 겹만 걷어내면 나머지는 전부 순수하다. 그래서 이 파일이 진짜 알맹이고
  * `index.ts` 는 여기에 파일 읽기를 얹은 것이다.
  *
  * 여기서는 스키마를 **직접 준다.** 찾아 줄 곳이 없으니 물어보지 않는다.
+ *
+ * @example 스키마를 받아 와서
+ * ```ts
+ * import { studio } from 'ytstudio/browser';
+ *
+ * const yt = studio(await (await fetch('/ytstudio.schema.json')).json());
+ * yt.ytdlp('https://youtu.be/abc').extractAudio().build();
+ * ```
+ *
+ * @module
  */
 import { buildSchema } from './core/schema.js';
 import { lintCommand as lintWith, nearestFlags as nearestWith } from './core/lint.js';
@@ -49,6 +54,7 @@ export type SchemaOrigin =
  * 맞지만, 에디터가 주는 목록은 `typesVersion` 기준이라 어긋난다.
  */
 export interface SchemaSource {
+  /** 스키마를 어디서 읽었나. */
   from: SchemaOrigin;
   /** 실제로 읽은 파일의 절대 경로. 직접 준 것이면 그렇다고 적힌다. */
   path: string;

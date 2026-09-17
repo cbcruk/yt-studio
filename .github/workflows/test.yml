@@ -86,6 +86,12 @@ jobs:
       - name: types 명령
         run: bun run test:types
 
+      # 손님이 에디터에서 보는 것은 lib/ 의 .d.ts 다. 공개 선언마다 JSDoc 이
+      # 붙었는지, @example 이 손님 프로젝트에서 그대로 컴파일되는지 본다.
+      # 규칙은 .claude/rules/jsdoc.md 에 있다.
+      - name: 문서
+        run: bun run test:docs
+
       # 손님에게 나가는 tarball 을 본다. files 나 exports 를 잘못 건드리면
       # 저장소 안에서는 멀쩡한데 설치하면 깨진다 — 그건 검사가 못 잡는다.
       - name: 패키지
