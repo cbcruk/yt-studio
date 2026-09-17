@@ -19,8 +19,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { basename, resolve } from 'node:path';
+import { Data, Effect } from 'effect';
 
-import { bundledSchema, previewFilename, ytstudio } from './index.js';
+import { bundledSchema, previewFilename, studio } from './index.js';
+import { resolveWith } from './resolve.js';
 import { emitEnvTypes } from './core/env-types.js';
 import { parseHelp } from './core/help-schema.js';
 import type { LintResult, Ytstudio } from './index.js';
@@ -43,16 +45,19 @@ let handle: Ytstudio | undefined;
  * It used to be decided at the top of the module, so a bad `YT_STUDIO_SCHEMA` or a
  * broken local schema printed a stack trace even for `--help`, and blocked
  * `yt-studio types` — the command that rewrites that very file.
+ *
+ * Only the failures {@linkcode resolveWith} declares become exit 2. It used to catch
+ * everything, so a bug in the reader looked like a broken schema file.
  */
 function yt(): Ytstudio {
-  if (handle) return handle;
-  try {
-    return (handle = ytstudio());
-  } catch (e) {
-    console.error(`${red('✗')} ${(e as Error).message}`);
-    console.error(dim('  YT_STUDIO_SCHEMA 나 작업 디렉터리의 yt-studio.schema.json 을 고치거나 지울 것 — yt-studio types 로 다시 뽑을 수 있다.'));
-    process.exit(2);
-  }
+  return (handle ??= Effect.runSync(resolveWith({}).pipe(Effect.match({
+    onSuccess: ({ raw, source }) => studio(raw, source),
+    onFailure: (e): never => {
+      console.error(`${red('✗')} ${e.message}`);
+      console.error(dim('  YT_STUDIO_SCHEMA 나 작업 디렉터리의 yt-studio.schema.json 을 고치거나 지울 것 — yt-studio types 로 다시 뽑을 수 있다.'));
+      process.exit(2);
+    },
+  }))));
 }
 
 const help = (version: string): string => `yt-studio — 설치된 yt-dlp(${version}) 에 명령어를 대조한다
@@ -80,9 +85,11 @@ const help = (version: string): string => `yt-studio — 설치된 yt-dlp(${vers
 
 /** Help must show even when the schema is broken — that is when it's needed most. */
 function helpText(): string {
-  let version = '?';
-  try { version = ytstudio().source.version; } catch { /* the command that needs the schema reports it */ }
-  return help(version);
+  // A schema that can't be read shows as `?`; the command that needs it reports why.
+  return help(Effect.runSync(resolveWith({}).pipe(Effect.match({
+    onSuccess: ({ raw }) => raw.ytdlp_version,
+    onFailure: () => '?',
+  }))));
 }
 
 /** One line on which schema was used. Without it, nobody knows what the verdict is a verdict about. */
@@ -162,6 +169,41 @@ function argError(e: unknown): string {
   return msg;
 }
 
+/** `types` was called wrong. */
+class UsageError extends Data.TaggedError('UsageError')<{ readonly reason: string }> {}
+/** The yt-dlp binary couldn't be run. */
+class YtdlpFailed extends Data.TaggedError('YtdlpFailed')<{ readonly bin: string }> {}
+/** The help parser lost too many options — its format has changed. */
+class HelpUnreadable extends Data.TaggedError('HelpUnreadable')<{ readonly removed: number; readonly total: number }> {}
+/** A generated file couldn't be written. */
+class WriteFailed extends Data.TaggedError('WriteFailed')<{ readonly path: string; readonly cause: unknown }> {}
+
+type TypesError = UsageError | YtdlpFailed | HelpUnreadable | WriteFailed;
+
+/**
+ * The one place a `types` failure becomes an exit code and the lines explaining it.
+ *
+ * The codes used to be `return 1` / `return 2` scattered through the command, and a
+ * failed write had no code at all — it escaped as a stack trace. Now the switch is
+ * exhaustive, so a new failure doesn't compile until it has a code.
+ */
+function typesFailure(e: TypesError): { code: 1 | 2; lines: string[] } {
+  switch (e._tag) {
+    case 'UsageError':
+      return { code: 2, lines: [`${red('✗')} ${e.reason}`, dim('  쓰는 법: yt-studio types [--yt-dlp <경로>]')] };
+    case 'YtdlpFailed':
+      // Silently falling back to the bundled one would pretend to succeed while changing nothing
+      return { code: 1, lines: [`${red('✗')} yt-dlp 를 실행하지 못했다: ${e.bin}`, dim('  PATH 에 없으면 --yt-dlp <경로> 로 가리킬 것.')] };
+    case 'HelpUnreadable':
+      return { code: 1, lines: [
+        `${red('✗')} 도움말에서 옵션 ${e.removed}개가 사라졌다 (번들 ${e.total}개 중) — 파서가 이 서식을 못 읽는다`,
+        dim('  아무것도 쓰지 않았다. 반쯤 쓴 스키마가 제일 나쁘다.'),
+      ] };
+    case 'WriteFailed':
+      return { code: 1, lines: [`${red('✗')} ${e.path} 에 쓰지 못했다 (${(e.cause as Error).message})`] };
+  }
+}
+
 /**
  * Reflects the yt-dlp users installed and regenerates the schema and types.
  *
@@ -173,37 +215,26 @@ function argError(e: unknown): string {
  * can't run in users' environments. `brew`, standalone binaries, and pipx all
  * fail on `import yt_dlp`.
  */
-function types(args: string[]): number {
-  let bin: string;
-  try {
+const typesWith = (args: string[]): Effect.Effect<void, TypesError> => Effect.gen(function* () {
+  const bin = yield* Effect.try({
     // Scanning arguments by hand stopped here, and only here. `indexOf('--yt-dlp')`
     // couldn't find `--yt-dlp=/path`, so it **silently dropped the path users
     // gave** and looked at PATH — exactly the kind of failure this repo keeps
     // catching. Being strict, unknown flags are caught here too.
-    const { values } = parseArgs({
+    try: () => parseArgs({
       args, strict: true, allowPositionals: false,
       options: { 'yt-dlp': { type: 'string' } },
-    });
-    bin = values['yt-dlp'] ?? 'yt-dlp';
-  } catch (e) {
-    console.error(`${red('✗')} ${argError(e)}`);
-    console.error(dim('  쓰는 법: yt-studio types [--yt-dlp <경로>]'));
-    return 2;
-  }
+    }).values['yt-dlp'] ?? 'yt-dlp',
+    catch: e => new UsageError({ reason: argError(e) }),
+  });
 
-  const ask = (flag: string): string =>
-    execFileSync(bin, [flag], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  const ask = (flag: string): Effect.Effect<string, YtdlpFailed> => Effect.try({
+    try: () => execFileSync(bin, [flag], { encoding: 'utf8', maxBuffer: 8 << 20 }),
+    catch: () => new YtdlpFailed({ bin }),
+  });
 
-  let help: string, version: string;
-  try {
-    version = ask('--version').trim().split('\n')[0]!.trim();   // split always returns at least one
-    help = ask('--help');
-  } catch {
-    // Silently falling back to the bundled one would pretend to succeed while changing nothing
-    console.error(`${red('✗')} yt-dlp 를 실행하지 못했다: ${bin}`);
-    console.error(dim('  PATH 에 없으면 --yt-dlp <경로> 로 가리킬 것.'));
-    return 1;
-  }
+  const version = (yield* ask('--version')).trim().split('\n')[0]!.trim();   // split always returns at least one
+  const help = yield* ask('--help');
 
   const bundled = bundledSchema();
   const r = parseHelp(help, version, bundled);
@@ -211,11 +242,8 @@ function types(args: string[]): number {
   // Help is output meant for people, so its format can change. A broken parser
   // extracts only a few and reports success — and then every one of users'
   // flags becomes a typo.
-  const gone = r.removed.length / bundled.options.length;
-  if (gone > 0.2) {
-    console.error(`${red('✗')} 도움말에서 옵션 ${r.removed.length}개가 사라졌다 (번들 ${bundled.options.length}개 중) — 파서가 이 서식을 못 읽는다`);
-    console.error(dim('  아무것도 쓰지 않았다. 반쯤 쓴 스키마가 제일 나쁘다.'));
-    return 1;
+  if (r.removed.length / bundled.options.length > 0.2) {
+    return yield* new HelpUnreadable({ removed: r.removed.length, total: bundled.options.length });
   }
 
   const byFlag = new Map(bundled.options.map(o => [o.flag, o]));
@@ -230,12 +258,15 @@ function types(args: string[]): number {
   const dtsPath = resolve(process.cwd(), 'yt-studio-env.d.ts');
   // Write beside the target, then rename. An interrupted write used to leave half a
   // schema under our file name — now the old file stays until the new one is whole.
-  const put = (path: string, text: string): void => {
-    writeFileSync(`${path}.tmp`, text);
-    renameSync(`${path}.tmp`, path);
-  };
-  put(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
-  put(dtsPath, dts);
+  const put = (path: string, text: string): Effect.Effect<void, WriteFailed> => Effect.try({
+    try: () => {
+      writeFileSync(`${path}.tmp`, text);
+      renameSync(`${path}.tmp`, path);
+    },
+    catch: cause => new WriteFailed({ path, cause }),
+  });
+  yield* put(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
+  yield* put(dtsPath, dts);
 
   console.log(`${dim('읽음')}      ${bin} ${dim(`(yt-dlp ${version}) · --help 파싱`)}`);
   console.log(`${dim('옵션')}      ${r.schema.options.length}개 ${dim(`· 새로 ${r.added.length} · 사라짐 ${r.removed.length} (번들 ${bundled.options.length} 대비)`)}`);
@@ -245,7 +276,18 @@ function types(args: string[]): number {
     console.log(`${yellow('!')} 처음 보는 그룹이라 실행 단계에 뒀다: ${r.unmappedGroups.join(' · ')}`);
   }
   for (const w of tsconfigWarnings(dtsPath)) console.log(`${yellow('!')} ${w}`);
-  return 0;
+});
+
+/** Runs `types` and returns its exit code. Defects are not caught — they print as themselves. */
+function types(args: string[]): number {
+  return Effect.runSync(typesWith(args).pipe(Effect.match({
+    onSuccess: () => 0,
+    onFailure: e => {
+      const { code, lines } = typesFailure(e);
+      for (const line of lines) console.error(line);
+      return code;
+    },
+  })));
 }
 
 /**

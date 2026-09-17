@@ -18,7 +18,7 @@ npx yt-studio lint 'yt-dlp -f bv+ba --write-sub https://youtu.be/abc'
 Write code in an editor with autocomplete, and the command is built on the spot and
 checked. The page runs on exactly the `.d.ts` and schema this package ships.
 
-ESM only, no runtime dependencies, Node 22+.
+ESM only, one runtime dependency ([`effect`](https://effect.website)), Node 22+.
 
 > Lint messages and CLI output are currently in **Korean**. The examples below show
 > them as they are.
@@ -27,7 +27,7 @@ Working on the repository **requires [bun](https://bun.com).** The version is pi
 by the `packageManager` field, and CI's `setup-bun` reads the same field.
 
 ```
-bun install       # the only dependencies are typescript and @types/node
+bun install       # effect, plus typescript and @types/node for development
 bun run build     # → lib/  (tsc — declarations must be emitted too, so tsc does this)
 bun run gen:types # yt-studio.schema.json → src/core/options.gen.ts
 bun run cli       # run the CLI without building
@@ -47,7 +47,7 @@ bun doesn't type-check and can't emit `.d.ts`, so tsc handles that side.
 
 For a while bun was a devDependency, which meant CI **installed the whole bun binary
 on every run** — `node_modules` was 380MB, 347MB of it bun. It's 34MB now. Users are
-unaffected (`dependencies` was always empty).
+unaffected — `dependencies` was empty then, and now holds only `effect`.
 
 ### `types: ["node"]` is a constraint kept on purpose
 
@@ -407,7 +407,7 @@ actually holds is tested against fixture help text
 
 ```
 src/core/            knows neither the DOM nor the file system. All TypeScript
-  schema.ts          reflected JSON → indexes. A value — no mutable globals
+  schema.ts          reflected JSON → indexes, and its effect/Schema decoder. A value — no mutable globals
   build.ts           commands in code — 184 methods grow from the schema
   options.gen.ts     generated: option types · filters · fields (made by gen_options.ts)
   lint.ts            command diagnostics — the heart of this tool
@@ -421,6 +421,7 @@ src/core/            knows neither the DOM nor the file system. All TypeScript
   env-types.ts       schema → option method declarations. Shared by both generators
 src/browser.ts       entry point without the file system — studio(raw) returns a handle
 src/index.ts         public API — browser.ts + one layer of where to pick the schema up
+src/resolve.ts       that layer — env var · working directory · bundled, as an Effect the CLI reads failures from
 src/cli.ts           yt-studio lint · explain · types
 demo/                Playground — consumes lib/ and the schema as-is (vite · monaco)
 tests/               all bun:test. A single `bun test` runs everything
