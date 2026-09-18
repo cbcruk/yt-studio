@@ -21,8 +21,8 @@
  */
 import { beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { closeSync, existsSync, mkdtempSync, openSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -128,6 +128,36 @@ test('인자 없이 부르면 쓰는 법을 낸다', () => {
 test('모르는 명령은 2 로 끝난다 — 오류(1)와 구분된다', () => {
   assert.equal(run(['nope']).code, 2);
   assert.equal(run(['lint']).code, 2, '빈 입력도 2여야 한다');
+});
+
+// Without quotes the shell splits the command, and `-x` looks like one of ours. The
+// arguments after lint are the yt-dlp command, not flags for this CLI.
+test('따옴표 없이 줘도 lint 는 나머지를 yt-dlp 명령어로 읽는다', () => {
+  const r = run(['lint', 'yt-dlp', '-x', '--write-sub', 'https://youtu.be/abc']);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /--write-sub 는 이 yt-dlp 버전에 없는/);
+});
+
+test('types 에 모르는 옵션을 주면 2 로 끝난다', () => {
+  const r = run(['types', '--bogus']);
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /모르는 옵션이다: --bogus/);
+});
+
+// A failed read used to come back as '' and say "no command" — the cause vanished.
+test('표준 입력을 못 읽으면 명령어가 없다고 하지 않고 이유를 말한다', () => {
+  const dir = openSync(os.tmpdir(), 'r');
+  try {
+    const r = spawnSync(NODE, [CLI, 'lint'], {
+      stdio: [dir, 'pipe', 'pipe'], encoding: 'utf8', cwd: ROOT, env: { ...process.env, NO_COLOR: '1' },
+    });
+    const out = r.stdout + r.stderr;
+    assert.equal(r.status, 2, out);
+    assert.match(out, /표준 입력을 읽지 못했다/);
+    assert.doesNotMatch(out, /검사할 명령어가 없다/);
+  } finally {
+    closeSync(dir);
+  }
 });
 
 // The schema used to be decided at the top of the module — a bad pointer printed a stack
