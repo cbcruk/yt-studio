@@ -11,7 +11,8 @@
  * - what would naturally follow the current combination of options
  */
 
-import { grammarMessage } from './grammar-error.js';
+import { Result } from 'effect';
+
 import { previewTemplate, parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
 import type { Opt, Schema } from './schema.js';
@@ -73,9 +74,8 @@ export function previewFilename(values: Values): FilePreview {
   const outs = ([] as (string | null)[]).concat((values.output ?? []) as string | (string | null)[]);
   const rawOut = outs.filter((v): v is string => v != null && !splitType(v).type).at(-1) ?? null;
   const template = rawOut || DEFAULT_OUTTMPL;
-  let body: string;
-  try { body = previewTemplate(parseTemplate(template)); }
-  catch (e) { grammarMessage(e); return { ok: false, text: template }; }
+  const body = Result.match(parseTemplate(template), { onSuccess: previewTemplate, onFailure: () => null });
+  if (body === null) return { ok: false, text: template };
 
   let home = '';
   if (values.paths) {

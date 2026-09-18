@@ -12,9 +12,24 @@
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
+import { Result } from 'effect';
 
-const { parseCookieSource, emitCookieSource, CookieError } =
-  await import('../../src/core/cookies.js');
+import type { CookieSource, CookieVocabs } from '../../src/core/cookies.js';
+
+const { parseCookieSource: parse, emitCookieSource } = await import('../../src/core/cookies.js');
+const { GrammarError } = await import('../../src/core/grammar-error.js');
+
+/** Reads assuming it succeeds — a failure throws the GrammarError. */
+const parseCookieSource = (v: string, vocabs?: CookieVocabs): CookieSource =>
+  Result.getOrThrow(parse(v, vocabs));
+
+/** The reason reading failed. Fails the test if it read, or failed with anything but GrammarError. */
+const failure = (v: string, vocabs?: CookieVocabs): string => {
+  const r = parse(v, vocabs);
+  assert.ok(Result.isFailure(r), `통과해버림: ${v}`);
+  assert.ok(r.failure instanceof GrammarError);
+  return r.failure.message;
+};
 const { lintCommand, ytdlp } = await import('../../src/index.js');
 
 const V = {
@@ -45,9 +60,8 @@ test('대소문자를 yt-dlp 와 같게 맞춘다', () => {
 });
 
 test('어휘 밖은 자리마다 다르게 말한다', () => {
-  assert.throws(() => parseCookieSource('chrom', V), /쿠키를 읽을 수 있는 브라우저가 아니다/);
-  assert.throws(() => parseCookieSource('firefox+NOPE', V), /아는 키링이 아니다/);
-  assert.throws(() => parseCookieSource('chrom', V), CookieError);
+  assert.match(failure('chrom', V), /쿠키를 읽을 수 있는 브라우저가 아니다/);
+  assert.match(failure('firefox+NOPE', V), /아는 키링이 아니다/);
 });
 
 // Without a vocabulary only the shape is checked — it must be usable without a schema.

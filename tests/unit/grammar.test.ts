@@ -7,10 +7,24 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 
+import { Result } from 'effect';
+
 import type { FormatNode } from '../../src/core/format-grammar.js';
 
-const { PREC, parseFormat, emitTree, parseFilterBody, emitFilter } =
+const { PREC, parseFormat: parseFormatResult, emitTree, parseFilterBody: parseFilterBodyResult, emitFilter } =
   await import('../../src/core/format-grammar.js');
+const { GrammarError, readGrammar } = await import('../../src/core/grammar-error.js');
+
+// Most tests here are about what gets read, so these unwrap — a failure throws the GrammarError.
+const parseFormat = (s: string): FormatNode | null => Result.getOrThrow(parseFormatResult(s));
+const parseFilterBody = (s: string) => Result.getOrThrow(parseFilterBodyResult(s));
+
+/** The reason a parse failed. Fails the test if it read, or failed with anything but {@linkcode GrammarError}. */
+const failure = (r: Result.Result<unknown, unknown>): string => {
+  assert.ok(Result.isFailure(r), '통과해버림');
+  assert.ok(r.failure instanceof GrammarError);
+  return r.failure.message;
+};
 
 /** Read and emit again. The round trip is the core property of this grammar. */
 const round = (s: string): string => emitTree(parseFormat(s));
@@ -90,7 +104,7 @@ test('불필요한 괄호는 다시 뱉을 때 사라진다', () => {
 test('망가진 입력은 이유를 담아 거부한다', () => {
   const bad = ['bv+', '(bv+ba', 'bv[height<=]x', 'bv+ba)', 'bv[unclosed'];
   for (const s of bad) {
-    assert.throws(() => parseFormat(s), Error, `통과해버림: ${s}`);
+    assert.ok(Result.isFailure(parseFormatResult(s)), `통과해버림: ${s}`);
   }
 });
 
@@ -119,8 +133,8 @@ test('연산자가 하나면 괄호가 풀리고 필터만 남는다', () => {
 });
 
 test('그룹 필터에도 닫힘 검사는 그대로 걸린다', () => {
-  assert.throws(() => parseFormat('(bv+ba)[height'), /'\]' 가 닫히지 않았다/);
-  assert.throws(() => parseFormat('()'), /셀렉터를 찾지 못했다/);
+  assert.match(failure(parseFormatResult('(bv+ba)[height')), /'\]' 가 닫히지 않았다/);
+  assert.match(failure(parseFormatResult('()')), /셀렉터를 찾지 못했다/);
 });
 
 test('필터 본문: 비교 · 존재 · 부재 · ? 접미사', () => {
@@ -167,10 +181,9 @@ test('우선순위 표는 sel > merge > fallback > multi', () => {
 });
 
 
-// Bad input must come out as GrammarError and nothing else — the checker catches only that,
-// so any other exception is a parser bug and must not be dressed up as a verdict.
-test('잘못된 입력에는 GrammarError 만 던진다', async () => {
-  const { GrammarError } = await import('../../src/core/grammar-error.js');
+// Bad input must fail with GrammarError and nothing else, and never throw — any other
+// exception is a parser bug and must not be dressed up as a verdict.
+test('잘못된 입력은 GrammarError 로만 실패한다', async () => {
   const { parseCookieSource } = await import('../../src/core/cookies.js');
   const { parseTemplate } = await import('../../src/core/output-template.js');
   let seed = 7;
@@ -178,15 +191,16 @@ test('잘못된 입력에는 GrammarError 만 던진다', async () => {
   const junk = (alpha: string): string =>
     Array.from({ length: Math.floor(rnd() * 16) }, () => alpha[Math.floor(rnd() * alpha.length)]).join('');
 
-  const cases: [string, (v: string) => unknown, string][] = [
-    ['-f', parseFormat, 'bvwa*+/,()[]<>=!?^$~ h1_.-'],
+  const cases: [string, (v: string) => Result.Result<unknown, unknown>, string][] = [
+    ['-f', parseFormatResult, 'bvwa*+/,()[]<>=!?^$~ h1_.-'],
     ['-o', parseTemplate, '%()sdj>|.0-5 abcS'],
     ['--cookies-from-browser', v => parseCookieSource(v, { browser: ['firefox'], keyring: ['KWALLET'] }), 'firefox+:KWALLET :: x'],
   ];
   for (const [name, parse, alpha] of cases) {
     for (let k = 0; k < 3000; k++) {
       const v = junk(alpha);
-      try { parse(v); } catch (e) { assert.ok(e instanceof GrammarError, `${name} ${JSON.stringify(v)} → ${e}`); }
+      const r = parse(v);
+      if (Result.isFailure(r)) assert.ok(r.failure instanceof GrammarError, `${name} ${JSON.stringify(v)} → ${r.failure}`);
     }
   }
 });
@@ -200,8 +214,7 @@ test('괄호가 너무 깊으면 스택 대신 문법 오류로 말한다', asyn
   assert.doesNotThrow(() => parseFormat('('.repeat(64) + 'b' + ')'.repeat(64)));
 });
 
-test('문법 오류가 아닌 예외는 삼키지 않는다', async () => {
-  const { grammarMessage, GrammarError } = await import('../../src/core/grammar-error.js');
-  assert.equal(grammarMessage(new GrammarError('x')), 'x');
-  assert.throws(() => grammarMessage(new TypeError('bug')), TypeError);
+test('문법 오류가 아닌 예외는 삼키지 않는다', () => {
+  assert.equal(failure(readGrammar(() => { throw new GrammarError('x'); })), 'x');
+  assert.throws(() => readGrammar(() => { throw new TypeError('bug'); }), TypeError);
 });
