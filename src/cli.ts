@@ -18,11 +18,14 @@
  * Commands, flags, `--help` and `--version` come from `effect/unstable/cli` (#35).
  * Every way a command can end is a tagged failure, and {@linkcode exitOf} is the
  * one place those become exit codes — `process.exit` appears once, at the bottom.
+ *
+ * Exit codes: 0 pass · 1 the target is wrong · 2 this CLI was called wrong ·
+ * 70 a bug in yt-studio itself (`EX_SOFTWARE`).
  */
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import { Console, Data, Effect, FileSystem, Layer, Option, Path, Result, Stdio, Terminal } from 'effect';
+import { Config, Console, Context, Data, Duration, Effect, FileSystem, Layer, Option, Path, Stdio, Terminal } from 'effect';
 import { Argument, CliConfig, CliError, CliOutput, Command, Flag, GlobalFlag } from 'effect/unstable/cli';
 import { ChildProcessSpawner } from 'effect/unstable/process';
 
@@ -45,28 +48,27 @@ const MARK = { error: red('✗'), warn: yellow('!'), info: dim('·') };
 /** The schema couldn't be read — a broken `YT_STUDIO_SCHEMA` or local schema file. */
 class SchemaUnreadable extends Data.TaggedError('SchemaUnreadable')<{ readonly reason: string }> {}
 
+/** The checker the commands check against. */
+class Studio extends Context.Service<Studio, Ytstudio>()('yt-studio/cli/Studio') {}
+
 /**
- * Where the schema comes from — looked up once, kept as a value.
+ * Finds the schema and builds the checker — only for commands that ask for it.
  *
- * It used to be decided at the top of the module as a throw, so a bad
- * `YT_STUDIO_SCHEMA` or a broken local schema printed a stack trace even for
- * `--help`, and blocked `yt-studio types` — the command that rewrites that very
- * file. Now a failure is only a value until a command that needs the schema asks.
+ * It used to be decided at the top of the module, so a bad `YT_STUDIO_SCHEMA` or a
+ * broken local schema took down `--help` and `yt-studio types` — the command that
+ * rewrites that very file. As a layer given only to `lint` · `explain` · `version`
+ * ({@linkcode Command.provide}), it is built when one of those runs and never otherwise.
  *
  * Only the failures {@linkcode resolveWith} declares become exit 2. A bug in the
  * reader still surfaces as a defect instead of looking like a broken schema file.
  */
-const resolved = Effect.runSync(Effect.result(resolveWith({})));
+const StudioLive = Layer.effect(Studio, resolveWith({}).pipe(
+  Effect.map(({ raw, source }) => studio(raw, source)),
+  Effect.mapError(e => new SchemaUnreadable({ reason: e.message })),
+));
 
-let handle: Ytstudio | undefined;
-
-/** The checker for this process. Fails when the schema can't be read. */
-const yt: Effect.Effect<Ytstudio, SchemaUnreadable> = Effect.suspend(() => {
-  if (handle) return Effect.succeed(handle);
-  if (Result.isFailure(resolved)) return Effect.fail(new SchemaUnreadable({ reason: resolved.failure.message }));
-  const { raw, source } = resolved.success;
-  return Effect.succeed(handle = studio(raw, source));
-});
+/** An error's message, for a thrown value we know nothing about. */
+const reasonOf = (u: unknown): string => (u instanceof Error ? u.message : String(u));
 
 /** One line on which schema was used. Without it, nobody knows what the verdict is a verdict about. */
 function source(s: Ytstudio): string {
@@ -77,7 +79,7 @@ function source(s: Ytstudio): string {
 /** Nothing to check — no arguments and nothing piped in. */
 class NoCommand extends Data.TaggedError('NoCommand') {}
 /** Standard input was there but couldn't be read. */
-class StdinUnreadable extends Data.TaggedError('StdinUnreadable')<{ readonly cause: unknown }> {}
+class StdinUnreadable extends Data.TaggedError('StdinUnreadable')<{ readonly reason: string }> {}
 
 /**
  * The arguments if given, otherwise all of standard input.
@@ -91,7 +93,7 @@ class StdinUnreadable extends Data.TaggedError('StdinUnreadable')<{ readonly cau
 const input = (args: readonly string[]): Effect.Effect<string, NoCommand | StdinUnreadable> => Effect.gen(function* () {
   const text = args.length ? args.join(' ')
     : process.stdin.isTTY ? ''
-      : yield* Effect.try({ try: () => readFileSync(0, 'utf8').trim(), catch: cause => new StdinUnreadable({ cause }) });
+      : yield* Effect.try({ try: () => readFileSync(0, 'utf8').trim(), catch: e => new StdinUnreadable({ reason: reasonOf(e) }) });
   if (!text) return yield* new NoCommand();
   return text;
 });
@@ -137,14 +139,59 @@ function explain(s: Ytstudio, r: LintResult): void {
   }
 }
 
-/** The yt-dlp binary couldn't be run. */
-class YtdlpFailed extends Data.TaggedError('YtdlpFailed')<{ readonly bin: string }> {}
+/** The yt-dlp binary couldn't be started — not on PATH, not executable, or `--yt-dlp` points at nothing. */
+class YtdlpNotRunnable extends Data.TaggedError('YtdlpNotRunnable')<{ readonly bin: string }> {}
+/** yt-dlp started but exited with an error — a broken Python install is the usual one. */
+class YtdlpFailed extends Data.TaggedError('YtdlpFailed')<{ readonly bin: string; readonly stderr: string }> {}
+/** yt-dlp didn't answer within {@linkcode askTimeout}. */
+class YtdlpTimeout extends Data.TaggedError('YtdlpTimeout')<{ readonly bin: string; readonly flag: string; readonly after: Duration.Duration }> {}
+/** An environment variable this CLI reads has a value it can't use. */
+class BadEnv extends Data.TaggedError('BadEnv')<{ readonly name: string; readonly reason: string }> {}
 /** The help parser lost too many options — its format has changed. */
 class HelpUnreadable extends Data.TaggedError('HelpUnreadable')<{ readonly removed: number; readonly total: number }> {}
 /** A generated file couldn't be written. */
-class WriteFailed extends Data.TaggedError('WriteFailed')<{ readonly path: string; readonly cause: unknown }> {}
+class WriteFailed extends Data.TaggedError('WriteFailed')<{ readonly path: string; readonly reason: string }> {}
 
-type TypesError = YtdlpFailed | HelpUnreadable | WriteFailed;
+type TypesError = YtdlpNotRunnable | YtdlpFailed | YtdlpTimeout | HelpUnreadable | WriteFailed | BadEnv;
+
+/**
+ * How long one `yt-dlp --version` / `--help` may take — `YT_STUDIO_YTDLP_TIMEOUT`, 60 seconds by default.
+ *
+ * Both answer in well under a second, but a standalone (PyInstaller) binary
+ * unpacks itself on a cold start. A hung one used to block `types` forever.
+ * The variable exists mostly so the timeout can be tested without waiting a minute.
+ */
+const askTimeout: Effect.Effect<Duration.Duration, BadEnv> = Config.Duration('YT_STUDIO_YTDLP_TIMEOUT').pipe(
+  Config.withDefault(Duration.seconds(60)),
+  // The ConfigError text is a schema dump; what the user needs is the expected shape.
+  Effect.mapError(() => new BadEnv({ name: 'YT_STUDIO_YTDLP_TIMEOUT', reason: '"30 seconds" · "500 millis" 같은 길이여야 한다' })),
+);
+
+/**
+ * Runs `yt-dlp <flag>` and returns its stdout.
+ *
+ * Every failure used to collapse into "couldn't run yt-dlp — point at it with
+ * --yt-dlp", even when yt-dlp was right there and its Python was what broke.
+ * Now "not there", "ran and failed" and "didn't answer" are three failures, and
+ * the second one shows what yt-dlp said.
+ */
+const ask = (bin: string, flag: string, after: Duration.Duration): Effect.Effect<string, YtdlpNotRunnable | YtdlpFailed | YtdlpTimeout> =>
+  Effect.callback<string, YtdlpNotRunnable | YtdlpFailed>(resume => {
+    const child = execFile(bin, [flag], { encoding: 'utf8', maxBuffer: 8 << 20 }, (err, stdout, stderr) => {
+      if (!err) return resume(Effect.succeed(stdout));
+      // A string code is a spawn failure (ENOENT, EACCES); a number is yt-dlp's own exit code.
+      resume(Effect.fail(typeof err.code === 'string'
+        ? new YtdlpNotRunnable({ bin })
+        : new YtdlpFailed({ bin, stderr })));
+    });
+    // Interrupted — the timeout below — so don't leave the process behind. This
+    // reaches only the process we started: if `--yt-dlp` points at a wrapper script,
+    // whatever the script started keeps running until it finishes on its own.
+    return Effect.sync(() => { child.kill(); });
+  }).pipe(Effect.timeoutOrElse({
+    duration: after,
+    orElse: () => Effect.fail(new YtdlpTimeout({ bin, flag, after })),
+  }));
 
 /**
  * Reflects the yt-dlp users installed and regenerates the schema and types.
@@ -158,13 +205,9 @@ type TypesError = YtdlpFailed | HelpUnreadable | WriteFailed;
  * fail on `import yt_dlp`.
  */
 const typesWith = (bin: string): Effect.Effect<void, TypesError> => Effect.gen(function* () {
-  const ask = (flag: string): Effect.Effect<string, YtdlpFailed> => Effect.try({
-    try: () => execFileSync(bin, [flag], { encoding: 'utf8', maxBuffer: 8 << 20 }),
-    catch: () => new YtdlpFailed({ bin }),
-  });
-
-  const version = (yield* ask('--version')).trim().split('\n')[0]!.trim();   // split always returns at least one
-  const help = yield* ask('--help');
+  const after = yield* askTimeout;
+  const version = (yield* ask(bin, '--version', after)).trim().split('\n')[0]!.trim();   // split always returns at least one
+  const help = yield* ask(bin, '--help', after);
 
   const bundled = bundledSchema();
   const r = parseHelp(help, version, bundled);
@@ -193,7 +236,7 @@ const typesWith = (bin: string): Effect.Effect<void, TypesError> => Effect.gen(f
       writeFileSync(`${path}.tmp`, text);
       renameSync(`${path}.tmp`, path);
     },
-    catch: cause => new WriteFailed({ path, cause }),
+    catch: e => new WriteFailed({ path, reason: reasonOf(e) }),
   });
   yield* put(schemaPath, `${JSON.stringify(r.schema, null, 1)}\n`);
   yield* put(dtsPath, dts);
@@ -224,7 +267,7 @@ function tsconfigWarnings(dtsPath: string): string[] {
   catch (e) {
     // No tsconfig means nothing to warn about; one we can't read means we didn't check.
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    return [`tsconfig.json 을 읽지 못해 include 를 확인하지 못했다 (${(e as Error).message})`];
+    return [`tsconfig.json 을 읽지 못해 include 를 확인하지 못했다 (${reasonOf(e)})`];
   }
 
   // Without include, tsc's default covers everything. With one, eyeball it —
@@ -243,8 +286,8 @@ type Failure = CliError.CliError | SchemaUnreadable | NoCommand | StdinUnreadabl
 /**
  * The one place a failure becomes an exit code and the lines explaining it.
  *
- * Three exit codes — 0 pass, 1 the intended job failed, 2 this CLI was called
- * wrong. Scripts need to tell "the target is wrong" apart from "the arguments
+ * Three exit codes for failures — 0 pass, 1 the intended job failed, 2 this CLI
+ * was called wrong. (Defects are not failures; {@linkcode main} gives them 70.) Scripts need to tell "the target is wrong" apart from "the arguments
  * were wrong". That promise used to live in a comment above five scattered
  * `process.exit` calls; now the switch is exhaustive, so a new failure doesn't
  * compile until it has a code.
@@ -262,19 +305,27 @@ function exitOf(e: Failure): { code: 0 | 1 | 2; lines: string[] } {
     case 'NoCommand':
       return { code: 2, lines: ['검사할 명령어가 없다. 인자로 주거나 표준 입력으로 넣을 것.'] };
     case 'StdinUnreadable':
-      return { code: 2, lines: [`${red('✗')} 표준 입력을 읽지 못했다 (${(e.cause as Error).message})`] };
+      return { code: 2, lines: [`${red('✗')} 표준 입력을 읽지 못했다 (${e.reason})`] };
     case 'TargetInvalid':
       return { code: 1, lines: [] };
-    case 'YtdlpFailed':
-      // Silently falling back to the bundled one would pretend to succeed while changing nothing
+    // Silently falling back to the bundled one would pretend to succeed while changing nothing
+    case 'YtdlpNotRunnable':
       return { code: 1, lines: [`${red('✗')} yt-dlp 를 실행하지 못했다: ${e.bin}`, dim('  PATH 에 없으면 --yt-dlp <경로> 로 가리킬 것.')] };
+    case 'YtdlpFailed': {
+      const said = e.stderr.trim().split('\n').filter(Boolean).slice(-3);
+      return { code: 1, lines: [`${red('✗')} yt-dlp 가 실패했다: ${e.bin}`, ...said.map(l => dim(`  ${l}`))] };
+    }
+    case 'YtdlpTimeout':
+      return { code: 1, lines: [`${red('✗')} yt-dlp 가 ${Duration.format(e.after)} 안에 답하지 않았다: ${e.bin} ${e.flag}`] };
+    case 'BadEnv':
+      return { code: 2, lines: [`${red('✗')} ${e.name} 의 값을 쓸 수 없다 (${e.reason})`] };
     case 'HelpUnreadable':
       return { code: 1, lines: [
         `${red('✗')} 도움말에서 옵션 ${e.removed}개가 사라졌다 (번들 ${e.total}개 중) — 파서가 이 서식을 못 읽는다`,
         dim('  아무것도 쓰지 않았다. 반쯤 쓴 스키마가 제일 나쁘다.'),
       ] };
     case 'WriteFailed':
-      return { code: 1, lines: [`${red('✗')} ${e.path} 에 쓰지 못했다 (${(e.cause as Error).message})`] };
+      return { code: 1, lines: [`${red('✗')} ${e.path} 에 쓰지 못했다 (${e.reason})`] };
   }
 }
 
@@ -313,7 +364,7 @@ const commandText = Argument.String('명령어').pipe(
 const check = (show: (s: Ytstudio, r: LintResult) => void) =>
   ({ command }: { readonly command: readonly string[] }) => Effect.gen(function* () {
     const text = yield* input(command);
-    const s = yield* yt;
+    const s = yield* Studio;
     const r = s.lint(text);
     show(s, r);
     if (r.counts.error) return yield* new TargetInvalid({ errors: r.counts.error });
@@ -321,10 +372,12 @@ const check = (show: (s: Ytstudio, r: LintResult) => void) =>
 
 const lint = Command.make('lint', { command: commandText }, check(report)).pipe(
   Command.withDescription('스키마와 문법에 어긋나는 곳을 찾는다. 오류가 있으면 1 로 끝난다'),
+  Command.provide(StudioLive),
 );
 
 const explainCmd = Command.make('explain', { command: commandText }, check(explain)).pipe(
   Command.withDescription('토큰마다 무슨 옵션인지 말한다'),
+  Command.provide(StudioLive),
 );
 
 const types = Command.make('types', {
@@ -341,21 +394,22 @@ const types = Command.make('types', {
 );
 
 const version = Command.make('version', {}, () => Effect.gen(function* () {
-  const s = yield* yt;
+  const s = yield* Studio;
   // Only the version goes to stdout — scripts read it as is.
   yield* Console.log(s.source.version);
   yield* Console.error(dim(`스키마  ${source(s)}`));
-})).pipe(Command.withDescription('지금 대조하는 스키마의 yt-dlp 버전'));
+})).pipe(
+  Command.withDescription('지금 대조하는 스키마의 yt-dlp 버전'),
+  Command.provide(StudioLive),
+);
 
 const help = Command.make('help', {}, () => showRootHelp).pipe(Command.withDescription('이 도움말'));
-
-// A schema that can't be read shows as `?` here; the command that needs it reports why.
-const schemaVersion = Result.isSuccess(resolved) ? resolved.success.raw.ytdlp_version : '?';
 
 const root = Command.make('yt-studio', {}, () => showRootHelp).pipe(
   // The formatter indents only the first line, so the rest carry their own two spaces.
   Command.withDescription([
-    `설치된 yt-dlp(${schemaVersion}) 에 명령어를 대조한다.`,
+    // No version here — finding the schema for help would put its failures back on --help.
+    '설치된 yt-dlp 의 스키마에 명령어를 대조한다. 어느 버전인지는 yt-studio version 이 말한다.',
     '',
     '명령어를 인자로 주거나 표준 입력으로 흘려 넣는다.',
     '',
@@ -413,9 +467,16 @@ const Services = Layer.mergeAll(
   CliOutput.layer(formatter),
 );
 
-const PACKAGE_VERSION: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+const { version: PACKAGE_VERSION, bugs: pkgBugs } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string; bugs: string };
 
-/** The whole CLI as one program: arguments in, exit code out. Defects are not caught — they print as themselves. */
+/**
+ * The whole CLI as one program: arguments in, exit code out.
+ *
+ * A defect — a bug in yt-studio, not in the command or the arguments — used to
+ * escape as an uncaught exception, and node exits those with 1. Scripts read 1 as
+ * "the command is wrong", so a crash looked like a verdict. It gets 70 now, with
+ * the stack, since that is what a bug report needs.
+ */
 const main = (argv: readonly string[]): Effect.Effect<number> =>
   Command.runWith(root, { version: PACKAGE_VERSION })(verbatim(argv)).pipe(
     Effect.match({
@@ -427,6 +488,11 @@ const main = (argv: readonly string[]): Effect.Effect<number> =>
       },
     }),
     Effect.provide(Services),
+    Effect.catchDefect(defect => Effect.sync(() => {
+      console.error(`${red('✗')} yt-studio 의 버그다 — ${pkgBugs} 에 알려 주면 고친다.`);
+      console.error(dim(defect instanceof Error ? defect.stack ?? defect.message : String(defect)));
+      return 70;
+    })),
   );
 
-process.exit(Effect.runSync(main(process.argv.slice(2))));
+process.exit(await Effect.runPromise(main(process.argv.slice(2))));

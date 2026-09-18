@@ -241,6 +241,9 @@ against, you don't know the verdict either, so it's always printed — see
 [Which yt-dlp it checks against](#which-yt-dlp-it-checks-against) below.
 
 **It exits with 1 when there are errors** — it drops straight into scripts and CI.
+The other codes: 0 passed (warnings alone still pass), 2 the CLI itself was called
+wrong (unknown command or flag, nothing to check, an unreadable schema), and 70 a
+bug in yt-studio — so a crash never reads as a verdict.
 Pipes work too (`pbpaste | yt-studio lint`). To read what a command means, use
 `yt-studio explain`.
 
@@ -308,6 +311,10 @@ $ npx yt-studio types
 (Read from `/usr/local/bin/yt-dlp` by parsing `--help`; 194 options, 3 added,
 0 removed compared to the bundled 191; wrote the schema and the declaration file;
 lists the new options.)
+
+It gives yt-dlp 60 seconds to answer each of `--version` and `--help` — a
+standalone binary unpacks itself on a cold start. Set `YT_STUDIO_YTDLP_TIMEOUT`
+(`"2 minutes"`, `"500 millis"`) to change that.
 
 **Both layers move together.** The checker picks up the new schema immediately, and
 new options become real methods.
