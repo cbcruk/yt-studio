@@ -83,6 +83,15 @@ test('가리킨 것이 헛다리면 던진다 — 조용히 안 넘어간다', (
   assert.throws(() => resolveSchema({ env: path.join(TMP, '없다.json') }), /읽지 못했다/);
 });
 
+// It used to be a defect — a raw EISDIR that took `--help` and `yt-studio types` down with it.
+test('우리 이름의 파일을 못 읽으면 SchemaError 다 — 결함이 아니다', async () => {
+  const { SchemaError } = await import('../../src/index.js');
+  const dir = mkdtempSync(path.join(TMP, 'dir-'));
+  mkdirSync(path.join(dir, SCHEMA_FILE));
+  assert.throws(() => resolveSchema({ cwd: dir }), (e: Error) =>
+    e instanceof SchemaError && /읽지 못했다/.test(e.message));
+});
+
 // The working-directory side, conversely, moves on quietly — it just picked up someone else's file.
 test('우리 것이 아닌 JSON 은 없는 것으로 친다', () => {
   assert.equal(resolveSchema({ cwd: decoy }).source.from, 'bundled');

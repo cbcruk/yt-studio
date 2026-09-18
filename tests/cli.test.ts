@@ -22,7 +22,7 @@
 import { beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { closeSync, existsSync, mkdtempSync, openSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
@@ -182,6 +182,59 @@ test('로컬 스키마가 깨져 있어도 types 는 돈다 — 그걸 다시 �
   // Fails on the missing binary — not on the broken schema it is meant to replace
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /yt-dlp 를 실행하지 못했다/);
+});
+
+// A directory under our file name used to be a defect: a stack trace and exit 1, even for
+// --help, and `types` — the command that rewrites that file — couldn't start.
+test('스키마 자리를 못 읽어도 --help 와 types 는 돈다', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'yt-studio-cli-'));
+  mkdirSync(path.join(dir, SCHEMA_FILE));
+
+  assert.equal(run(['--help'], '', { cwd: dir }).code, 0);
+
+  const lint = run(['lint', 'yt-dlp -x https://youtu.be/abc'], '', { cwd: dir });
+  assert.equal(lint.code, 2, lint.out);
+  assert.match(lint.out, /읽지 못했다/);
+  assert.doesNotMatch(lint.out, /\n\s+at /, '스택 트레이스가 새어 나왔다');
+
+  const types = run(['types', '--yt-dlp', '/nope/yt-dlp'], '', { cwd: dir });
+  assert.match(types.out, /yt-dlp 를 실행하지 못했다/);
+});
+
+/** A stand-in yt-dlp: a shell script with the given body. */
+function fakeYtdlp(body: string): string {
+  const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'yt-studio-bin-')), 'yt-dlp');
+  writeFileSync(file, `#!/bin/sh\n${body}\n`);
+  chmodSync(file, 0o755);
+  return file;
+}
+
+// "Couldn't run yt-dlp — point at it with --yt-dlp" used to cover this too, while yt-dlp
+// was right there and its Python was what broke.
+test('yt-dlp 가 돌다 실패하면 그 말을 옮긴다', () => {
+  const bin = fakeYtdlp('echo "ModuleNotFoundError: No module named yt_dlp" >&2; exit 1');
+  const r = run(['types', '--yt-dlp', bin], '', { cwd: mkdtempSync(path.join(os.tmpdir(), 'yt-studio-cli-')) });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /yt-dlp 가 실패했다/);
+  assert.match(r.out, /No module named yt_dlp/);
+});
+
+test('yt-dlp 가 답하지 않으면 기다리다 끝낸다', () => {
+  const bin = fakeYtdlp('exec sleep 30');
+  const started = Date.now();
+  const r = run(['types', '--yt-dlp', bin], '', {
+    cwd: mkdtempSync(path.join(os.tmpdir(), 'yt-studio-cli-')),
+    env: { YT_STUDIO_YTDLP_TIMEOUT: '300 millis' },
+  });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /안에 답하지 않았다/);
+  assert.ok(Date.now() - started < 10_000, '제한 시간을 넘겨 기다렸다');
+});
+
+test('제한 시간 환경변수가 틀리면 2 로 끝난다', () => {
+  const r = run(['types', '--yt-dlp', '/nope/yt-dlp'], '', { env: { YT_STUDIO_YTDLP_TIMEOUT: 'soon' } });
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /YT_STUDIO_YTDLP_TIMEOUT/);
 });
 
 // Importing must not touch the file system — users passing their own schema pay nothing.

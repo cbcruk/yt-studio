@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Data, Effect } from 'effect';
+import { Config, Data, Effect, Option } from 'effect';
 
 import { SchemaError, TYPES_VERSION } from './browser.js';
 import { decodeRawSchema } from './core/schema.js';
@@ -40,16 +40,22 @@ export class SchemaMissing extends Data.TaggedError('SchemaMissing')<{ readonly 
  * be used must not be skipped silently: that would check against the bundled
  * version and report a pass. That covers two cases.
  *
+ * - can't be read — no permission, or a directory under our file name
  * - not JSON at all — our file name, cut off mid-write (`yt-studio types` interrupted)
  * - has `ytdlp_version` but a field is missing or wrong — {@linkcode decodeRawSchema} lists them
  *
- * A read that throws for any other reason (permissions, a directory under our name)
- * is not in the error channel. It is a defect and surfaces as itself.
+ * An unreadable file used to be left out of the error channel as a "defect". But
+ * permissions and a stray directory are the user's environment, not a bug in this
+ * code — and as a defect it took down `--help` and `yt-studio types`, the command
+ * that rewrites this very file, with a stack trace and exit 1.
  */
 const readSchema = (path: string): Effect.Effect<RawSchema | null, SchemaError> =>
   Effect.gen(function* () {
     if (!existsSync(path)) return null;
-    const text = readFileSync(path, 'utf8');
+    const text = yield* Effect.try({
+      try: () => readFileSync(path, 'utf8'),
+      catch: e => new SchemaError([`${path} — 읽지 못했다 (${(e as Error).message})`]),
+    });
     const v = yield* Effect.try({
       try: (): unknown => JSON.parse(text),
       catch: e => new SchemaError([`${path} — JSON 으로 읽지 못했다 (${(e as Error).message})`]),
@@ -101,6 +107,18 @@ export interface Resolved {
 }
 
 /**
+ * `YT_STUDIO_SCHEMA`, through Effect's `ConfigProvider` — the environment by default.
+ *
+ * A string that is merely absent is not an error, so the only `ConfigError` left
+ * would be a broken provider. That is a defect.
+ */
+const schemaEnv: Effect.Effect<string | undefined> = Config.String('YT_STUDIO_SCHEMA').pipe(
+  Config.option,
+  Effect.map(Option.getOrUndefined),
+  Effect.orDie,
+);
+
+/**
  * Finds the schema — env var, working directory, then bundled — with its failures in the type.
  *
  * `resolveSchema` in `index.ts` runs this and throws. The CLI runs it and turns a
@@ -118,7 +136,8 @@ export const resolveWith = (at: Where): Effect.Effect<Resolved, SchemaError | Sc
       raw,
     });
 
-    const env = at.env ?? process.env.YT_STUDIO_SCHEMA;
+    // An empty value counts as unset — `YT_STUDIO_SCHEMA= yt-studio lint …` turns it off.
+    const env = at.env ?? (yield* schemaEnv);
     if (env) {
       // If something explicitly pointed to can't be read, don't move on silently.
       // That is a typo, and moving on would check against the wrong version and
