@@ -9,7 +9,9 @@
  *   multi    := fallback (',' fallback)*            bv,ba
  */
 
-import { GrammarError } from './grammar-error.js';
+import type { Result } from 'effect';
+
+import { GrammarError, readGrammar } from './grammar-error.js';
 
 /** Operator precedence. A child lower than its parent gets parenthesized. */
 export const PREC = { multi: 0, fallback: 1, merge: 2, sel: 3 } as const;
@@ -89,8 +91,12 @@ export const FKEYS: [key: string, label: string, type: 'num' | 'str'][] = [
   ['dynamic_range', 'dynamic range', 'str'],
 ];
 
-/** `height<=?1080`, `format_note`, `!format_note` → one filter slot. */
-export function parseFilterBody(body: string): Filter {
+/** `height<=?1080`, `format_note`, `!format_note` → one filter slot. Fails with {@linkcode GrammarError} when it cannot be read. */
+export function parseFilterBody(body: string): Result.Result<Filter, GrammarError> {
+  return readGrammar(() => readFilter(body));
+}
+
+function readFilter(body: string): Filter {
   const b = body.trim();
   if (!b) throw new GrammarError('빈 필터');
   const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
@@ -108,8 +114,16 @@ export function parseFilterBody(body: string): Filter {
  */
 const MAX_DEPTH = 64;
 
-/** Format selector string → tree. Throws {@linkcode GrammarError} with the reason when it cannot be read. */
-export function parseFormat(src: string): FormatNode | null {
+/**
+ * Format selector string → tree. Fails with {@linkcode GrammarError} carrying the reason when it cannot be read.
+ *
+ * Succeeds with `null` for an empty or blank string.
+ */
+export function parseFormat(src: string): Result.Result<FormatNode | null, GrammarError> {
+  return readGrammar(() => readFormat(src));
+}
+
+function readFormat(src: string): FormatNode | null {
   const s = (src || '').trim();
   if (!s) return null;
   let i = 0, depth = 0;
@@ -159,7 +173,7 @@ export function parseFormat(src: string): FormatNode | null {
       i++;
       const j = s.indexOf(']', i);
       if (j < 0) throw new GrammarError("']' 가 닫히지 않았다", i);
-      (node.filters ||= []).push(parseFilterBody(s.slice(i, j)));
+      (node.filters ||= []).push(readFilter(s.slice(i, j)));
       i = j + 1; ws();
     }
     return node;

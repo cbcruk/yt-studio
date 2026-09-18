@@ -17,8 +17,9 @@
  * diagnostics comes out.
  */
 
+import { Result } from 'effect';
+
 import { scanCommand } from './command.js';
-import { grammarMessage } from './grammar-error.js';
 import { parseFormat } from './format-grammar.js';
 import { parseTemplate, splitType } from './output-template.js';
 import { splitEntry } from './paths.js';
@@ -197,23 +198,29 @@ function checkKeys(opt: Opt, value: string | null): string | null {
  */
 function checkCookies(opt: Opt, value: string | null): string | null {
   if (!opt.vocabs || value == null || value === '') return null;
-  try { parseCookieSource(value, opt.vocabs); return null; }
-  catch (e) { return `${opt.flag} — ${grammarMessage(e)}`; }
+  return Result.match(parseCookieSource(value, opt.vocabs), {
+    onSuccess: () => null,
+    onFailure: e => `${opt.flag} — ${e.message}`,
+  });
 }
 
 /** Runs `-f` through the real parser. If it cannot be read, returns what the parser said. */
 function checkFormat(value: string): string | null {
-  try { parseFormat(value); return null; }
-  catch (e) { return grammarMessage(e); }
+  return Result.match(parseFormat(value), {
+    onSuccess: () => null,
+    onFailure: e => e.message,
+  });
 }
 
 function checkOutput(value: string): { error?: string; pieces?: Piece[]; hasExt?: boolean } {
   const { template } = splitType(value);
-  let pieces;
-  try { pieces = parseTemplate(template); }
-  catch (e) { return { error: grammarMessage(e) }; }
-  const hasExt = pieces.some(p => p.t === 'field' && (p.name === 'ext' || /(^|\.)ext$/.test(p.name)));
-  return { pieces, hasExt };
+  return Result.match(parseTemplate(template), {
+    onSuccess: pieces => ({
+      pieces,
+      hasExt: pieces.some(p => p.t === 'field' && (p.name === 'ext' || /(^|\.)ext$/.test(p.name))),
+    }),
+    onFailure: e => ({ error: e.message }),
+  });
 }
 
 function checkPaths(values: string[]): string[] {

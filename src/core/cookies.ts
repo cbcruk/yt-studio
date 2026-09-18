@@ -23,7 +23,9 @@
  * So `Firefox` and `FIREFOX` are both valid.
  */
 
-import { GrammarError } from './grammar-error.js';
+import type { Result } from 'effect';
+
+import { GrammarError, readGrammar } from './grammar-error.js';
 
 /** The four slots read out. Slots not given are `null`. */
 export interface CookieSource {
@@ -41,28 +43,32 @@ export interface CookieVocabs {
 
 const SHAPE = /^([^+:]+)(?:\s*\+\s*([^:]+))?(?:\s*:\s*(?!:)(.+?))?(?:\s*::\s*(.+))?$/;
 
-/** Why a value couldn't be read. One human-readable line, in Korean. */
-export class CookieError extends GrammarError {}
-
 /**
- * String → four slots. Throws `CookieError` when it can't be read.
+ * String → four slots. Fails with {@linkcode GrammarError} carrying the reason when it can't be read.
  *
  * Without vocabularies only the shape is checked — it has to be usable without a schema.
+ *
+ * There used to be a `CookieError extends GrammarError`; no caller ever told the
+ * two apart, so the failure is the same type as `-f` · `-o` (#34).
  */
-export function parseCookieSource(value: string, vocabs: CookieVocabs = {}): CookieSource {
+export function parseCookieSource(value: string, vocabs: CookieVocabs = {}): Result.Result<CookieSource, GrammarError> {
+  return readGrammar(() => readCookieSource(value, vocabs));
+}
+
+function readCookieSource(value: string, vocabs: CookieVocabs): CookieSource {
   const m = SHAPE.exec(String(value ?? '').trim());
-  if (!m) throw new CookieError('BROWSER[+KEYRING][:PROFILE][::CONTAINER] 모양이 아니다');
+  if (!m) throw new GrammarError('BROWSER[+KEYRING][:PROFILE][::CONTAINER] 모양이 아니다');
 
   const browser = m[1]!.trim().toLowerCase();   // group 1 is required
   const keyring = m[2] === undefined ? null : m[2].trim().toUpperCase();
 
   const known = vocabs.browser;
   if (known?.length && !known.includes(browser)) {
-    throw new CookieError(`${browser} 는 쿠키를 읽을 수 있는 브라우저가 아니다 (${known.join(' · ')})`);
+    throw new GrammarError(`${browser} 는 쿠키를 읽을 수 있는 브라우저가 아니다 (${known.join(' · ')})`);
   }
   const rings = vocabs.keyring;
   if (keyring !== null && rings?.length && !rings.includes(keyring)) {
-    throw new CookieError(`${keyring} 는 아는 키링이 아니다 (${rings.join(' · ')})`);
+    throw new GrammarError(`${keyring} 는 아는 키링이 아니다 (${rings.join(' · ')})`);
   }
 
   return {

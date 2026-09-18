@@ -12,6 +12,7 @@
  */
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
+import { Result } from 'effect';
 
 // Only what users use is taken from the public entry point. The other four are internal, so
 // they come straight from core — putting them on the public surface would make removing them breaking after release.
@@ -155,7 +156,7 @@ test('빌더가 만든 트리는 파서가 낸 트리와 같다', () => {
     f.bvStar({ ext: 'mp4' }).plus(f.baStar()).or(f.raw('b')),
   ]) {
     // This must hold to say reading (parseFormat) and writing (the builder) share one grammar
-    assert.deepEqual(e.node, parseFormat(String(e)), String(e));
+    assert.deepEqual(e.node, Result.getOrThrow(parseFormat(String(e))), String(e));
   }
 });
 
@@ -180,7 +181,7 @@ test('카탈로그에 없는 필드는 field() 로', () => {
 test('빌더가 만든 템플릿은 파서가 읽는다', () => {
   const c = ytdlp(U).output(t => t`${t.uploader}/${t.upload_date.date('%Y')}/${t.title}.${t.ext}`);
   const tpl = c.toArray()[c.toArray().indexOf('-o') + 1]!;
-  assert.deepEqual(parseTemplate(tpl).map(p => p.t),
+  assert.deepEqual(Result.getOrThrow(parseTemplate(tpl)).map(p => p.t),
     ['field', 'text', 'field', 'text', 'field', 'text', 'field']);
 });
 

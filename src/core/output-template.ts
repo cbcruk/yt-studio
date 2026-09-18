@@ -11,7 +11,9 @@
  * first, then `>`, and they are rejoined in the same order, so it is lossless.
  */
 
-import { GrammarError } from './grammar-error.js';
+import type { Result } from 'effect';
+
+import { GrammarError, readGrammar } from './grammar-error.js';
 
 /** File types that can prefix `-o` and `-P`, with a one-line description. `''` is the default. */
 export const OUT_TYPES: [type: string, label: string][] = [
@@ -141,8 +143,12 @@ function splitBody(body: string): Body {
 const joinBody = ({ name, strf, fallback }: Body): string =>
   name + (strf ? '>' + strf : '') + (fallback != null ? '|' + fallback : '');
 
-/** Template string → pieces. Throws {@linkcode GrammarError} with the reason when it cannot be read. */
-export function parseTemplate(src: string): Piece[] {
+/** Template string → pieces. Fails with {@linkcode GrammarError} carrying the reason when it cannot be read. */
+export function parseTemplate(src: string): Result.Result<Piece[], GrammarError> {
+  return readGrammar(() => readTemplate(src));
+}
+
+function readTemplate(src: string): Piece[] {
   const s = src || '';
   const out: Piece[] = [];
   let text = '';
