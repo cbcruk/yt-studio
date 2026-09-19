@@ -9,9 +9,9 @@
  *   multi    := fallback (',' fallback)*            bv,ba
  */
 
-import type { Result } from 'effect';
+import { Result } from 'effect';
 
-import { GrammarError, readGrammar } from './grammar-error.js';
+import { GrammarError } from './grammar-error.js';
 
 /** Operator precedence. A child lower than its parent gets parenthesized. */
 export const PREC = { multi: 0, fallback: 1, merge: 2, sel: 3 } as const;
@@ -93,95 +93,109 @@ export const FKEYS: [key: string, label: string, type: 'num' | 'str'][] = [
 
 /** `height<=?1080`, `format_note`, `!format_note` → one filter slot. Fails with {@linkcode GrammarError} when it cannot be read. */
 export function parseFilterBody(body: string): Result.Result<Filter, GrammarError> {
-  return readGrammar(() => readFilter(body));
-}
-
-function readFilter(body: string): Filter {
-  const b = body.trim();
-  if (!b) throw new GrammarError('빈 필터');
-  const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
-  // All four groups are required, so each is a string whenever `m` matched.
-  if (m) return { key: m[1]!, op: m[2]!, loose: m[3] === '?', value: m[4]!.trim() };
-  if (/^![A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b.slice(1), op: 'hasnot', value: '' };
-  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b, op: 'has', value: '' };
-  throw new GrammarError(`필터를 읽지 못했다: [${body}]`);
+  return Result.gen(function* () {
+    const b = body.trim();
+    if (!b) return yield* Result.fail(new GrammarError('빈 필터'));
+    const m = b.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(!?[\^$*~]?=|<=|>=|<|>)(\??)\s*(.*)$/);
+    // All four groups are required, so each is a string whenever `m` matched.
+    if (m) return { key: m[1]!, op: m[2]!, loose: m[3] === '?', value: m[4]!.trim() };
+    if (/^![A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b.slice(1), op: 'hasnot', value: '' };
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(b)) return { key: b, op: 'has', value: '' };
+    return yield* Result.fail(new GrammarError(`필터를 읽지 못했다: [${body}]`));
+  });
 }
 
 /**
  * Nesting deeper than this is refused instead of overflowing the stack.
  *
- * Real selectors nest two or three levels; 64 leaves plenty of room.
+ * Real selectors nest two or three levels; 64 leaves plenty of room. Each level is
+ * a generator now (#39), which is a heavier frame than a plain call — still far
+ * from the limit at 64.
  */
 const MAX_DEPTH = 64;
+
+/** What every step of the descent returns: a node, or the reason it stopped. */
+type Read = Result.Result<FormatNode, GrammarError>;
 
 /**
  * Format selector string → tree. Fails with {@linkcode GrammarError} carrying the reason when it cannot be read.
  *
  * Succeeds with `null` for an empty or blank string.
+ *
+ * Every step below returns {@linkcode Read}, so the failure is in the type all the
+ * way down and `yield*` is what carries it up. Reading the position (`i` · `depth`)
+ * still happens by closing over the string — a parser state service would be a
+ * second thing to read for no reader's benefit.
  */
 export function parseFormat(src: string): Result.Result<FormatNode | null, GrammarError> {
-  return readGrammar(() => readFormat(src));
-}
+  return Result.gen(function* () {
+    const s = (src || '').trim();
+    if (!s) return null;
+    let i = 0, depth = 0;
+    const ws = (): void => { while (i < s.length && /\s/.test(s.charAt(i))) i++; };
+    const peek = (): string | undefined => s[i];
 
-function readFormat(src: string): FormatNode | null {
-  const s = (src || '').trim();
-  if (!s) return null;
-  let i = 0, depth = 0;
-  const ws = (): void => { while (i < s.length && /\s/.test(s.charAt(i))) i++; };
-  const peek = (): string | undefined => s[i];
+    const expr = (): Read => multi();
 
-  const expr = (): FormatNode => multi();
-
-  function multi(): FormatNode {
-    const first = fallback(), kids = [first]; ws();
-    while (peek() === ',') { i++; kids.push(fallback()); ws(); }
-    return kids.length === 1 ? first : { t: 'multi', kids };
-  }
-  function fallback(): FormatNode {
-    const first = merge(), kids = [first]; ws();
-    while (peek() === '/') { i++; kids.push(merge()); ws(); }
-    return kids.length === 1 ? first : { t: 'fallback', kids };
-  }
-  function merge(): FormatNode {
-    const first = atom(), kids = [first]; ws();
-    while (peek() === '+') { i++; kids.push(atom()); ws(); }
-    return kids.length === 1 ? first : { t: 'merge', kids };
-  }
-
-  /**
-   * atom := (selector | '(' expr ')') filter*
-   *
-   * Filters are read at the end of the atom, not after the selector — they attach
-   * to whatever node came. That way filters on groups are read too.
-   */
-  function atom(): FormatNode {
-    ws();
-    let node: FormatNode;
-    if (peek() === '(') {
-      if (++depth > MAX_DEPTH) throw new GrammarError(`괄호가 ${MAX_DEPTH}겹보다 깊다`, i);
-      i++; node = expr(); ws();
-      if (peek() !== ')') throw new GrammarError("')' 가 닫히지 않았다", i);
-      i++; depth--;
-    } else {
-      const start = i;
-      while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s.charAt(i))) i++;
-      if (i === start) throw new GrammarError(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`, i);
-      node = { t: 'sel', name: s.slice(start, i), filters: [] };
+    function multi(): Read {
+      return Result.gen(function* () {
+        const first = yield* fallback(), kids = [first]; ws();
+        while (peek() === ',') { i++; kids.push(yield* fallback()); ws(); }
+        return kids.length === 1 ? first : { t: 'multi', kids };
+      });
     }
-    ws();
-    while (peek() === '[') {
-      i++;
-      const j = s.indexOf(']', i);
-      if (j < 0) throw new GrammarError("']' 가 닫히지 않았다", i);
-      (node.filters ||= []).push(readFilter(s.slice(i, j)));
-      i = j + 1; ws();
+    function fallback(): Read {
+      return Result.gen(function* () {
+        const first = yield* merge(), kids = [first]; ws();
+        while (peek() === '/') { i++; kids.push(yield* merge()); ws(); }
+        return kids.length === 1 ? first : { t: 'fallback', kids };
+      });
     }
-    return node;
-  }
+    function merge(): Read {
+      return Result.gen(function* () {
+        const first = yield* atom(), kids = [first]; ws();
+        while (peek() === '+') { i++; kids.push(yield* atom()); ws(); }
+        return kids.length === 1 ? first : { t: 'merge', kids };
+      });
+    }
 
-  const tree = expr(); ws();
-  if (i < s.length) throw new GrammarError(`읽고 남은 글자: "${s.slice(i)}"`, i);
-  return tree;
+    /**
+     * atom := (selector | '(' expr ')') filter*
+     *
+     * Filters are read at the end of the atom, not after the selector — they attach
+     * to whatever node came. That way filters on groups are read too.
+     */
+    function atom(): Read {
+      return Result.gen(function* () {
+        ws();
+        let node: FormatNode;
+        if (peek() === '(') {
+          if (++depth > MAX_DEPTH) return yield* Result.fail(new GrammarError(`괄호가 ${MAX_DEPTH}겹보다 깊다`, i));
+          i++; node = yield* expr(); ws();
+          if (peek() !== ')') return yield* Result.fail(new GrammarError("')' 가 닫히지 않았다", i));
+          i++; depth--;
+        } else {
+          const start = i;
+          while (i < s.length && /[A-Za-z0-9_*.\-]/.test(s.charAt(i))) i++;
+          if (i === start) return yield* Result.fail(new GrammarError(`셀렉터를 찾지 못했다 (${i + 1}번째 글자 근처)`, i));
+          node = { t: 'sel', name: s.slice(start, i), filters: [] };
+        }
+        ws();
+        while (peek() === '[') {
+          i++;
+          const j = s.indexOf(']', i);
+          if (j < 0) return yield* Result.fail(new GrammarError("']' 가 닫히지 않았다", i));
+          (node.filters ||= []).push(yield* parseFilterBody(s.slice(i, j)));
+          i = j + 1; ws();
+        }
+        return node;
+      });
+    }
+
+    const tree = yield* expr(); ws();
+    if (i < s.length) return yield* Result.fail(new GrammarError(`읽고 남은 글자: "${s.slice(i)}"`, i));
+    return tree;
+  });
 }
 
 /** One filter → `[height<=1080]`. `has`/`hasnot` write just the name, no value. */

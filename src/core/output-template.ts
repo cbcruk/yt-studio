@@ -11,9 +11,9 @@
  * first, then `>`, and they are rejoined in the same order, so it is lossless.
  */
 
-import type { Result } from 'effect';
+import { Result } from 'effect';
 
-import { GrammarError, readGrammar } from './grammar-error.js';
+import { GrammarError } from './grammar-error.js';
 
 /** File types that can prefix `-o` and `-P`, with a one-line description. `''` is the default. */
 export const OUT_TYPES: [type: string, label: string][] = [
@@ -145,36 +145,34 @@ const joinBody = ({ name, strf, fallback }: Body): string =>
 
 /** Template string → pieces. Fails with {@linkcode GrammarError} carrying the reason when it cannot be read. */
 export function parseTemplate(src: string): Result.Result<Piece[], GrammarError> {
-  return readGrammar(() => readTemplate(src));
-}
+  return Result.gen(function* () {
+    const s = src || '';
+    const out: Piece[] = [];
+    let text = '';
+    const flush = (): void => { if (text) { out.push({ t: 'text', text }); text = ''; } };
 
-function readTemplate(src: string): Piece[] {
-  const s = src || '';
-  const out: Piece[] = [];
-  let text = '';
-  const flush = (): void => { if (text) { out.push({ t: 'text', text }); text = ''; } };
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] !== '%') { text += s[i]; continue; }
+      if (s[i + 1] === '%') { text += '%'; i++; continue; }   // %% → literal %
+      if (s[i + 1] !== '(') return yield* Result.fail(new GrammarError(`'%' 뒤에 '(' 가 없다 (${i + 1}번째 글자)`, i));
 
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] !== '%') { text += s[i]; continue; }
-    if (s[i + 1] === '%') { text += '%'; i++; continue; }   // %% → literal %
-    if (s[i + 1] !== '(') throw new GrammarError(`'%' 뒤에 '(' 가 없다 (${i + 1}번째 글자)`, i);
+      const close = s.indexOf(')', i + 2);
+      if (close < 0) return yield* Result.fail(new GrammarError("'%(' 의 괄호가 닫히지 않았다", i));
+      const body = s.slice(i + 2, close);
+      if (!body) return yield* Result.fail(new GrammarError(`빈 필드 %() (${i + 1}번째 글자)`, i));
 
-    const close = s.indexOf(')', i + 2);
-    if (close < 0) throw new GrammarError("'%(' 의 괄호가 닫히지 않았다", i);
-    const body = s.slice(i + 2, close);
-    if (!body) throw new GrammarError(`빈 필드 %() (${i + 1}번째 글자)`, i);
+      // After the parenthesis: flags, width, precision, then one conversion character.
+      let j = close + 1;
+      while (j < s.length && /[#0\-+ .,\d]/.test(s.charAt(j))) j++;
+      if (j >= s.length) return yield* Result.fail(new GrammarError(`%(${body}) 뒤에 변환 글자가 없다`, i));
 
-    // After the parenthesis: flags, width, precision, then one conversion character.
-    let j = close + 1;
-    while (j < s.length && /[#0\-+ .,\d]/.test(s.charAt(j))) j++;
-    if (j >= s.length) throw new GrammarError(`%(${body}) 뒤에 변환 글자가 없다`, i);
-
+      flush();
+      out.push({ t: 'field', fmt: s.slice(close + 1, j), conv: s.charAt(j), ...splitBody(body) });
+      i = j;
+    }
     flush();
-    out.push({ t: 'field', fmt: s.slice(close + 1, j), conv: s.charAt(j), ...splitBody(body) });
-    i = j;
-  }
-  flush();
-  return out;
+    return out;
+  });
 }
 
 /** One piece → template string. `%` in literals goes back to `%%`. */

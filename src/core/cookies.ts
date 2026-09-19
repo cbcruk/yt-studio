@@ -23,9 +23,9 @@
  * So `Firefox` and `FIREFOX` are both valid.
  */
 
-import type { Result } from 'effect';
+import { Result } from 'effect';
 
-import { GrammarError, readGrammar } from './grammar-error.js';
+import { GrammarError } from './grammar-error.js';
 
 /** The four slots read out. Slots not given are `null`. */
 export interface CookieSource {
@@ -52,31 +52,29 @@ const SHAPE = /^([^+:]+)(?:\s*\+\s*([^:]+))?(?:\s*:\s*(?!:)(.+?))?(?:\s*::\s*(.+
  * two apart, so the failure is the same type as `-f` · `-o` (#34).
  */
 export function parseCookieSource(value: string, vocabs: CookieVocabs = {}): Result.Result<CookieSource, GrammarError> {
-  return readGrammar(() => readCookieSource(value, vocabs));
-}
+  return Result.gen(function* () {
+    const m = SHAPE.exec(String(value ?? '').trim());
+    if (!m) return yield* Result.fail(new GrammarError('BROWSER[+KEYRING][:PROFILE][::CONTAINER] 모양이 아니다'));
 
-function readCookieSource(value: string, vocabs: CookieVocabs): CookieSource {
-  const m = SHAPE.exec(String(value ?? '').trim());
-  if (!m) throw new GrammarError('BROWSER[+KEYRING][:PROFILE][::CONTAINER] 모양이 아니다');
+    const browser = m[1]!.trim().toLowerCase();   // group 1 is required
+    const keyring = m[2] === undefined ? null : m[2].trim().toUpperCase();
 
-  const browser = m[1]!.trim().toLowerCase();   // group 1 is required
-  const keyring = m[2] === undefined ? null : m[2].trim().toUpperCase();
+    const known = vocabs.browser;
+    if (known?.length && !known.includes(browser)) {
+      return yield* Result.fail(new GrammarError(`${browser} 는 쿠키를 읽을 수 있는 브라우저가 아니다 (${known.join(' · ')})`));
+    }
+    const rings = vocabs.keyring;
+    if (keyring !== null && rings?.length && !rings.includes(keyring)) {
+      return yield* Result.fail(new GrammarError(`${keyring} 는 아는 키링이 아니다 (${rings.join(' · ')})`));
+    }
 
-  const known = vocabs.browser;
-  if (known?.length && !known.includes(browser)) {
-    throw new GrammarError(`${browser} 는 쿠키를 읽을 수 있는 브라우저가 아니다 (${known.join(' · ')})`);
-  }
-  const rings = vocabs.keyring;
-  if (keyring !== null && rings?.length && !rings.includes(keyring)) {
-    throw new GrammarError(`${keyring} 는 아는 키링이 아니다 (${rings.join(' · ')})`);
-  }
-
-  return {
-    browser,
-    keyring,
-    profile: m[3] === undefined ? null : m[3].trim(),
-    container: m[4] === undefined ? null : m[4].trim(),
-  };
+    return {
+      browser,
+      keyring,
+      profile: m[3] === undefined ? null : m[3].trim(),
+      container: m[4] === undefined ? null : m[4].trim(),
+    };
+  });
 }
 
 /** Four slots → string. Round-trips with `parseCookieSource`. */

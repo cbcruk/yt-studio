@@ -1,5 +1,3 @@
-import { Result } from 'effect';
-
 /**
  * The one error a value parser fails with when the **input** is wrong.
  *
@@ -13,6 +11,10 @@ import { Result } from 'effect';
  * but telling the two apart was on each caller to remember, and the signature
  * said nothing. Now the parsers return `Result<T, GrammarError>`: bad input is a
  * value in the type, and anything else is a bug that propagates (#34).
+ *
+ * Nothing catches it any more. The parsers read with `Result.gen` all the way down
+ * (#39), so this is only ever **failed with** — the `try`/`catch` that had to
+ * remember which exceptions were input errors is gone.
  */
 export class GrammarError extends Error {
   /** 0-based index in the parsed string near where reading failed, when known. */
@@ -22,20 +24,5 @@ export class GrammarError extends Error {
     super(message);
     this.name = 'GrammarError';
     this.at = at;
-  }
-}
-
-/**
- * Runs a throwing reader and puts a {@linkcode GrammarError} in the failure channel.
- *
- * Recursive descent keeps throwing inside — threading `Result` through every
- * `atom` · `merge` would double the parser for no reader's benefit. Only the
- * parser's entry turns it into a value. Any other exception is rethrown as-is.
- */
-export function readGrammar<A>(read: () => A): Result.Result<A, GrammarError> {
-  try { return Result.succeed(read()); }
-  catch (e) {
-    if (e instanceof GrammarError) return Result.fail(e);
-    throw e;
   }
 }

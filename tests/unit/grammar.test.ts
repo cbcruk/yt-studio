@@ -13,7 +13,7 @@ import type { FormatNode } from '../../src/core/format-grammar.js';
 
 const { PREC, parseFormat: parseFormatResult, emitTree, parseFilterBody: parseFilterBodyResult, emitFilter } =
   await import('../../src/core/format-grammar.js');
-const { GrammarError, readGrammar } = await import('../../src/core/grammar-error.js');
+const { GrammarError } = await import('../../src/core/grammar-error.js');
 
 // Most tests here are about what gets read, so these unwrap — a failure throws the GrammarError.
 const parseFormat = (s: string): FormatNode | null => Result.getOrThrow(parseFormatResult(s));
@@ -212,9 +212,4 @@ test('괄호가 너무 깊으면 스택 대신 문법 오류로 말한다', asyn
   const msg = lintCommand(`yt-dlp -f "${deep}" https://x/y`).issues.map(i => i.msg).join(' | ');
   assert.match(msg, /괄호가 64겹보다 깊다/);
   assert.doesNotThrow(() => parseFormat('('.repeat(64) + 'b' + ')'.repeat(64)));
-});
-
-test('문법 오류가 아닌 예외는 삼키지 않는다', () => {
-  assert.equal(failure(readGrammar(() => { throw new GrammarError('x'); })), 'x');
-  assert.throws(() => readGrammar(() => { throw new TypeError('bug'); }), TypeError);
 });
