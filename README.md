@@ -429,11 +429,13 @@ src/core/            knows neither the DOM nor the file system. All TypeScript
 src/browser.ts       entry point without the file system — studio(raw) returns a handle
 src/index.ts         public API — browser.ts + one layer of where to pick the schema up
 src/resolve.ts       that layer — env var · working directory · bundled, as an Effect the CLI reads failures from
-src/cli.ts           yt-studio lint · explain · types
+src/cli.ts           the executable — runs main(argv) and exits with its code
+src/cli-main.ts      yt-studio lint · explain · types. Says everything through Console
 demo/                Playground — consumes lib/ and the schema as-is (vite · monaco)
 tests/               all bun:test. A single `bun test` runs everything
-  unit/*.test.ts     pure logic (132 — schema resolution order lives here too)
-  cli.test.ts        the CLI as a process — exit codes · pipes · schema resolution order
+  unit/*.test.ts     pure logic (157 — schema resolution order lives here too)
+  unit/cli.test.ts   what the CLI says — main(argv) in-process, Console swapped out
+  cli.test.ts        the CLI as a process — exit codes · pipes · a real yt-dlp
   types.test.ts      yt-studio types — compiles the generated .d.ts with real tsc
   docs.test.ts       JSDoc on public declarations · do @example blocks compile (.claude/rules/jsdoc.md)
   drift.test.ts      compared against the real yt-dlp. Skipped without yt-dlp
@@ -455,8 +457,8 @@ tsconfig.test.json   type-checking only (sources · tests · generators)
 | | With | Why |
 |---|---|---|
 | Installing dependencies | **bun**, `bun.lock` | 0.04s with a warm cache |
-| All tests | **`bun:test`** | one runner. A single `bun test` runs all 12 files |
-| Unit tests | **bun**, directly on `src/` | no build. 130ms |
+| All tests | **`bun:test`** | one runner. A single `bun test` runs all 13 files |
+| Unit tests | **bun**, directly on `src/` | no build. 270ms |
 | Generating option types | **bun** | reads the `.ts` vocabulary tables as-is |
 | Type-checking | **tsc** | bun doesn't check types. This also stands in for a linter |
 | Published `lib/` | **tsc** | bun can't emit `.d.ts` |

@@ -18,6 +18,10 @@
  *
  * When the schema became a value, those five moved to `unit/resolve.test.ts`.
  * The one left here is not about order but **whether the CLI says it on screen**.
+ *
+ * **What it says moved out too.** Since the CLI says everything through Effect's
+ * `Console` (#40), `unit/cli.test.ts` runs `main(argv)` in this process and reads
+ * the text back. What stays here needs a real process — or a real yt-dlp.
  */
 import { beforeAll, test } from 'bun:test';
 import assert from 'node:assert/strict';
@@ -94,15 +98,6 @@ test('색을 끄면 이스케이프가 안 남는다 — grep 에 걸리면 곤�
   assert.doesNotMatch(r.out, /\x1b\[/, '색코드가 남았다');
 });
 
-// What it says is covered by unit/explain.test.ts. Here we only check that the
-// subcommand is wired up and emits one chunk per token — asserting on screen text
-// breaks the test every time the wording is polished.
-test('explain 은 토큰마다 한 덩이씩 낸다', () => {
-  const r = run(['explain', 'yt-dlp -x --no-part https://youtu.be/abc']);
-  assert.equal(r.code, 0, r.out);
-  assert.equal(r.out.split('\n').filter(l => l.startsWith('  ')).length, 3, r.out);
-});
-
 test('version 은 첫 줄에 버전만 낸다 — 스크립트가 그걸 읽는다', () => {
   const r = run(['version']);
   assert.match(r.out.split('\n')[0]!.trim(), /^\d{4}\.\d{2}\.\d{2}$/);
@@ -119,15 +114,9 @@ test('무엇에 대조했는지 판정 옆에 적는다', () => {
   assert.match(outside.out, /패키지 내장/);
 });
 
-test('인자 없이 부르면 쓰는 법을 낸다', () => {
-  const r = run([]);
-  assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /yt-studio lint/);
-});
-
-test('모르는 명령은 2 로 끝난다 — 오류(1)와 구분된다', () => {
-  assert.equal(run(['nope']).code, 2);
-  assert.equal(run(['lint']).code, 2, '빈 입력도 2여야 한다');
+// 2 has to reach the shell, apart from 1. What it says about it is in unit/cli.test.ts.
+test('빈 입력은 2 로 끝난다 — 오류(1)와 구분된다', () => {
+  assert.equal(run(['lint']).code, 2);
 });
 
 // Without quotes the shell splits the command, and `-x` looks like one of ours. The
@@ -136,12 +125,6 @@ test('따옴표 없이 줘도 lint 는 나머지를 yt-dlp 명령어로 읽는�
   const r = run(['lint', 'yt-dlp', '-x', '--write-sub', 'https://youtu.be/abc']);
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /--write-sub 는 이 yt-dlp 버전에 없는/);
-});
-
-test('types 에 모르는 옵션을 주면 2 로 끝난다', () => {
-  const r = run(['types', '--bogus']);
-  assert.equal(r.code, 2, r.out);
-  assert.match(r.out, /모르는 옵션이다: --bogus/);
 });
 
 // A failed read used to come back as '' and say "no command" — the cause vanished.
